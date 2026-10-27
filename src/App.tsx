@@ -10,6 +10,7 @@ import { ErrorBoundary } from './ui/ErrorBoundary.tsx'
 import { pageMain } from './ui/layout.ts'
 import { LoadingState } from './ui/states.tsx'
 import { useRealtimeNotifications } from './data/useNotifications.ts'
+import { useScrollRestoration } from './ui/useScrollRestoration.ts'
 import { useRealtimeSubteams } from './data/useRealtimeSubteams.ts'
 
 // Route-level code splitting (Phase 7 §7.1): the authenticated shell — auth
@@ -33,6 +34,7 @@ const SpecSheet = lazy(() => import('./pages/SpecSheet.tsx'))
 const Finances = lazy(() => import('./pages/Finances.tsx'))
 const Settings = lazy(() => import('./pages/Settings.tsx'))
 const Inbox = lazy(() => import('./pages/Inbox.tsx'))
+const Contacts = lazy(() => import('./pages/Contacts.tsx'))
 
 // What a person sees while a route's chunk is still downloading. Same shell
 // shape as every page (`#main-content`, the skip-link target) so the layout
@@ -75,6 +77,7 @@ function GlobalRealtime() {
 // is the login form.
 export default function App() {
   const location = useLocation()
+  useScrollRestoration()
   return (
     <RequireAuth>
       <SeasonProvider>
@@ -121,6 +124,8 @@ export default function App() {
                 {/* Not season-scoped either: what needs you does not depend on
                     which season is on screen. */}
                 <Route path="/inbox" element={<Inbox />} />
+                {/* Not season-scoped either: the people you can ask outlive a season. */}
+                <Route path="/contacts" element={<Contacts />} />
                 {/* Any other address: say so, with a way back. */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
