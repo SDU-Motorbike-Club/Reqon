@@ -65,7 +65,7 @@ export default function Contributions() {
             <option key={m.id} value={m.id}>
               {m.full_name}
               {m.id === me ? ' (you)' : ''}
-              {m.status === 'active' ? '' : ' (former member)'}
+              {m.status === 'alumni' ? ' (former member)' : ''}
             </option>
           ))}
         </select>

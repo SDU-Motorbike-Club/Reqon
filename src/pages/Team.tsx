@@ -13,14 +13,14 @@ import { ErrorState, LoadingState } from '../ui/states.tsx'
 export default function Team() {
   const auth = useAuth()
   const me = auth.status === 'member' ? auth.member.id : undefined
-  // A retired member reads but does not write; the database refuses it too.
-  const canWrite = auth.status === 'member' && auth.member.status === 'active'
+  // A retired member reads but does not write; the database refuses it too. A trial member uses the tools.
+  const canWrite = auth.status === 'member' && auth.member.status !== 'alumni'
   const can = usePermissions()
   const tools = useTools()
   const members = useMembers()
   const names = useMemo(() => new Map((members.data ?? []).map((m) => [m.id, m.full_name])), [members.data])
   const roster = useMemo(
-    () => (members.data ?? []).filter((m) => m.status === 'active').sort((a, b) => a.full_name.localeCompare(b.full_name)),
+    () => (members.data ?? []).filter((m) => m.status !== 'alumni').sort((a, b) => a.full_name.localeCompare(b.full_name)),
     [members.data],
   )
   const error = tools.error ?? members.error

@@ -3355,6 +3355,7 @@ export type Database = {
       is_developer: { Args: never; Returns: boolean }
       is_finite_number: { Args: { n: number }; Returns: boolean }
       is_member: { Args: never; Returns: boolean }
+      is_participating_member: { Args: never; Returns: boolean }
       is_task_leader: { Args: never; Returns: boolean }
       lapse_spec_readiness: {
         Args: { p_by?: string; p_reason: string; p_spec_id: string }
@@ -4041,7 +4042,7 @@ export type Database = {
     Enums: {
       clause_state: "open" | "wip" | "compliant" | "verified" | "blocked" | "na"
       finance_kind: "income" | "expense"
-      member_state: "active" | "alumni"
+      member_state: "active" | "alumni" | "trial"
       privileged_role:
         | "developer"
         | "treasurer"
@@ -4193,7 +4194,7 @@ export const Constants = {
     Enums: {
       clause_state: ["open", "wip", "compliant", "verified", "blocked", "na"],
       finance_kind: ["income", "expense"],
-      member_state: ["active", "alumni"],
+      member_state: ["active", "alumni", "trial"],
       privileged_role: [
         "developer",
         "treasurer",

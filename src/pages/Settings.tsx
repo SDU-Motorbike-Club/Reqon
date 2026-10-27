@@ -4,6 +4,7 @@ import { usePermissions } from '../auth/usePermissions.ts'
 import { pageMain } from '../ui/layout.ts'
 import { AccountSettings } from './settings/AccountSettings.tsx'
 import { RosterSettings } from './settings/RosterSettings.tsx'
+import { AccessGuide } from './settings/AccessGuide.tsx'
 import { DepartmentSettings } from './settings/DepartmentSettings.tsx'
 import { MilestoneSettings } from './settings/MilestoneSettings.tsx'
 import { HandoverSettings } from './settings/HandoverSettings.tsx'
@@ -103,6 +104,10 @@ export default function Settings() {
 
       <Section title="Roster" tutorialId="settings-roster">
         <RosterSettings />
+      </Section>
+
+      <Section title="Who can do what">
+        <AccessGuide />
       </Section>
 
       {canManageDepartments && (

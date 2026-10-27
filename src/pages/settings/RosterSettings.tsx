@@ -71,6 +71,14 @@ function RosterRow({
         {retired && (
           <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] text-slate-700">alumni</span>
         )}
+        {member.status === 'trial' && (
+          <span
+            className="rounded bg-sky-100 px-1.5 py-0.5 text-[11px] text-sky-900"
+            title="On trial: works on their own tasks, suggests proposals and uses the tools. Set them to Active to make them a full member."
+          >
+            trial
+          </span>
+        )}
         {member.must_change_password && (
           <span
             className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-900"
@@ -142,6 +150,7 @@ function RosterRow({
                   onChange={(e) => onStatus(e.target.value as MemberState)}
                   className="min-h-11 rounded border border-slate-300 bg-white px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 disabled:opacity-60 sm:min-h-0"
                 >
+                  <option value="trial">Trial</option>
                   <option value="active">Active</option>
                   <option value="alumni">Alumni (retired)</option>
                 </select>

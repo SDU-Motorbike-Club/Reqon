@@ -35,7 +35,7 @@ export default function SpecSheet() {
     () => new Map((members.data ?? []).map((member) => [member.id, member.full_name])),
     [members.data],
   )
-  const actorId = auth.status === 'member' && auth.member.status === 'active' ? auth.member.id : null
+  const actorId = auth.status === 'member' && auth.member.status !== 'alumni' ? auth.member.id : null
   // Which rows are open lives in the address (?open=a,b), so a link or a
   // refresh opens the same rows and other parameters are kept.
   const [params, setParams] = useUrlParams()

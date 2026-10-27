@@ -55,7 +55,7 @@ export default function Tasks() {
   const choices = (departments.data ?? []).filter((d) => d.archived_at === null || d.key === list.department)
 
   return (
-    <main id="main-content" tabIndex={-1} className={pageMain('wide')}>
+    <main id="main-content" tabIndex={-1} className={`${pageMain('wide')} *:mx-auto`}>
       <PageHeader
         title="Tasks"
         description="Every active task in one list. Click a column heading to sort the whole list by it; the search and filters keep the sort."

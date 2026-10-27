@@ -384,3 +384,54 @@ describe('task attachments (docs/ultraplan Phase 3, D-05)', () => {
     expect(canManageAttachment(perms, 'owner')).toBe(false)
   })
 })
+
+// Trial members (20260143000100, docs/trial-members.md): supabase/tests/trial_member_test.sql
+// proves the database side. A trial member works on what they own and holds no authority.
+describe('trial members', () => {
+  const trial: TaskActor = { id: 'newbie', status: 'trial', isDeveloper: false, headOf: [] }
+  const own = { owner_id: 'newbie', subteam_key: 'chassis', archived_at: null }
+  const theirs = { owner_id: 'someone', subteam_key: 'chassis', archived_at: null }
+
+  it('edits and moves a task they own, not someone else\'s, and not an archived one', () => {
+    expect(canEditTask(trial, own)).toBe(true)
+    expect(canEditTask(trial, theirs)).toBe(false)
+    expect(canEditTask(trial, { ...own, archived_at: '2026-01-01T00:00:00Z' })).toBe(false)
+  })
+
+  it('has no authority: not a leader, no department authority, no direct task creation', () => {
+    expect(isTaskLeader(trial)).toBe(false)
+    expect(canCreateTask(trial)).toBe(false)
+    expect(hasDepartmentAuthority(trial, 'chassis')).toBe(false)
+    expect(canReassignTaskOwner(trial, own)).toBe(false)
+    expect(canArchiveTask(trial, own)).toBe(false)
+    expect(canRestoreTask(trial, own)).toBe(false)
+    expect(reviewsAnyProposal(trial)).toBe(false)
+    expect(canReviewProposal(trial, { subteam_key: 'chassis' })).toBe(false)
+  })
+
+  it('suggests proposals', () => {
+    expect(canSubmitProposal(trial)).toBe(true)
+  })
+
+  it('uploads to their own task and manages only their own files', () => {
+    const perms = attachmentPermissions(trial, own)
+    expect(perms.canUpload).toBe(true)
+    expect(perms.canManageAll).toBe(false)
+    expect(canManageAttachment(perms, 'newbie')).toBe(true)
+    expect(canManageAttachment(perms, 'someone')).toBe(false)
+    expect(attachmentPermissions(trial, theirs).canUpload).toBe(false)
+  })
+
+  it('a trial member holds no role, so the role-based permissions are the plain member ones', () => {
+    const plain = permissionsFor([])
+    expect(plain.canSuggestProposal).toBe(true)
+    expect(plain.canAdminister).toBe(false)
+    expect(plain.canViewFinances).toBe(false)
+    expect(plain.canManageDepartments).toBe(false)
+    expect(NO_PERMISSIONS.canSuggestProposal).toBe(true)
+  })
+
+  it('cannot be given a role, so it cannot be a Head either: the headOf of a trial actor stays empty', () => {
+    expect(trial.headOf).toHaveLength(0)
+  })
+})

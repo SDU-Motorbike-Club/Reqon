@@ -626,6 +626,18 @@ and take it back when they are done (`20260107000000_developer_full_access.sql`)
 Everyone on the roster keeps the day-to-day work: the register, tasks, meetings,
 proposals, the spec sheet and handover notes.
 
+**Trial members.** A new person can be put on the roster with the status **Trial**
+(not a role: it is a status, like Alumni). They read everything a member reads,
+edit and move the tasks they own, suggest proposals, record spec measurements,
+attach files to their own tasks and use the tool list. They cannot create tasks
+directly, reassign or archive tasks, change a requirement's status, link tasks,
+edit meetings or the rulebook, and they cannot hold a role or be a Head. There
+is no end date: a President, Vice President or Developer sets them to **Active**
+in Settings → Roster when the trial is over. The rule is fail-closed —
+`is_active_member()` still means *Active only*, and `is_participating_member()`
+(active or trial) is used only where a trial member is allowed
+(`20260143000100_trial_member_access.sql`, design in `docs/trial-members.md`).
+
 ### 7a. Departments and Heads — a second, separate kind of authority
 
 A **Department** is a division of work (a row of `subteams` — the table
@@ -949,6 +961,12 @@ themselves: enter the current password, then the new one twice. The current
 password is checked by signing in with it first, and every other device is
 signed out once the change succeeds. A forgotten password is reset by whoever
 manages the Supabase dashboard (Authentication → Users).
+
+### Putting someone on trial
+
+**Settings → Roster →** set their status to **Trial**, and to **Active** when they
+become a full member. Someone who holds a role or heads a department cannot be set
+to Trial: take that away first.
 
 ### Retiring someone
 

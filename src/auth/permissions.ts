@@ -178,9 +178,11 @@ export const NO_PERMISSIONS: Permissions = permissionsFor([])
 // obviously-refused write, never trusted as the source of truth.
 export type TaskActor = {
   id: string
-  // member_state: an alumnus has read-only access to every task,
-  // active/inactive gates ALL of the checks below (is_active_member()).
-  status: 'active' | 'alumni'
+  // member_state: an alumnus has read-only access to every task. A trial member
+  // works on the tasks they own and suggests proposals (is_participating_member())
+  // but holds no authority; every leader and department-authority check below
+  // still needs 'active' (is_active_member()).
+  status: 'active' | 'alumni' | 'trial'
   isDeveloper: boolean
   // Department keys this member heads, directly or as the Head of the parent
   // department (department_authority() 'head' / 'parent_head'), active only —
@@ -194,6 +196,13 @@ export type TaskActor = {
   // The active departments where they act ('president' / 'vicepresident' in
   // department_authority()): for an active President or VP, all of them.
   governs?: readonly string[]
+}
+
+// is_participating_member() (20260143000100): active or trial. The one place the
+// app decides who may do a trial member's work; anything it does not name stays
+// active-only, like the database.
+export function isParticipating(status: TaskActor['status']): boolean {
+  return status !== 'alumni'
 }
 
 // is_task_leader() (20260142000000): an active Head of any department, the
@@ -225,14 +234,15 @@ export function hasDepartmentAuthority(actor: TaskActor, subteamKey: string | nu
   return actor.headOf.includes(subteamKey) || (actor.governs ?? []).includes(subteamKey)
 }
 
-// can_edit_task(id): the active owner, department authority over the task's
-// department, or any task leader (a Head of ANY department, the President, the
-// Vice President, a Developer) — and the task must not be archived.
+// can_edit_task(id): the owner (active or trial), department authority over the
+// task's department, or any task leader (a Head of ANY department, the President,
+// the Vice President, a Developer) — and the task must not be archived. A trial
+// member passes only as the owner: both authority checks need 'active'.
 export function canEditTask(
   actor: TaskActor,
   task: Pick<Task, 'owner_id' | 'subteam_key' | 'archived_at'>,
 ): boolean {
-  if (actor.status !== 'active') return false
+  if (!isParticipating(actor.status)) return false
   if (task.archived_at !== null) return false
   if (task.owner_id === actor.id) return true
   return hasDepartmentAuthority(actor, task.subteam_key) || isTaskLeader(actor)
@@ -297,9 +307,9 @@ export function reviewsAnyProposal(actor: TaskActor): boolean {
   return actor.isDeveloper || actor.isGovernance === true || actor.headOf.length > 0 || (actor.governs ?? []).length > 0
 }
 
-// submit_proposal(): any active member, for any active department.
+// submit_proposal(): any active or trial member, for any active department.
 export function canSubmitProposal(actor: Pick<TaskActor, 'status'>): boolean {
-  return actor.status === 'active'
+  return isParticipating(actor.status)
 }
 
 // Task attachments (20260132000000_task_attachments.sql, docs/ultraplan Phase 3):
@@ -320,11 +330,11 @@ export function attachmentPermissions(
   actor: TaskActor,
   task: Pick<Task, 'owner_id' | 'subteam_key' | 'archived_at'>,
 ): AttachmentPermissions {
-  const active = actor.status === 'active'
   return {
     canUpload: canEditTask(actor, task),
     canManageAll: hasDepartmentAuthority(actor, task.subteam_key),
-    actorId: active ? actor.id : null,
+    // A trial member deletes and captions the files they uploaded themselves.
+    actorId: isParticipating(actor.status) ? actor.id : null,
   }
 }
 

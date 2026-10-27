@@ -133,7 +133,7 @@ export default function Board() {
   const sources = useSourceProposals(sourceIds)
 
   const activeOwners = useMemo(
-    () => (members.data ?? []).filter((m) => m.status === 'active').map((m) => ({ id: m.id, name: m.full_name })),
+    () => (members.data ?? []).filter((m) => m.status !== 'alumni').map((m) => ({ id: m.id, name: m.full_name })),
     [members.data],
   )
   const activeDepartments = useMemo(
