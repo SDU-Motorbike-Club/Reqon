@@ -209,7 +209,7 @@ function ClauseRowInner({
         </select>
 
         {/* A visible name that stays while typing (a placeholder disappears). */}
-        <div className="w-full min-w-0 sm:w-auto sm:flex-1 xl:order-last xl:basis-full">
+        <div className="col-span-full order-last w-full min-w-0 sm:order-none sm:w-auto sm:flex-1 xl:order-last xl:basis-full">
           <label className="block text-xs font-medium text-slate-600" htmlFor={`evidence-${clause.clause_key}`}>
             Evidence<span className="sr-only"> for {clause.printed_ref}</span>
           </label>

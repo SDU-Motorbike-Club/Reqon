@@ -426,6 +426,45 @@ export type Database = {
           },
         ]
       }
+      club_credentials: {
+        Row: {
+          has_secret: boolean | null
+          id: string
+          last_revealed_at: string | null
+          last_revealed_by: string | null
+          login: string
+          secret_id: string | null
+          service: string
+          sort_order: number
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          has_secret?: boolean | null
+          id?: string
+          last_revealed_at?: string | null
+          last_revealed_by?: string | null
+          login?: string
+          secret_id?: string | null
+          service: string
+          sort_order?: number
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          has_secret?: boolean | null
+          id?: string
+          last_revealed_at?: string | null
+          last_revealed_by?: string | null
+          login?: string
+          secret_id?: string | null
+          service?: string
+          sort_order?: number
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       contact_categories: {
         Row: {
           created_at: string
@@ -881,6 +920,7 @@ export type Database = {
           full_name: string
           id: string
           initials: string | null
+          must_change_password: boolean
           notes: string | null
           phone: string | null
           role: string
@@ -894,6 +934,7 @@ export type Database = {
           full_name: string
           id: string
           initials?: string | null
+          must_change_password?: boolean
           notes?: string | null
           phone?: string | null
           role?: string
@@ -907,6 +948,7 @@ export type Database = {
           full_name?: string
           id?: string
           initials?: string | null
+          must_change_password?: boolean
           notes?: string | null
           phone?: string | null
           role?: string
@@ -1062,6 +1104,91 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "members"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          activity_id: number
+          actor_id: string | null
+          created_at: string
+          entity: string
+          entity_id: string
+          id: number
+          kind: string
+          member_id: string
+          read_at: string | null
+          season_id: string | null
+          title: string | null
+        }
+        Insert: {
+          activity_id: number
+          actor_id?: string | null
+          created_at?: string
+          entity: string
+          entity_id: string
+          id?: number
+          kind: string
+          member_id: string
+          read_at?: string | null
+          season_id?: string | null
+          title?: string | null
+        }
+        Update: {
+          activity_id?: number
+          actor_id?: string | null
+          created_at?: string
+          entity?: string
+          entity_id?: string
+          id?: number
+          kind?: string
+          member_id?: string
+          read_at?: string | null
+          season_id?: string | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activity"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_season"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "v_subteam_progress"
+            referencedColumns: ["season_id"]
           },
         ]
       }
@@ -2635,6 +2762,10 @@ export type Database = {
       }
     }
     Functions: {
+      add_club_credential: {
+        Args: { p_login?: string; p_secret?: string; p_service: string }
+        Returns: string
+      }
       add_department_member: {
         Args: {
           p_member_id: string
@@ -2888,7 +3019,9 @@ export type Database = {
         Args: { p_spec_id: string }
         Returns: boolean
       }
+      can_reset_password: { Args: { p_member: string }; Returns: boolean }
       can_review_proposal: { Args: { p_proposal_id: string }; Returns: boolean }
+      can_view_club_credentials: { Args: never; Returns: boolean }
       can_view_finances: { Args: never; Returns: boolean }
       change_reason_detail: { Args: never; Returns: Json }
       clean_text: { Args: { p_text: string }; Returns: string }
@@ -3071,6 +3204,7 @@ export type Database = {
         }
       }
       mark_attachment_purged: { Args: { p_ids: number[] }; Returns: number }
+      mark_password_reset: { Args: { p_member: string }; Returns: undefined }
       pgp_armor_headers: {
         Args: { "": string }
         Returns: Record<string, unknown>[]
@@ -3091,6 +3225,8 @@ export type Database = {
         Args: { p_proposal_id: string }
         Returns: string
       }
+      proposal_reviewers: { Args: { p_key: string }; Returns: string[] }
+      purge_read_notifications: { Args: never; Returns: number }
       reconciliation_apply: { Args: { p_manifest: Json }; Returns: Json }
       reconciliation_preflight: {
         Args: { p_manifest: Json }
@@ -3278,6 +3414,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      reveal_club_credential: { Args: { p_id: string }; Returns: string }
       review_proposal: {
         Args: {
           p_action: string
@@ -3413,6 +3550,10 @@ export type Database = {
       revoke_spec_readiness: {
         Args: { p_reason: string; p_spec_id: string }
         Returns: boolean
+      }
+      save_club_credential: {
+        Args: { p_id: string; p_login: string; p_secret?: string }
+        Returns: undefined
       }
       set_attachment_caption: {
         Args: { p_attachment_id: string; p_caption: string }
