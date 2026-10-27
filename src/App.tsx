@@ -21,6 +21,7 @@ import { useRealtimeSubteams } from './data/useRealtimeSubteams.ts'
 // never show a loading flicker.
 const Now = lazy(() => import('./pages/Now.tsx'))
 const Priorities = lazy(() => import('./pages/Priorities.tsx'))
+const Tasks = lazy(() => import('./pages/Tasks.tsx'))
 const Register = lazy(() => import('./pages/Register.tsx'))
 const Book = lazy(() => import('./pages/Book.tsx'))
 const Milestones = lazy(() => import('./pages/Milestones.tsx'))
@@ -35,6 +36,8 @@ const Finances = lazy(() => import('./pages/Finances.tsx'))
 const Settings = lazy(() => import('./pages/Settings.tsx'))
 const Inbox = lazy(() => import('./pages/Inbox.tsx'))
 const Contacts = lazy(() => import('./pages/Contacts.tsx'))
+const Contributions = lazy(() => import('./pages/Contributions.tsx'))
+const Team = lazy(() => import('./pages/Team.tsx'))
 
 // What a person sees while a route's chunk is still downloading. Same shell
 // shape as every page (`#main-content`, the skip-link target) so the layout
@@ -104,7 +107,9 @@ export default function App() {
                     reason. */}
                 <Route element={<SeasonScopedLayout />}>
                   <Route path="/" element={<Now />} />
+                  {/* Not in the menu any more: the Tasks page took its place. Now's tiles still drill down here. */}
                   <Route path="/priorities" element={<Priorities />} />
+                  <Route path="/tasks" element={<Tasks />} />
                   <Route path="/register" element={<Register />} />
                   <Route path="/book" element={<Book />} />
                   <Route path="/milestones" element={<Milestones />} />
@@ -126,6 +131,10 @@ export default function App() {
                 <Route path="/inbox" element={<Inbox />} />
                 {/* Not season-scoped either: the people you can ask outlive a season. */}
                 <Route path="/contacts" element={<Contacts />} />
+                {/* Across seasons by design: it is a person's record, not a season's. */}
+                <Route path="/contributions" element={<Contributions />} />
+                {/* Your first steps and the club's tools outlive a season too. */}
+                <Route path="/team" element={<Team />} />
                 {/* Any other address: say so, with a way back. */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

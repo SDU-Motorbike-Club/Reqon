@@ -23,6 +23,10 @@ describe('activity presentation', () => {
     })
   })
 
+  it('says which department a meeting was called for', () => {
+    expect(presentActivity(row('called', { subteam_key: 'chassis' }), names).summary).toBe('Meeting called for chassis')
+  })
+
   it('resolves people, link provenance and missing former actors', () => {
     expect(presentActivity(row('owner_changed', { from: 'm1', to: 'm2' }), names).summary)
       .toBe('Owner: Ada Rider → Lin Driver')

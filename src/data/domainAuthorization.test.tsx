@@ -367,6 +367,7 @@ for (const [role, may] of Object.entries(MATRIX)) {
         startsAt: null,
         endsAt: null,
         location: null,
+        subteamKey: null,
         agenda: null,
         notes: null,
         attendees: null,
@@ -421,6 +422,7 @@ describe('a vice-president, specifically', () => {
         startsAt: null,
         endsAt: null,
         location: null,
+        subteamKey: null,
         agenda: '## Agenda\n- fairing',
         notes: 'Decided to order tyres.',
         attendees: null,
@@ -442,7 +444,7 @@ describe('two people editing the same meeting', () => {
   it('refuses a save when the meeting changed after it was opened, and says so instead of overwriting', async () => {
     db.meetings[0] = { ...db.meetings[0], updated_at: '2026-09-10T10:05:00+00:00', notes: 'Theirs.' }
     const update = hook(() => useUpdateMeeting())
-    const draft = { title: 'Weekly build', heldOn: '2026-09-10', startsAt: null, endsAt: null, location: null, agenda: null, notes: 'Mine.', attendees: null }
+    const draft = { title: 'Weekly build', heldOn: '2026-09-10', startsAt: null, endsAt: null, location: null, subteamKey: null, agenda: null, notes: 'Mine.', attendees: null }
     await expect(update.current.mutateAsync({ id: 'm1', expectedUpdatedAt: '2026-09-10T10:00:00+00:00', ...draft })).rejects.toThrow(/someone else saved it after you opened it/)
     expect(db.meetings[0]).toMatchObject({ notes: 'Theirs.' })
     // Opened on the current version: it saves.
@@ -471,6 +473,7 @@ describe('a row someone else already removed', () => {
         startsAt: null,
         endsAt: null,
         location: null,
+        subteamKey: null,
         agenda: null,
         notes: 'Too late',
         attendees: null,

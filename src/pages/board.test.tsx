@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -21,6 +21,7 @@ const state = {
   linkWrites: [] as Record<string, unknown>[],
   linkError: null as Error | null,
   moves: [] as Record<string, unknown>[],
+  created: [] as Record<string, unknown>[],
 }
 type Dept = { key: string; name: string; lead_id: string | null; archived_at: string | null }
 let departments: Dept[]
@@ -75,8 +76,15 @@ vi.mock('../data/useTasks.ts', () => ({
     isPending: false,
     error: null,
   }),
+  useCreateTask: () => ({
+    mutateAsync: async (v: Record<string, unknown>) => { state.created.push(v); return { id: 'new', title: String(v.title) } },
+    reset: () => {},
+    isPending: false,
+    error: null,
+  }),
   useSetTaskDepartment: () => ({
     mutate: (v: Record<string, unknown>, o?: { onSuccess?: () => void }) => { state.moves.push(v); o?.onSuccess?.() },
+    mutateAsync: async (v: Record<string, unknown>) => { state.moves.push(v) },
     isPending: false,
     error: null,
   }),
@@ -127,6 +135,7 @@ beforeEach(() => {
   state.linkWrites = []
   state.linkError = null
   state.moves = []
+  state.created = []
   state.tasks = [
     task('aero-mine', { owner_id: 'me', title: 'Aero mine' }),
     task('aero-theirs', { owner_id: 'm2', title: 'Aero theirs' }),
@@ -264,6 +273,7 @@ describe('who may change what (one contextual permission model)', () => {
   const moveSelect = (id: string) => screen.queryByLabelText(`Move ${id} to another lane`)
 
   it('the owner moves their own task; everyone else\'s is read-only', () => {
+    departments = departments.map((d) => ({ ...d, lead_id: 'm2' })) // not a Head: only a task leader edits others' tasks (20260142)
     renderBoard('/board?dept=BODY') // "me" heads AERO only, so BODY is not theirs except what they own
     expect(moveSelect('Body mine')).toBeInTheDocument()
     expect(moveSelect('Body theirs')).not.toBeInTheDocument()
@@ -356,7 +366,43 @@ describe('the details editor', () => {
     expect(within(dialog).getByRole('heading', { level: 2 })).toHaveTextContent(String(state.tasks[0].title))
     const panel = within(await within(dialog).findByTestId('task-details-long'))
     expect(panel.getByLabelText('Description')).toHaveValue('A long description of the work.')
-    expect(panel.getByTestId('task-source-long')).toHaveTextContent('Created from the proposal “Old proposal”')
+    // Where a task came from is not shown: it is history, not something to act on.
+    expect(panel.queryByText(/Where it came from|Created from the proposal/)).not.toBeInTheDocument()
+  })
+
+  it('orders the panel by weight: alerts, blocker, what it is, who and when, waits for, linked work, department, attachments, save, archive', async () => {
+    session.roles = ['president']
+    state.tasks = [task('ordered', { subteam_key: 'AERO', title: 'Ordered', state: 'blocked', blocked_reason: 'Waiting for the quote' })]
+    renderBoard('/board?dept=AERO')
+    await open('ordered')
+    const at = (el: HTMLElement) => Array.from(screen.getByTestId('task-details-ordered').querySelectorAll('*')).indexOf(el)
+    const panel = within(screen.getByTestId('task-details-ordered'))
+    const sequence = [
+      panel.getByLabelText('Title'),
+      panel.getByLabelText('Description'),
+      panel.getByLabelText('Why is it blocked?'),
+      panel.getByLabelText('Owner'),
+      panel.getByLabelText('Priority'),
+      panel.getByLabelText('Deadline'),
+      panel.getByLabelText('Start date'),
+      screen.getByTestId('task-deps-ordered'),
+      screen.getByTestId('task-links-ordered'),
+      screen.getByTestId('task-department-ordered'),
+      screen.getByTestId('task-save-ordered'),
+    ].map(at)
+    expect(sequence.every((n) => n > -1)).toBe(true)
+    expect(sequence).toEqual([...sequence].sort((a, b) => a - b))
+  })
+
+  it('links the milestone and the requirements from the panel itself, with the one Save', async () => {
+    session.roles = ['president']
+    state.tasks = [task('lw', { subteam_key: 'AERO', title: 'Linkable' })]
+    renderBoard('/board?dept=AERO')
+    await open('lw')
+    const links = within(screen.getByTestId('task-links-lw'))
+    expect(links.getByLabelText('Milestone')).toBeInTheDocument()
+    expect(links.getByText('Requirements')).toBeInTheDocument()
+    expect(links.getByText('Saved with “Save details”.')).toBeInTheDocument()
   })
 
   it('lets a Head reassign the owner and saves ONLY the changed fields', async () => {
@@ -370,6 +416,7 @@ describe('the details editor', () => {
   })
 
   it('lets an owner edit their fields but not reassign, and says who can', async () => {
+    departments = departments.map((d) => ({ ...d, lead_id: 'm2' })) // not a Head: only a task leader edits others' tasks (20260142)
     renderBoard('/board?dept=BODY')
     const { panel } = await open('body-mine')
     expect(panel.getByLabelText('Deadline')).toBeInTheDocument()
@@ -378,6 +425,7 @@ describe('the details editor', () => {
   })
 
   it('shows the same facts read-only, with the reason, to someone who may not edit', async () => {
+    departments = departments.map((d) => ({ ...d, lead_id: 'm2' })) // not a Head: only a task leader edits others' tasks (20260142)
     renderBoard('/board?dept=BODY')
     const { panel } = await open('body-theirs')
     expect(panel.getByTestId('task-readonly-body-theirs')).toHaveTextContent('Read-only for you')
@@ -526,14 +574,19 @@ describe('blockers and prerequisites', () => {
     state.links = [{ task_id: 'waiter', depends_on_task_id: 'me-task' }]
     renderBoard('/board?dept=AERO')
     const { user, panel } = await open('me-task')
-    const options = within(panel.getByLabelText(/Add a prerequisite/)).getAllByRole('option').map((o) => o.textContent)
-    expect(options).toEqual(['Choose a task…', 'Candidate — Bodywork']) // not itself, not the task already waiting for it
-    await user.selectOptions(panel.getByLabelText(/Add a prerequisite/), 'cand')
+    const box = panel.getByRole('combobox', { name: /Add a prerequisite/ })
+    await user.click(box)
+    const options = within(panel.getByRole('listbox')).getAllByRole('option').map((o) => o.textContent)
+    expect(options).toEqual(['Candidate — Bodywork']) // not itself, not the task already waiting for it
+    await user.type(box, 'body')
+    await user.click(within(panel.getByRole('listbox')).getByRole('option', { name: /Candidate/ }))
+    expect(box).toHaveValue('Candidate — Bodywork')
     await user.click(panel.getByRole('button', { name: 'Add prerequisite' }))
     expect(state.linkWrites).toEqual([{ add: { taskId: 'me-task', dependsOnTaskId: 'cand' } }])
   })
 
   it('shows what waits for the task, and offers no link controls to someone who may not edit it', async () => {
+    departments = departments.map((d) => ({ ...d, lead_id: 'm2' })) // not a Head: only a task leader edits others' tasks (20260142)
     state.tasks = [
       task('theirs', { owner_id: 'm2', subteam_key: 'BODY', title: 'Theirs' }),
       task('waiter', { owner_id: 'm2', subteam_key: 'BODY', title: 'Waiter' }),
@@ -746,7 +799,7 @@ describe('the department of a task (its own command, with a reason)', () => {
   const openDetails = async (user: ReturnType<typeof userEvent.setup>, id: string) =>
     user.click(within(screen.getByTestId(`task-${id}`)).getByText(/^Details/))
 
-  it('the President gives an unassigned task a department even where Heads exist; the reason is required and sent', async () => {
+  it('the President gives an unassigned task a department even where Heads exist, with Save details; the reason may be left out', async () => {
     const user = userEvent.setup()
     session.roles = ['president']
     state.tasks = [task('loose', { subteam_key: null, title: 'Loose task' })]
@@ -757,13 +810,58 @@ describe('the department of a task (its own command, with a reason)', () => {
     const select = panel.getByLabelText('Give it a department')
     // Archived departments are never offered.
     expect(within(select).queryByRole('option', { name: 'Retired dept' })).not.toBeInTheDocument()
+    // There is no separate Move button: Save details sits BELOW the Department section.
+    expect(screen.queryByRole('button', { name: 'Move task' })).not.toBeInTheDocument()
+    const save = screen.getByTestId('task-save-loose')
+    expect(screen.getByTestId('task-department-loose').compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     await user.selectOptions(select, 'BODY')
-    const move = panel.getByRole('button', { name: 'Move task' })
-    expect(move).toBeDisabled()
-    await user.type(panel.getByLabelText('Why? (kept in the history)'), '  Bodywork owns the fairing  ')
-    await user.click(move)
-    expect(state.moves).toEqual([{ id: 'loose', departmentKey: 'BODY', reason: 'Bodywork owns the fairing' }])
-    expect(panel.getByRole('status')).toHaveTextContent('Moved to Bodywork.')
+    expect(screen.getByTestId('task-department-pending-loose')).toHaveTextContent('It gets this department when you press Save details.')
+    expect(state.moves).toEqual([]) // nothing is sent until Save
+    // The first department needs no reason: the history still records one.
+    expect(panel.getByLabelText('Why? (optional, kept in the history)')).toBeInTheDocument()
+    await user.click(save)
+    await waitFor(() => expect(state.moves).toEqual([{ id: 'loose', departmentKey: 'BODY', reason: 'Department assigned' }]))
+    expect(await screen.findByTestId('task-save-result-loose')).toHaveTextContent('Saved: department.')
+  })
+
+  it('a reason typed for the first department is the one kept', async () => {
+    const user = userEvent.setup()
+    session.roles = ['president']
+    state.tasks = [task('loose', { subteam_key: null, title: 'Loose task' })]
+    renderBoard()
+    await openDetails(user, 'loose')
+    const panel = within(screen.getByTestId('task-department-loose'))
+    await user.selectOptions(panel.getByLabelText('Give it a department'), 'BODY')
+    await user.type(panel.getByLabelText('Why? (optional, kept in the history)'), '  Bodywork owns the fairing  ')
+    await user.click(screen.getByTestId('task-save-loose'))
+    await waitFor(() => expect(state.moves).toEqual([{ id: 'loose', departmentKey: 'BODY', reason: 'Bodywork owns the fairing' }]))
+  })
+
+  it('saving with no department chosen still says there is nothing to save', async () => {
+    const user = userEvent.setup()
+    session.roles = ['president']
+    state.tasks = [task('loose', { subteam_key: null, title: 'Loose task' })]
+    renderBoard()
+    await openDetails(user, 'loose')
+    await user.click(screen.getByTestId('task-save-loose'))
+    expect(await screen.findByTestId('task-save-result-loose')).toHaveTextContent('Nothing to save')
+    expect(state.moves).toEqual([])
+  })
+
+  it('moving between departments needs a reason, says so, and sends nothing without one', async () => {
+    const user = userEvent.setup()
+    session.roles = ['president']
+    state.tasks = [task('placed', { subteam_key: 'AERO', title: 'Placed task' })]
+    renderBoard('/board?dept=AERO')
+    await openDetails(user, 'placed')
+    const panel = within(screen.getByTestId('task-department-placed'))
+    await user.selectOptions(panel.getByLabelText('Move to'), 'BODY')
+    await user.click(screen.getByTestId('task-save-placed'))
+    expect(await screen.findByText(/Say why the task moves to another department/)).toBeInTheDocument()
+    expect(state.moves).toEqual([])
+    await user.type(panel.getByLabelText('Why? (required to move, kept in the history)'), 'Moved to Bodywork')
+    await user.click(screen.getByTestId('task-save-placed'))
+    await waitFor(() => expect(state.moves).toEqual([{ id: 'placed', departmentKey: 'BODY', reason: 'Moved to Bodywork' }]))
   })
 
   it('a Head of one department gets no department control — moving work out is not theirs to do', async () => {
@@ -780,7 +878,7 @@ describe('the department of a task (its own command, with a reason)', () => {
     renderBoard()
     await openDetails(user, 'aero-theirs')
     const options = within(screen.getByTestId('task-department-aero-theirs')).getAllByRole('option').map((o) => o.textContent)
-    expect(options).toEqual(['Choose a department…', 'Bodywork'])
+    expect(options).toEqual(['Keep the current department', 'Bodywork'])
   })
 
   it('an ordinary member who heads nothing sees no department control', async () => {
@@ -789,5 +887,104 @@ describe('the department of a task (its own command, with a reason)', () => {
     renderBoard()
     await openDetails(user, 'aero-mine')
     expect(screen.queryByTestId('task-department-aero-mine')).not.toBeInTheDocument()
+  })
+})
+
+describe('a long lane: a short list first, with Show more', () => {
+  const many = (n: number) => Array.from({ length: n }, (_, i) => task(`t${String(i).padStart(2, '0')}`, { title: `Task ${String(i).padStart(2, '0')}`, due_date: `2026-12-${String(28 - (i % 27)).padStart(2, '0')}` }))
+
+  it('shows the first 10 cards of a long lane, asks for more 10 at a time, and can fold back', async () => {
+    state.tasks = many(66)
+    const user = userEvent.setup()
+    renderBoard()
+    const lane = within(screen.getByTestId('lane-todo'))
+    expect(lane.getByRole('heading')).toHaveTextContent('(66)') // the count is the lane's, not the page's
+    expect(lane.getAllByRole('listitem').length).toBeLessThan(40)
+    expect(screen.getByTestId('board-more-todo')).toHaveTextContent('Show 10 more (56 left)')
+    await user.click(screen.getByTestId('board-more-todo'))
+    expect(screen.getByTestId('board-more-todo')).toHaveTextContent('Show 10 more (46 left)')
+    await user.click(screen.getByTestId('board-fewer-todo'))
+    expect(screen.getByTestId('board-more-todo')).toHaveTextContent('(56 left)')
+  })
+
+  it('does not offer "show more" for a short lane', () => {
+    state.tasks = many(6)
+    renderBoard()
+    expect(screen.queryByTestId('board-more-todo')).not.toBeInTheDocument()
+  })
+
+  it('has no search or sort of its own: the Tasks page searches and sorts every task', () => {
+    state.tasks = many(6)
+    renderBoard()
+    expect(screen.queryByLabelText('Search tasks')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Order each lane by')).not.toBeInTheDocument()
+  })
+
+  it('keeps a task a link names on screen even when it is past the first page', () => {
+    state.tasks = many(30)
+    renderBoard('/board?task=t25')
+    expect(within(screen.getByTestId('lane-todo')).getByText('Task 25')).toBeInTheDocument()
+  })
+})
+
+describe('creating a task straight on the Board (task leaders only)', () => {
+  it('offers New task to a Head, and not to a plain member', () => {
+    renderBoard()
+    expect(screen.getByTestId('board-new-task')).toBeInTheDocument()
+    cleanup()
+    departments = departments.map((d) => ({ ...d, lead_id: 'm2' }))
+    renderBoard()
+    expect(screen.queryByTestId('board-new-task')).not.toBeInTheDocument()
+  })
+
+  it('asks only for a title, a department and a deadline, then creates it with exactly what was typed', async () => {
+    const user = userEvent.setup()
+    renderBoard()
+    await user.click(screen.getByTestId('board-new-task'))
+    const form = within(screen.getByTestId('new-task-form'))
+    expect(form.getByRole('heading', { name: 'New task' })).toBeInTheDocument()
+    await user.click(form.getByTestId('new-task-submit'))
+    expect(form.getByText('Give the task a name.')).toBeInTheDocument()
+    expect(form.getByText('Give the task a deadline.')).toBeInTheDocument()
+    expect(form.getByText('Choose a department.')).toBeInTheDocument()
+    // The milestone and the requirements are optional: nothing is said about them.
+    expect(form.queryByText('Choose a milestone.')).not.toBeInTheDocument()
+    expect(form.queryByText('Link at least one requirement.')).not.toBeInTheDocument()
+    expect(state.created).toEqual([])
+
+    await user.type(form.getByLabelText('Title'), '  Brake duct  ')
+    await user.type(form.getByLabelText('Deadline'), '2026-12-01')
+    await user.selectOptions(form.getByLabelText('Department'), 'BODY')
+    await user.selectOptions(form.getByLabelText('Owner'), 'me')
+    await user.click(form.getByTestId('new-task-submit'))
+    await waitFor(() => expect(state.created).toHaveLength(1))
+    expect(state.created[0]).toEqual({
+      title: 'Brake duct', detail: null, departmentKey: 'BODY', ownerId: 'me', dueDate: '2026-12-01',
+      milestoneKey: null, clauseKeys: [], priority: 'normal',
+    })
+    expect(await screen.findByTestId('board-task-created')).toHaveTextContent('Created “Brake duct”.')
+  })
+
+  it('sends a milestone and requirements when they are given', async () => {
+    const user = userEvent.setup()
+    renderBoard()
+    await user.click(screen.getByTestId('board-new-task'))
+    const form = within(screen.getByTestId('new-task-form'))
+    await user.type(form.getByLabelText('Title'), 'Linked')
+    await user.type(form.getByLabelText('Deadline'), '2026-12-01')
+    await user.selectOptions(form.getByLabelText('Department'), 'BODY')
+    await user.selectOptions(form.getByLabelText('Milestone'), 'MS1')
+    await user.type(form.getByLabelText('Find a requirement'), 'A.1')
+    await user.click(await form.findByRole('checkbox'))
+    await user.click(form.getByTestId('new-task-submit'))
+    await waitFor(() => expect(state.created).toHaveLength(1))
+    expect(state.created[0]).toMatchObject({ milestoneKey: 'MS1', clauseKeys: ['A.1'] })
+  })
+
+  it('starts on the department the Board is filtered to', async () => {
+    const user = userEvent.setup()
+    renderBoard('/board?dept=BODY')
+    await user.click(screen.getByTestId('board-new-task'))
+    expect(within(screen.getByTestId('new-task-form')).getByLabelText('Department')).toHaveValue('BODY')
   })
 })

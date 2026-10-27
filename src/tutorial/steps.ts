@@ -17,9 +17,11 @@ export const CHAPTERS = [
   { id: 'start', label: 'Getting started' },
   { id: 'now', label: 'Now' },
   { id: 'board', label: 'Board' },
+  { id: 'tasks', label: 'Tasks' },
   { id: 'priorities', label: 'Priorities' },
   { id: 'proposals', label: 'Task proposals' },
   { id: 'meetings', label: 'Meetings' },
+  { id: 'team', label: 'Team' },
   { id: 'milestones', label: 'Milestones' },
   { id: 'gantt', label: 'Gantt' },
   { id: 'register', label: 'Register' },
@@ -27,6 +29,7 @@ export const CHAPTERS = [
   { id: 'specs', label: 'Spec sheet' },
   { id: 'files', label: 'Files' },
   { id: 'contacts', label: 'Contacts' },
+  { id: 'contributions', label: 'Contributions' },
   { id: 'archive', label: 'Archive' },
   { id: 'finances', label: 'Finances' },
   { id: 'settings', label: 'Settings and your account' },
@@ -165,6 +168,16 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     target: 'now-actions',
     title: 'What to do next',
     body: 'Short lists of overdue, blocked and soon-due work, your tasks and your proposals, each with owner, department, date and a link to the card. Proposals are raised on the Proposals screen.',
+  },
+
+  // --------------------------------------------------------------------- Tasks
+  {
+    id: 'tasks',
+    chapter: 'tasks',
+    route: '/tasks',
+    target: 'tasks-overview',
+    title: 'Tasks — every task, sortable',
+    body: 'All active tasks in one list. Click a column heading to sort the whole list by it; click again to reverse. Search and the filters keep the sort. Open a task to edit it on the Board.',
   },
 
   // ---------------------------------------------------------------- Priorities
@@ -395,6 +408,26 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     target: 'contacts-overview',
     title: 'Contacts — who can help',
     body: 'People who can help, by area: what each knows and how to reach them. Pick a category or search for a skill. Department Heads, the President and the Vice President keep it up to date.',
+  },
+
+  // ---------------------------------------------------------------------- Team
+  {
+    id: 'team',
+    chapter: 'team',
+    route: '/team',
+    target: 'team-overview',
+    title: 'Team — the club’s tools',
+    body: 'Each tool says whose it is, where it is and who has it now. Take a tool nobody has with “I have it”, and update yours when it moves.',
+  },
+
+  // ------------------------------------------------------------- Contributions
+  {
+    id: 'contributions',
+    chapter: 'contributions',
+    route: '/contributions',
+    target: 'contributions-overview',
+    title: 'Contributions — what someone finished',
+    body: 'The tasks a member has finished, season by season. It opens on you; pick anyone from the list, former members included. Credit goes to the task’s owner. Cancelled tasks do not count.',
   },
 
   // ------------------------------------------------------------------- Archive

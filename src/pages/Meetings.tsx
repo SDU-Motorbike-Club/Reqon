@@ -7,9 +7,11 @@ import {
   useSaveMeetingTemplate,
   type Meeting,
 } from '../data/useMeetings.ts'
+import { useSubteams } from '../data/useSubteams.ts'
 import { formatDay } from '../lib/dates.ts'
 import { MarkdownField } from '../meetings/MarkdownField.tsx'
 import { MeetingDialog } from '../meetings/MeetingDialog.tsx'
+import { MeetingShare } from '../meetings/MeetingShare.tsx'
 import { MeetingText } from '../meetings/MeetingText.tsx'
 import { Dialog } from '../ui/Dialog.tsx'
 import { PageHeader } from '../ui/PageHeader.tsx'
@@ -39,6 +41,9 @@ export default function Meetings() {
   const meetings = useMeetings()
   const template = useMeetingTemplate()
   const remove = useDeleteMeeting()
+  const departments = useSubteams()
+  const departmentName = (key: string | null) =>
+    key ? (departments.data?.find((d) => d.key === key)?.name ?? key) : null
   const [editing, setEditing] = useState<Meeting | 'new' | null>(null)
   const [deleting, setDeleting] = useState<Meeting | null>(null)
   const [message, setMessage] = useState('')
@@ -123,6 +128,7 @@ export default function Meetings() {
                   <p className="text-sm text-slate-700">
                     <time dateTime={meeting.held_on}>{when(meeting)}</time>
                     {meeting.location ? ` · ${meeting.location}` : ''}
+                    {meeting.subteam_key ? ` · For ${departmentName(meeting.subteam_key)}` : ''}
                   </p>
                 </div>
 
@@ -145,6 +151,8 @@ export default function Meetings() {
                 {meeting.attendees && (
                   <p className="mt-2 text-xs text-slate-600">Who came: {meeting.attendees}</p>
                 )}
+
+                <MeetingShare meeting={meeting} department={departmentName(meeting.subteam_key)} />
 
                 {(can.canCreateMeeting || can.canDeleteMeeting) && (
                   <div className="mt-3 flex flex-wrap gap-2">

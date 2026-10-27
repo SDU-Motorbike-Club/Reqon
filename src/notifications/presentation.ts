@@ -15,6 +15,7 @@ export type NotificationKind =
   | 'proposal_promoted'
   | 'proposal_comment'
   | 'role_granted'
+  | 'meeting_called'
 
 export type NotificationView = {
   // One sentence, said to the person reading it.
@@ -53,6 +54,8 @@ export function describeNotification(n: Pick<Notification, 'kind' | 'title' | 'e
       const role = n.title && n.title in ROLE_LABELS ? ROLE_LABELS[n.title as PrivilegedRole] : n.title
       return { text: role ? `${who} gave you the ${role} role.` : `${who} gave you a new role.`, to: '/settings' }
     }
+    case 'meeting_called':
+      return { text: `${who} called a meeting for your department${n.title ? `: “${n.title}”` : ''}.`, to: '/meetings' }
     default:
       return { text: `${who}: ${n.kind.replaceAll('_', ' ')}${n.title ? ` — ${n.title}` : ''}.`, to: '/' }
   }

@@ -182,9 +182,9 @@ begin
   insert into tasks (season_id, title, subteam_key, owner_id) values (season, 'H in SA2', 'H_SA2', mem2) returning id into t_sa2;
   perform pg_temp.expect('parent Head edits a subdepartment task', pg_temp.attempt(ha, format('update tasks set detail = ''ha'' where id = %L', t_sa1)), 'ALLOWED');
   perform pg_temp.expect('subdepartment Head edits it', pg_temp.attempt(hs, format('update tasks set detail = ''hs'' where id = %L', t_sa1)), 'ALLOWED');
-  perform pg_temp.expect('subdepartment Head cannot edit a parent task', pg_temp.attempt(hs, format('update tasks set detail = ''x'' where id = %L', t_pa)), 'DENIED');
-  perform pg_temp.expect('... nor a sibling task', pg_temp.attempt(hs, format('update tasks set detail = ''x'' where id = %L', t_sa2)), 'DENIED');
-  perform pg_temp.expect('another Head cannot edit it', pg_temp.attempt(hb, format('update tasks set detail = ''x'' where id = %L', t_sa1)), 'DENIED');
+  perform pg_temp.expect('a subdepartment Head edits a parent task (any Head is a task leader, 20260142)', pg_temp.attempt(hs, format('update tasks set detail = ''x'' where id = %L', t_pa)), 'ALLOWED');
+  perform pg_temp.expect('... and a sibling task', pg_temp.attempt(hs, format('update tasks set detail = ''x'' where id = %L', t_sa2)), 'ALLOWED');
+  perform pg_temp.expect('another Head edits it too', pg_temp.attempt(hb, format('update tasks set detail = ''x'' where id = %L', t_sa1)), 'ALLOWED');
   perform pg_temp.expect('parent Head reassigns the owner of a subdepartment task', pg_temp.attempt(ha, format('update tasks set owner_id = %L where id = %L', mem, t_sa1)), 'ALLOWED');
   perform pg_temp.expect('the owner cannot reassign themselves away', pg_temp.attempt(mem, format('update tasks set owner_id = %L where id = %L', mem2, t_sa1)), 'DENIED');
   perform pg_temp.expect('parent Head archives a subdepartment task', pg_temp.attempt(ha, format('select archive_task(%L)', t_sa1)), 'ALLOWED');
@@ -206,7 +206,7 @@ begin
   insert into tasks (season_id, title, subteam_key, owner_id) values (season, 'H in SB1', 'H_SB1', mem2) returning id into t_sb1;
   perform pg_temp.expect('one person heading two departments edits in the first', pg_temp.attempt(hm, format('update tasks set detail = ''hm'' where id = %L', t_sa2)), 'ALLOWED');
   perform pg_temp.expect('... and in the second', pg_temp.attempt(hm, format('update tasks set detail = ''hm'' where id = %L', t_sb1)), 'ALLOWED');
-  perform pg_temp.expect('... but not in a third', pg_temp.attempt(hm, format('update tasks set detail = ''x'' where id = %L', t_pa)), 'DENIED');
+  perform pg_temp.expect('... and in a third', pg_temp.attempt(hm, format('update tasks set detail = ''x'' where id = %L', t_pa)), 'ALLOWED');
 
   -- ============================================ revocation takes effect at once
   update subteams set lead_id = null where key = pa;

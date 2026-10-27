@@ -13,9 +13,10 @@ export type NavItem = { to: string; label: string; group: NavGroup; end?: boolea
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Now', group: 'home', end: true },
   { to: '/board', label: 'Board', group: 'work' },
-  { to: '/priorities', label: 'Priorities', group: 'work' },
+  { to: '/tasks', label: 'Tasks', group: 'work' },
   { to: '/proposals', label: 'Proposals', group: 'work' },
   { to: '/meetings', label: 'Meetings', group: 'work' },
+  { to: '/team', label: 'Team', group: 'work' },
   { to: '/milestones', label: 'Milestones', group: 'plan' },
   { to: '/gantt', label: 'Gantt', group: 'plan' },
   { to: '/register', label: 'Register', group: 'rules' },
@@ -23,7 +24,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/specs', label: 'Spec sheet', group: 'rules' },
   { to: '/files', label: 'Files', group: 'records', requires: 'attachmentsEnabled' },
   { to: '/contacts', label: 'Contacts', group: 'records' },
-  { to: '/archive', label: 'Archive', group: 'records' },
+  { to: '/contributions', label: 'Contributions', group: 'records' },
   { to: '/finances', label: 'Finances', group: 'admin', requires: 'canViewFinances' },
   { to: '/settings', label: 'Settings', group: 'admin' },
 ]

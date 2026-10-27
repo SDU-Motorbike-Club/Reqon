@@ -25,6 +25,9 @@ export type MeetingDraft = {
   startsAt: string | null
   endsAt: string | null
   location: string | null
+  // The department the meeting is for, or null for the whole club. Choosing one
+  // tells that department in its inbox (20260140000000).
+  subteamKey: string | null
   agenda: string | null
   notes: string | null
   attendees: string | null
@@ -70,6 +73,7 @@ const toRow = (draft: MeetingDraft) => ({
   starts_at: draft.startsAt,
   ends_at: draft.endsAt,
   location: draft.location,
+  subteam_key: draft.subteamKey,
   agenda: draft.agenda,
   notes: draft.notes,
   attendees: draft.attendees,

@@ -145,8 +145,8 @@ begin
     pg_temp.attempt(o1, format('update tasks set blocked_reason = null where id = %L', ta)), 'ERROR 23514: A blocked task must say why%');
   perform pg_temp.expect('a member without authority cannot edit the reason',
     pg_temp.attempt(mem, format('update tasks set blocked_reason = ''nope'' where id = %L', ta)), 'DENIED');
-  perform pg_temp.expect('another department''s Head cannot',
-    pg_temp.attempt(hb, format('update tasks set blocked_reason = ''nope'' where id = %L', ta)), 'DENIED');
+  perform pg_temp.expect('another department''s Head can too (any Head is a task leader, 20260142)',
+    pg_temp.attempt(hb, format('update tasks set blocked_reason = ''nope'' where id = %L', ta)), 'ALLOWED');
   perform pg_temp.expect('the department Head can unblock it',
     pg_temp.attempt(ha, format('update tasks set state = ''wip'' where id = %L', ta)), 'ALLOWED');
   perform pg_temp.expect('... which clears the reason and the stamp',
@@ -181,7 +181,8 @@ begin
     pg_temp.attempt(mem, format('select add_task_dependency(%L, %L)', tx, tb)), 'DENIED');
   perform pg_temp.expect('the prerequisite''s owner cannot link someone else''s task to theirs',
     pg_temp.attempt(o2, format('select add_task_dependency(%L, %L)', tx, tb)), 'DENIED');
-  perform pg_temp.expect('another department''s Head cannot', pg_temp.attempt(hb, format('select add_task_dependency(%L, %L)', tx, tb)), 'DENIED');
+  perform pg_temp.expect('another department''s Head can too (any Head is a task leader, 20260142)', pg_temp.attempt(hb, format('select add_task_dependency(%L, %L)', tx, tb)), 'ALLOWED');
+  delete from task_dependencies where task_id = tx and depends_on_task_id = tb;
   -- Role hierarchy (20260130000000): the President may, although the department has a Head (asked without linking).
   perform pg_temp.expect('the President may where the department has a Head',
     pg_temp.val(pre, format('can_edit_task(%L)', tx)), 'true');
@@ -236,10 +237,11 @@ begin
     pg_temp.attempt(ha, format('update tasks set blocked_reason = ''waiting for parts'' where id = %L', tx)) || ':' ||
     pg_temp.val(ha, format('remove_task_dependency(%L, %L)', tx, tc)), 'ALLOWED:true');
   perform pg_temp.expect('removing again is a harmless retry', pg_temp.val(ha, format('remove_task_dependency(%L, %L)', tx, tc)), 'false');
-  perform pg_temp.expect('... and is audited once', (select count(*)::text from activity where entity_id = tx::text and action = 'dependency_removed'), '2');
+  perform pg_temp.expect('... and each removal is audited (ha twice, plus the clean-up of the other Head''s link)', (select count(*)::text from activity where entity_id = tx::text and action = 'dependency_removed'), '3');
 
   perform pg_temp.expect('a member cannot remove a link', pg_temp.attempt(mem, format('select remove_task_dependency(%L, %L)', ta, tb)), 'DENIED');
-  perform pg_temp.expect('another Head cannot', pg_temp.attempt(hb, format('select remove_task_dependency(%L, %L)', ta, tb)), 'DENIED');
+  perform pg_temp.expect('another Head can too (any Head is a task leader, 20260142)', pg_temp.attempt(hb, format('select remove_task_dependency(%L, %L)', ta, tb)), 'ALLOWED');
+  insert into task_dependencies (task_id, depends_on_task_id) values (ta, tb) on conflict do nothing;
   perform pg_temp.expect('the owner can', pg_temp.val(o1, format('remove_task_dependency(%L, %L)', ta, tb)), 'true');
 
   -- authority follows the CURRENT owner
@@ -305,13 +307,14 @@ begin
   insert into tasks (season_id, title, owner_id, subteam_key, milestone_key) values (season, 'Task move', o1, pa, ms) returning id into tmove;
   perform pg_temp.expect('the owner puts their task in a subsection', pg_temp.attempt(o1, format('update tasks set section_id = %L where id = %L', sub1, tmove)), 'ALLOWED');
   perform pg_temp.expect('a member with no authority over the task cannot regroup it', pg_temp.attempt(mem, format('update tasks set section_id = %L where id = %L', sec2, tmove)), 'DENIED');
-  perform pg_temp.expect('another department''s Head cannot', pg_temp.attempt(hb, format('update tasks set section_id = %L where id = %L', sec2, tmove)), 'DENIED');
+  perform pg_temp.expect('another department''s Head can too (any Head is a task leader, 20260142)', pg_temp.attempt(hb, format('update tasks set section_id = %L where id = %L', sec2, tmove)), 'ALLOWED');
+  update tasks set section_id = sub1 where id = tmove;
   perform pg_temp.expect('a section of another milestone is refused',
     pg_temp.attempt(o1, format('update tasks set section_id = %L where id = %L', sub_b, tmove)), 'ERROR 23514%');
   perform pg_temp.expect('the department Head moves it to another section', pg_temp.attempt(ha, format('update tasks set section_id = %L where id = %L', sec2, tmove)), 'ALLOWED');
   perform pg_temp.expect('the move persists on the same task row: one task, its id and milestone unchanged',
     (select (section_id = sec2 and milestone_key = ms)::text from tasks where id = tmove) || ':' || (select count(*)::text from tasks where title = 'Task move'), 'true:1');
-  perform pg_temp.expect('each regrouping is audited', (select count(*)::text from activity where entity_id = tmove::text and action in ('section_linked', 'section_changed')), '2');
+  perform pg_temp.expect('each regrouping is audited (including the other Head''s move and its reset)', (select count(*)::text from activity where entity_id = tmove::text and action in ('section_linked', 'section_changed')), '4');
 
   -- ================================================================= verdict
   select count(*), count(*) filter (where not (got like expected)),

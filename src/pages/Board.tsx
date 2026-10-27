@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { attachmentPermissions, canArchiveTask, canEditTask, canReassignTaskOwner, canRestoreTask, taskDepartmentTargets } from '../auth/permissions.ts'
+import { attachmentPermissions, canArchiveTask, canCreateTask, canEditTask, canReassignTaskOwner, canRestoreTask, taskDepartmentTargets } from '../auth/permissions.ts'
 import { useAuth } from '../auth/context.ts'
 import { departmentChoices } from '../departments/filter.ts'
 import { DepartmentNav } from '../departments/DepartmentNav.tsx'
@@ -25,7 +25,10 @@ import { pageMain } from '../ui/layout.ts'
 import { PageHeader } from '../ui/PageHeader.tsx'
 import { ActionError, ErrorState } from '../ui/states.tsx'
 import { Dialog } from '../ui/Dialog.tsx'
+import { buttonPrimary } from '../ui/buttons.ts'
+import { LANE_PAGE, laneWindow } from './board/boardView.ts'
 import { MoveControl } from './board/MoveControl.tsx'
+import { NewTaskDialog } from './board/NewTaskDialog.tsx'
 import { TaskCard } from './board/TaskCard.tsx'
 import { TaskDetails, type TaskLinksView, type TaskPermissions } from './board/TaskDetails.tsx'
 import { useUrlParams } from '../lib/useUrlParams.ts'
@@ -79,7 +82,11 @@ export default function Board() {
   // Merged into the address, so ?task= and anything else in it survives.
   const setFilter = (next: TaskFilter) => setParams((current) => applyTaskFilter(current, next), { replace: true })
 
+  const memberName = useMemo(() => new Map((members.data ?? []).map((m) => [m.id, m.full_name])), [members.data])
+  const deptName = useMemo(() => new Map((departmentList ?? []).map((d) => [d.key, d.name])), [departmentList])
   const visible = useMemo(() => filterTasks(allTasks, filter, myId), [allTasks, filter, myId])
+  // How many extra cards each lane has been asked to show beyond the first page.
+  const [extra, setExtra] = useState<Record<string, number>>({})
 
   // A link from elsewhere (the Register's linked-task list) can name one task:
   // /board?task=ID opens that card's details. Only a plausible id is honoured,
@@ -102,6 +109,9 @@ export default function Board() {
   const openTask = openTaskId ? allTasks.find((t) => t.id === openTaskId) : undefined
   const dialogTitleId = useId()
   // After an archive the card is gone: say so, and offer Undo to whoever may restore.
+  // The New task dialog (a task leader creates a task straight on the Board), and the line that says it was made.
+  const [creating, setCreating] = useState(false)
+  const [created, setCreated] = useState<string | null>(null)
   const [archived, setArchived] = useState<{ id: string; title: string; canRestore: boolean; restored: boolean } | null>(null)
   const restore = useRestoreTask()
   const counts = useMemo(() => taskScopeCounts(allTasks, filter.department, myId), [allTasks, filter.department, myId])
@@ -122,12 +132,10 @@ export default function Board() {
   const sourceIds = useMemo(() => allTasks.map((t) => t.source_proposal).filter((id): id is string => id !== null), [allTasks])
   const sources = useSourceProposals(sourceIds)
 
-  const memberName = useMemo(() => new Map((members.data ?? []).map((m) => [m.id, m.full_name])), [members.data])
   const activeOwners = useMemo(
     () => (members.data ?? []).filter((m) => m.status === 'active').map((m) => ({ id: m.id, name: m.full_name })),
     [members.data],
   )
-  const deptName = useMemo(() => new Map((departmentList ?? []).map((d) => [d.key, d.name])), [departmentList])
   const activeDepartments = useMemo(
     () => (departmentList ?? []).filter((d) => d.archived_at === null).map((d) => ({ key: d.key, name: d.name })),
     [departmentList],
@@ -199,7 +207,7 @@ export default function Board() {
 
   return (
     <main id="main-content" tabIndex={-1} className={pageMain()}>
-      <PageHeader title="Board" description="The team’s active tasks. Open a card’s details to edit it; archived work is in the Archive.">
+      <PageHeader title="Board" description="The team’s active tasks, in lanes. Filter them by department or to your own, and open a card’s details to edit it. The Tasks page searches and sorts every task. A task that stays done for 24 hours moves to the Archive on its own.">
         <p className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-slate-500">
           <span data-testid="board-realtime-state" title="Live updates from other people editing">
             Live updates: {realtime}
@@ -209,6 +217,27 @@ export default function Board() {
           </Link>
         </p>
       </PageHeader>
+
+      {canCreateTask(actor) && (
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className={buttonPrimary}
+            data-testid="board-new-task"
+            onClick={() => {
+              setCreated(null)
+              setCreating(true)
+            }}
+          >
+            New task
+          </button>
+          {created && (
+            <p role="status" className="text-sm text-emerald-800" data-testid="board-task-created">
+              Created “{created}”.
+            </p>
+          )}
+        </div>
+      )}
 
       <DepartmentNav choices={choices} value={filter.department} counts={departmentCounts} testId="board-departments" />
 
@@ -341,9 +370,11 @@ export default function Board() {
           spinner, so an open select is never yanked away mid-change. */}
       {/* On a phone the lanes sit side by side and swipe, the next one peeking
           in, so "In progress" is not buried under every To do card. */}
-      <div className="-mx-3 flex snap-x snap-mandatory scroll-px-3 gap-3 overflow-x-auto overscroll-x-contain px-3 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3 min-[75rem]:grid-cols-5" data-tutorial="board-lanes">
+      <div className="relative -mx-3 flex snap-x snap-mandatory scroll-px-3 gap-3 overflow-x-auto overscroll-x-contain px-3 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3 min-[75rem]:grid-cols-5" data-tutorial="board-lanes">
         {LANES.map((lane) => {
           const laneTasks = visible.filter((t) => t.state === lane.state)
+          const limit = LANE_PAGE + (extra[lane.state] ?? 0)
+          const { shown, hidden } = laneWindow(laneTasks, limit, focusId ?? openTaskId)
           return (
             <section key={lane.state} className={`w-[85%] flex-none snap-start self-start rounded-lg border p-2 sm:w-auto sm:self-auto ${lane.boardTone}`} aria-labelledby={`lane-${lane.state}`} data-testid={`lane-${lane.state}`}>
               <h2 id={`lane-${lane.state}`} className="mb-2 text-xs font-semibold tracking-wide text-slate-700 uppercase">
@@ -353,7 +384,7 @@ export default function Board() {
                 <p className="px-1 py-2 text-xs text-slate-700">Nothing here.</p>
               ) : (
                 <ul className="space-y-2">
-                  {laneTasks.map((task) => {
+                  {shown.map((task) => {
                     const source = task.source_proposal ? sources.data?.get(task.source_proposal) : undefined
                     return (
                       <TaskCard
@@ -378,10 +409,48 @@ export default function Board() {
                   })}
                 </ul>
               )}
+              {(hidden > 0 || (extra[lane.state] ?? 0) > 0) && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {hidden > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setExtra((e) => ({ ...e, [lane.state]: (e[lane.state] ?? 0) + LANE_PAGE }))}
+                      className="inline-flex min-h-11 items-center rounded border border-slate-300 bg-white px-3 text-xs font-medium text-slate-800 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:outline-none sm:min-h-0 sm:py-1"
+                      data-testid={`board-more-${lane.state}`}
+                    >
+                      Show {Math.min(LANE_PAGE, hidden)} more ({hidden} left)
+                    </button>
+                  )}
+                  {(extra[lane.state] ?? 0) > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setExtra((e) => ({ ...e, [lane.state]: 0 }))}
+                      className="inline-flex min-h-11 items-center rounded px-2 text-xs text-slate-700 underline underline-offset-2 sm:min-h-0"
+                      data-testid={`board-fewer-${lane.state}`}
+                    >
+                      Show fewer
+                    </button>
+                  )}
+                </div>
+              )}
             </section>
           )
         })}
       </div>
+
+      <NewTaskDialog
+        open={creating}
+        onClose={() => setCreating(false)}
+        onCreated={(task) => {
+          setCreating(false)
+          setCreated(task.title)
+        }}
+        departments={activeDepartments}
+        owners={activeOwners}
+        milestones={milestoneOptions}
+        viewerId={myId}
+        defaultDepartment={filter.department}
+      />
 
       <Dialog open={openTask !== undefined} onClose={() => setOpenTaskId(null)} labelledBy={dialogTitleId}>
         {openTask && (
@@ -416,7 +485,6 @@ export default function Board() {
               owners={ownersFor(openTask)}
               milestones={milestoneOptions}
               requirementKeys={keysByTask.get(openTask.id) ?? []}
-              source={openTask.source_proposal ? (sources.data?.get(openTask.source_proposal) ?? null) : null}
               links={linksFor(openTask)}
               viewerId={myId}
               onArchived={(task: Task) => {

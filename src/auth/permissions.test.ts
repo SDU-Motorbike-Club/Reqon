@@ -5,7 +5,9 @@ import {
   canManageAttachment,
   ROLE_LABELS,
   canArchiveTask,
+  canCreateTask,
   canEditTask,
+  isTaskLeader,
   canGrantRole,
   canResetPassword,
   canRestoreTask,
@@ -171,8 +173,10 @@ describe('task-level authorization (ADR-0003)', () => {
     expect(canEditTask(head, task)).toBe(true)
   })
 
-  it('the Head of a DIFFERENT department may not edit', () => {
-    expect(canEditTask(otherHead, task)).toBe(false)
+  it('the Head of a DIFFERENT department may edit too: any Head is a task leader (20260142)', () => {
+    expect(canEditTask(otherHead, task)).toBe(true)
+    expect(isTaskLeader(otherHead)).toBe(true)
+    expect(canCreateTask(otherHead)).toBe(true)
   })
 
   it('a bystander with no stake in the task may not edit', () => {
@@ -197,12 +201,13 @@ describe('task-level authorization (ADR-0003)', () => {
     expect(canEditTask(owner, noDept)).toBe(true)
     expect(canEditTask(developer, noDept)).toBe(true)
     expect(canEditTask(governance, noDept)).toBe(true)
-    expect(canEditTask(head, noDept)).toBe(false)
+    expect(canEditTask(head, noDept)).toBe(true) // a Head is a task leader
+    expect(canEditTask(treasurer, noDept)).toBe(false)
   })
 
-  it('the President/VP act only where no Head exists (governs), and restore anywhere', () => {
+  it('the President/VP edit any task, archive only where they govern, and restore anywhere', () => {
     const governance: TaskActor = { id: 'pres', status: 'active', isDeveloper: false, headOf: [], isGovernance: true, governs: ['OPS'] }
-    expect(canEditTask(governance, task)).toBe(false)
+    expect(canEditTask(governance, task)).toBe(true) // a leader edits any task
     expect(canArchiveTask(governance, task)).toBe(false)
     expect(canEditTask(governance, { ...task, subteam_key: 'OPS' })).toBe(true)
     expect(canArchiveTask(governance, { ...task, subteam_key: 'OPS' })).toBe(true)
@@ -358,7 +363,7 @@ describe('task attachments (docs/ultraplan Phase 3, D-05)', () => {
     expect(attachmentPermissions(vp, task).canUpload).toBe(true)
     expect(attachmentPermissions(developer, task).canUpload).toBe(true)
     expect(attachmentPermissions(member, task).canUpload).toBe(false)
-    expect(attachmentPermissions(otherHead, task).canUpload).toBe(false)
+    expect(attachmentPermissions(otherHead, task).canUpload).toBe(true) // any Head is a task leader
     expect(attachmentPermissions(owner, { ...task, archived_at: '2026-10-01' }).canUpload).toBe(false)
   })
 

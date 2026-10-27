@@ -307,16 +307,15 @@ describe('who may do what (the Board\'s permission rule, from the real mirrors)'
     expect(screen.queryByRole('button', { name: /Unlink Bodywork budget line/ })).not.toBeInTheDocument()
   })
 
-  it('the Head of a department manages its work, including tasks they do not own', async () => {
+  it('a Head manages any task, including tasks they do not own and other departments\' (any Head is a task leader, 20260142)', async () => {
     who.id = 'm2' // Bo, Head of AERO
     const user = userEvent.setup()
     renderGantt()
     await open(user, /MS1-1/, /Cover sheet/)
     expect(screen.getByLabelText('Move Draft the cover to another lane')).toBeInTheDocument()
     expect(screen.getByLabelText('Owner for Draft the cover')).toBeInTheDocument()
-    // ...but not another department's.
-    expect(screen.queryByLabelText('Move Bodywork budget line to another lane')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Unlink Bodywork budget line/ })).not.toBeInTheDocument()
+    // ...and another department's too.
+    expect(screen.getByLabelText('Move Bodywork budget line to another lane')).toBeInTheDocument()
   })
 
   it('a Developer\'s override is explicit: they may edit every task', async () => {
@@ -399,14 +398,14 @@ describe('linking an existing task (the only work-association command)', () => {
     expect(screen.queryByTestId('link-confirm')).not.toBeInTheDocument()
   })
 
-  it('a Head is offered the department\'s tasks, and only that department\'s', async () => {
+  it('a Head is offered every task to link, not only their department\'s (any Head is a task leader)', async () => {
     who.id = 'm3' // Cy, Head of BODY (also owns t2 and t6)
     const user = userEvent.setup()
     renderGantt()
     await open(user, /MS1-1/, /Cover sheet/)
     const options = optionTexts(linkSelect('Cover sheet'))
     expect(options).toContain('Loose theirs')
-    expect(options.join('|')).not.toMatch(/Loose mine/)
+    expect(options.join('|')).toMatch(/Loose mine/)
   })
 
   it('a person with nothing they may link is told so', async () => {

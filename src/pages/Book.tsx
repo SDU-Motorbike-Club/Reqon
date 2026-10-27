@@ -30,6 +30,7 @@ export default function Book() {
       </div>
       <div data-tutorial="book-actions">
         <BookReader
+          mode="scroll"
           page={page}
           notice={notice}
           ruleRef={ruleRef}

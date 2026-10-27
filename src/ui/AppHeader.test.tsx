@@ -77,7 +77,7 @@ describe('main navigation', () => {
     // Now · daily work · planning · competition rules · records · admin. (Files shows only with attachments on,
     // Finances only for people who may see money.) Proposals and Meetings are two screens.
     expect(labels).toEqual([
-      'Now', 'Board', 'Priorities', 'Proposals', 'Meetings', 'Milestones', 'Gantt', 'Register', 'Book', 'Spec sheet', 'Contacts', 'Archive', 'Settings',
+      'Now', 'Board', 'Tasks', 'Proposals', 'Meetings', 'Team', 'Milestones', 'Gantt', 'Register', 'Book', 'Spec sheet', 'Contacts', 'Contributions', 'Settings',
     ])
   })
 

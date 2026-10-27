@@ -37,6 +37,18 @@ vi.mock('../book/PdfPageView.tsx', () => ({
     return <div data-testid="pdf-stub" data-url={p.url} data-page-index={p.pageIndex} role="img" aria-label={p.label} />
   },
 }))
+// The Book screen reads as one scrollable column (PdfScrollView). The stub records the page it was asked to
+// scroll to, and a button stands in for the reader scrolling to another page.
+vi.mock('../book/PdfScrollView.tsx', () => ({
+  default: (p: { url: string; pageIndex: number; label: string; onDocument: (n: number) => void; onVisiblePage: (n: number) => void; onError: (m: string) => void }) => {
+    if (pdf.error) queueMicrotask(() => p.onError(pdf.error as string))
+    return (
+      <div data-testid="pdf-stub" data-url={p.url} data-page-index={p.pageIndex} role="img" aria-label={p.label}>
+        <button type="button" data-testid="stub-scroll-to-5" onClick={() => p.onVisiblePage(5)}>scroll to 5</button>
+      </div>
+    )
+  },
+}))
 vi.mock('../data/useRegulationDocument.ts', () => ({
   useRegulationDocument: () => ({ ...state.doc, refetch: state.refetch }),
   useBookFile: () => state.file,
@@ -84,7 +96,7 @@ describe('a configured book', () => {
     expect(screen.getByTestId('book-open-external')).toHaveAttribute('href', 'https://example.org/regs.pdf#page=16')
     expect(screen.getByTestId('book-location')).toHaveTextContent('Rule F.13.3.1')
     expect(screen.getByTestId('book-location')).toHaveTextContent('Page 12 (PDF page 16)')
-    expect(screen.getByRole('img')).toHaveAccessibleName('Requirements Book, ED1, page 12')
+    expect(screen.getByRole('img')).toHaveAccessibleName('Requirements Book, ED1')
     expect(screen.queryByTestId('book-page-notice')).not.toBeInTheDocument()
   })
 
@@ -93,9 +105,12 @@ describe('a configured book', () => {
     const user = userEvent.setup()
     renderBook('/book?page=3')
     expect(await drawn()).toBe(3)
-    await user.click(screen.getByRole('button', { name: /Next/ }))
-    await waitFor(async () => expect(await drawn()).toBe(4))
-    const box = screen.getByRole('textbox', { name: 'Page' })
+    // Scrolling to another page keeps it in the address; there is no Previous or Next on this screen.
+    expect(screen.queryByRole('button', { name: /Next/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Previous/ })).not.toBeInTheDocument()
+    await user.click(screen.getByTestId('stub-scroll-to-5'))
+    await waitFor(() => expect(screen.getByTestId('book-location')).toHaveTextContent('Page 5'))
+    const box = screen.getByRole('textbox', { name: 'Go to page' })
     await user.clear(box)
     await user.type(box, '40{Enter}')
     await waitFor(async () => expect(await drawn()).toBe(40))
@@ -183,13 +198,13 @@ describe('a configured book', () => {
     view.rerender(<MemoryRouter initialEntries={['/book']}><Book /></MemoryRouter>)
     await waitFor(() => expect(screen.getByTestId('pdf-stub')).toHaveAttribute('data-url', 'https://x.test/sign/ed2'))
     expect(screen.getByTestId('book-location')).toHaveTextContent('ED2')
-    expect(screen.getByRole('img')).toHaveAccessibleName('Requirements Book, ED2, page 1')
+    expect(screen.getByRole('img')).toHaveAccessibleName('Requirements Book, ED2')
   })
 
   it('keeps the page controls large enough to use on a phone', async () => {
     renderBook('/book?page=3')
     await drawn()
-    for (const control of [screen.getByRole('button', { name: /Previous/ }), screen.getByRole('button', { name: /Next/ }), screen.getByRole('textbox', { name: 'Page' }), screen.getByTestId('book-open-external')]) {
+    for (const control of [screen.getByRole('textbox', { name: 'Go to page' }), screen.getByTestId('book-open-external')]) {
       expect(control.className).toMatch(/min-h-11/)
     }
   })

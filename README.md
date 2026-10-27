@@ -714,6 +714,16 @@ Three separate things:
 | Call a meeting, write its agenda and minutes | no | — | — | yes | yes |
 | Delete a meeting / edit the agenda template | no | — | — | President only | yes |
 
+**Meeting for a department, and announcement texts.** A meeting can be called
+for one department (`meetings.subteam_key`, migration
+`20260140000000_meeting_department.sql`; empty = the whole club). Choosing one
+tells that department's members for the season and its Head (and the parent
+Head) in their inbox, never the person who called it. A meeting dated before
+today is a record being written up: the screen warns but still saves, and the
+database tells nobody. Every meeting also offers ready-made **WhatsApp** and
+**email** texts with copy buttons (`src/meetings/meetingText.ts`), built from the
+meeting itself so a correction is made once, in the meeting.
+
 The key point this table makes on purpose: **holding President or Vice
 President, by itself, grants no task or proposal power** — see §7a. Those two
 roles configure departments; a department's day-to-day work is its Head's.
@@ -724,8 +734,10 @@ the caller, so nobody suggests in someone else's name, and requires a title,
 deadline, milestone and at least one requirement link
 (`submit_proposal`). Only that department's Head, or a Developer, may
 review, park, reject, reopen or promote it (`review_proposal`,
-`can_review_proposal`) — never the author of their own suggestion, and never
-a Head of a *different* department. "My proposals" means proposals **you
+`can_review_proposal`) — a Head of a *different* department may not. The
+author of a proposal may review it when they hold that authority themselves:
+a Head can approve and promote their own proposal in their own department
+(`approve_and_promote`; pinned by `supabase/tests/task_authority_create_test.sql`). "My proposals" means proposals **you
 suggested** (`raised_by`), not proposals you might end up owning. Stages
 read Suggested → Under review → Decided (Approved/Rejected), with Parked as
 a side exit; an old proposal missing required data is marked
@@ -852,6 +864,51 @@ directly, so it cannot be faked or tampered with from the outside. It shows
 up as history on the Archive screen and on individual tasks/proposals; it is
 never keystroke-level and never contains a password, phone number or
 private roster note.
+
+**Who may change a task, and the Tasks page.** A **task leader** is an active
+Head (of any department), the President, the Vice President or a Developer
+(`is_task_leader()`, migration `20260142000000_task_authority_and_direct_create.sql`).
+A leader may edit any task and reassign its owner, in any department; an
+ordinary member edits only the tasks they own; a Treasurer is not a leader.
+Archiving, restoring, moving a task to another department and reviewing
+proposals keep their department-scoped rules. A leader can also **create a
+task directly** with "New task" on the Board (`create_task`): a title, an
+active department and a deadline. The milestone and the requirements are
+optional and can be added later on the task; with both given the task keeps
+them, like a promoted one. The owner is told in the inbox.
+Members still suggest work as proposals. `/tasks` is every active task in one
+list (the database view `v_task_list`): click a column heading to sort the
+whole list, click again to reverse; the sort, the search, the department,
+"whose" and state filters and the page are in the address
+(`?sort=&dir=&q=&dept=&scope=&state=&page=`). The database sorts and filters
+all rows, so page 2 continues page 1. Headings are buttons on a wide screen;
+on a phone the list is cards. `/priorities` is no longer in the menu (the Tasks
+page took its place) but Now's tiles still drill down into it.
+
+**The Requirements Book** (`/book`) reads as one scrollable column: pages are
+drawn as they come near the screen and freed when far away, and the page in the
+middle is kept in `?page=`. The Register's reader beside a rule still shows one
+page at a time.
+
+**Tools: Team.** `/team` is the club's tool list (migration
+`20260141000000_team_tools.sql`). A tool has three separate facts: **whose** it
+is (the owner, never changes), **where** it is (workshop, home, university,
+somewhere else) and **who has it** right now (a member, or nobody: it just
+sits there). "Borrowed" is somebody having it, not a place. Everyone reads the
+list; a member lists their own tools; the owner, the President, Vice President,
+a Developer, or whoever has a tool changes where it is and who has it; anyone
+else may take a tool nobody has ("I have it"); only the owner or an admin
+renames or removes it (`guard_tool_change`). Retired members read but do not
+write. It is not behind the season gate.
+
+**What someone finished: Contributions.** `/contributions` lists the tasks a
+member has finished (state `done`, archived ones included), grouped by season
+with a count per department. It opens on you; the picker shows anyone on the
+roster, former members too, and `?member=` keeps the choice in the address.
+It is read-only and has no table of its own: it reads `tasks`, which the whole
+roster already reads, so it cannot disagree with the Board or the Archive.
+Credit follows the task's **current owner**, and a cancelled task is not a
+contribution. It spans seasons, so it is not behind the season gate.
 
 **What needs you: the Inbox.** The same history also feeds each member's own
 inbox (the **Inbox** link in the header, with the unread count). A database

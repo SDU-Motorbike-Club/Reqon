@@ -1,5 +1,5 @@
 -- =============================================================================
---  Contacts checks for Reqon (contact_categories, contacts, migration 20260136).
+--  Contacts checks for Reqon (contact_categories, contacts, migration 20260136000100).
 --
 --  SAFE TO RUN AGAINST THE REAL PROJECT. Everything happens inside one block
 --  that always ends by raising an exception, so every change is rolled back.

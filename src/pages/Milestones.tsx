@@ -12,7 +12,6 @@ import { useMembers } from '../data/useMembers.ts'
 import {
   useMilestones,
   useMilestoneSections,
-  useSetSectionDrafted,
 } from '../data/useMilestones.ts'
 import { useRealtimeMilestoneSections } from '../data/useRealtimeMilestoneSections.ts'
 import { useRealtimeMilestones } from '../data/useRealtimeMilestones.ts'
@@ -22,7 +21,6 @@ import { TASK_STATE_LABEL } from '../tasks/taskState.ts'
 import { milestoneProgress, progressLabel, tasksUnderSection, unsectionedFor } from './gantt/ganttProgress.ts'
 import { ms1Points } from './now/nowModel.ts'
 import {
-  draftedCount,
   sectionsFor,
   subsectionsOf,
   submissionWindow,
@@ -47,7 +45,6 @@ export default function Milestones() {
   const realtime = useRealtimeMilestoneSections()
   useRealtimeMilestones()
   const clauses = useClauses()
-  const setDrafted = useSetSectionDrafted()
   const permissions = usePermissions()
   const members = useMembers()
   const departments = useSubteams()
@@ -136,11 +133,6 @@ export default function Milestones() {
       {milestones.isLoading && (
         <p role="status" className="mb-2 text-xs text-slate-500">Loading…</p>
       )}
-      {setDrafted.isError && (
-        <p role="alert" className="mb-3 rounded border border-red-300 bg-red-50 p-2 text-sm text-red-800">
-          Could not save that change: {setDrafted.error.message}
-        </p>
-      )}
 
       <p className="mb-3 text-xs text-slate-600">
         The bar counts linked Board tasks done. Submitted and accepted are recorded by hand.{' '}
@@ -158,7 +150,6 @@ export default function Milestones() {
         {ordered.map((milestone, index) => {
           const window = submissionWindow(milestone, new Date())
           const mySections = sectionsFor(sections.data ?? [], milestone.key)
-          const { drafted, total } = draftedCount(mySections)
           const view = progress.data ? milestoneProgress(mySections, progress.data, milestone.key) : null
           const isOpen = open.has(milestone.key)
           const panelId = `milestone-panel-${milestone.key}`
@@ -247,11 +238,6 @@ export default function Milestones() {
               />
 
               <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-slate-500">
-                {total > 0 && (
-                  <span>
-                    Drafting checklist: <span data-testid={`sections-${milestone.key}`}>{drafted}/{total}</span> sections drafted
-                  </span>
-                )}
                 <span data-testid={`points-${milestone.key}`}>{milestone.max_points} points</span>
                 {milestone.article_ref && <span className="font-mono">{milestone.article_ref}</span>}
               </p>
@@ -267,11 +253,6 @@ export default function Milestones() {
                   {mySections.length === 0 && loose.length === 0 && (
                     <p className="text-xs text-slate-600">No sections and no linked tasks yet.</p>
                   )}
-                  {mySections.length > 0 && (
-                    <p className="text-xs font-medium text-slate-600">
-                      Drafting checklist — tick a section once its text is drafted ({drafted}/{total}). Ticks are not task progress.
-                    </p>
-                  )}
                   <ul className="mt-1 space-y-2">
                     {topLevelSections(sections.data ?? [], milestone.key).map((section) => {
                       const subs = subsectionsOf(sections.data ?? [], section.id)
@@ -279,18 +260,11 @@ export default function Milestones() {
                         const under = progress.data ? tasksUnderSection(progress.data, sec.id) : []
                         return (
                           <li key={sec.id} className={`rounded border border-slate-200 bg-white p-2 ${nested ? 'ml-6' : ''}`} data-testid={`milestone-section-${sec.id}`}>
-                            <label className="flex min-h-11 items-center gap-2 font-medium text-slate-900 sm:min-h-0">
-                              <input
-                                type="checkbox"
-                                checked={sec.is_drafted}
-                                aria-label={`${sec.name}${nested ? ' (subsection)' : ''} drafted`}
-                                onChange={(e) => setDrafted.mutate({ id: sec.id, isDrafted: e.target.checked })}
-                                className="h-5 w-5 accent-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
-                              />
+                            <p className="flex min-h-11 items-center gap-2 font-medium text-slate-900 sm:min-h-0">
                               {nested && <span aria-hidden="true" className="text-slate-400">↳</span>}
                               {sec.name}
                               {nested && <span className="sr-only"> (subsection)</span>}
-                            </label>
+                            </p>
                             {under.length === 0 ? (
                               // Linking a task to a section happens on the Gantt; go straight to this section there.
                               <p className="ml-7 text-xs text-slate-500">

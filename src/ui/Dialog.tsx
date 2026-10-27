@@ -54,7 +54,7 @@ export function Dialog({
         // A click on the backdrop lands on the <dialog> itself.
         if (dismissible && event.target === event.currentTarget) onClose()
       }}
-      className="pc-slide-up mx-0 mt-auto mb-0 max-h-[90dvh] w-full max-w-none overflow-y-auto overscroll-contain rounded-t-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-900/40 sm:m-auto sm:max-h-[85dvh] sm:w-[min(34rem,calc(100%-2rem))] sm:rounded-xl"
+      className="pc-slide-up mx-0 mt-auto mb-0 max-h-[90dvh] w-full max-w-none overflow-y-auto overscroll-contain rounded-t-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-900/40 sm:m-auto sm:max-h-[85dvh] sm:w-[min(40rem,calc(100%-2rem))] lg:w-[min(54rem,calc(100%-3rem))] sm:rounded-xl"
     >
       {open && (
         <div className="px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5">{children}</div>

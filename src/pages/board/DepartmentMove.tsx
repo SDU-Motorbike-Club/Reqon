@@ -1,29 +1,34 @@
-import { useId, useState } from 'react'
-import { useSetTaskDepartment } from '../../data/useTasks.ts'
-import { buttonSecondary } from '../../ui/buttons.ts'
-import { ActionError } from '../../ui/states.tsx'
+import { useId } from 'react'
 
 const FIELD =
   'mt-1 min-h-11 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0'
 const LABEL = 'block text-xs font-medium text-slate-700'
-const MAX_REASON = 500
+export const MAX_DEPARTMENT_REASON = 500
+// A task's FIRST department needs no reason from the person: the command still
+// records one, so the history says what happened.
+export const FIRST_ASSIGNMENT_REASON = 'Department assigned'
 
-// Which department a task belongs to is never part of the ordinary edit: it is its
-// own command (set_task_department), with a reason the audit trail keeps. Shown only
-// to someone the database would let move THIS task (taskDepartmentTargets): the
-// President, Vice President or a Developer, or a Head between departments they head.
+// Which department a task belongs to is not part of the ordinary field edit: it is
+// its own command (set_task_department), with a reason the audit trail keeps. It is
+// chosen here and SAVED with "Save details" (TaskDetails runs the command), so there
+// is one Save for everything on the panel. Shown only to someone the database would
+// let move THIS task (taskDepartmentTargets): the President, Vice President or a
+// Developer, or a Head between departments they head.
 export function DepartmentMove(props: {
   taskId: string
   currentName: string | null
   targets: { key: string; name: string }[]
+  // The department picked (a key, or '' for none) and the reason typed; both are held by
+  // TaskDetails, so Save details can send them.
+  value: string
+  reason: string
+  onValue: (key: string) => void
+  onReason: (reason: string) => void
+  disabled?: boolean
 }) {
-  const move = useSetTaskDepartment()
   const uid = useId()
-  const [target, setTarget] = useState('')
-  const [reason, setReason] = useState('')
-  const [moved, setMoved] = useState<string | null>(null)
-  const chosen = props.targets.some((d) => d.key === target) ? target : ''
-  const trimmed = reason.trim()
+  const firstTime = props.currentName === null
+  const chosen = props.targets.some((d) => d.key === props.value) ? props.value : ''
 
   return (
     <section className="border-t border-slate-100 pt-2" aria-labelledby={`${uid}-h`} data-testid={`task-department-${props.taskId}`}>
@@ -31,32 +36,13 @@ export function DepartmentMove(props: {
         Department
       </h4>
       <p className="mt-0.5 text-sm text-slate-700">{props.currentName ?? 'No department yet.'}</p>
-      <form
-        noValidate
-        className="mt-1 grid gap-2 sm:grid-cols-2"
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (chosen === '' || trimmed === '' || move.isPending) return
-          const name = props.targets.find((d) => d.key === chosen)?.name ?? chosen
-          setMoved(null)
-          move.mutate(
-            { id: props.taskId, departmentKey: chosen, reason: trimmed },
-            {
-              onSuccess: () => {
-                setMoved(name)
-                setTarget('')
-                setReason('')
-              },
-            },
-          )
-        }}
-      >
+      <div className="mt-1 grid gap-2 sm:grid-cols-2">
         <div>
           <label htmlFor={`${uid}-to`} className={LABEL}>
-            {props.currentName ? 'Move to' : 'Give it a department'}
+            {firstTime ? 'Give it a department' : 'Move to'}
           </label>
-          <select id={`${uid}-to`} value={chosen} onChange={(e) => setTarget(e.target.value)} className={FIELD} disabled={move.isPending}>
-            <option value="">Choose a department…</option>
+          <select id={`${uid}-to`} value={chosen} onChange={(e) => props.onValue(e.target.value)} className={FIELD} disabled={props.disabled}>
+            <option value="">{firstTime ? 'Choose a department…' : 'Keep the current department'}</option>
             {props.targets.map((d) => (
               <option key={d.key} value={d.key}>
                 {d.name}
@@ -66,34 +52,23 @@ export function DepartmentMove(props: {
         </div>
         <div>
           <label htmlFor={`${uid}-why`} className={LABEL}>
-            Why? (kept in the history)
+            {firstTime ? 'Why? (optional, kept in the history)' : 'Why? (required to move, kept in the history)'}
           </label>
           <input
             id={`${uid}-why`}
-            value={reason}
-            maxLength={MAX_REASON}
-            onChange={(e) => setReason(e.target.value)}
+            value={props.reason}
+            maxLength={MAX_DEPARTMENT_REASON}
+            onChange={(e) => props.onReason(e.target.value)}
             className={FIELD}
-            disabled={move.isPending}
+            disabled={props.disabled}
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
-          <button
-            type="submit"
-            className={buttonSecondary}
-            disabled={chosen === '' || trimmed === '' || move.isPending}
-            data-testid={`task-department-move-${props.taskId}`}
-          >
-            {move.isPending ? 'Moving…' : 'Move task'}
-          </button>
-          {moved && !move.isPending && (
-            <span role="status" className="text-sm text-green-700">
-              Moved to {moved}.
-            </span>
-          )}
-        </div>
-      </form>
-      <ActionError error={move.error} className="mt-1" />
+      </div>
+      {chosen !== '' && (
+        <p className="mt-1 text-xs text-slate-600" data-testid={`task-department-pending-${props.taskId}`}>
+          {firstTime ? 'It gets this department when you press Save details.' : 'It moves when you press Save details.'}
+        </p>
+      )}
     </section>
   )
 }

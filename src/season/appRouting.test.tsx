@@ -58,6 +58,7 @@ vi.mock('../data/useNotifications.ts', () => ({ useRealtimeNotifications: () => 
 // SeasonGate's fallback in front of it) is exactly what this test checks.
 // vi.mock() calls are hoisted and must be static top-level calls (no loop).
 vi.mock('../pages/Now.tsx', () => ({ default: () => 'NOW PAGE' }))
+vi.mock('../pages/Tasks.tsx', () => ({ default: () => 'TASKS PAGE' }))
 vi.mock('../pages/Priorities.tsx', () => ({ default: () => 'PRIORITIES PAGE' }))
 vi.mock('../pages/Register.tsx', () => ({ default: () => 'REGISTER PAGE' }))
 vi.mock('../pages/Milestones.tsx', () => ({ default: () => 'MILESTONES PAGE' }))
@@ -69,12 +70,15 @@ vi.mock('../pages/SpecSheet.tsx', () => ({ default: () => 'SPECS PAGE' }))
 vi.mock('../pages/Finances.tsx', () => ({ default: () => 'FINANCES PAGE' }))
 vi.mock('../pages/Settings.tsx', () => ({ default: () => 'SETTINGS PAGE' }))
 vi.mock('../pages/Inbox.tsx', () => ({ default: () => 'INBOX PAGE' }))
+vi.mock('../pages/Contributions.tsx', () => ({ default: () => 'CONTRIBUTIONS PAGE' }))
+vi.mock('../pages/Team.tsx', () => ({ default: () => 'TEAM PAGE' }))
 
 const { default: App } = await import('../App.tsx')
 
 const SEASON_SCOPED_ROUTES: [string, string][] = [
   ['/', 'NOW PAGE'],
   ['/priorities', 'PRIORITIES PAGE'],
+  ['/tasks', 'TASKS PAGE'],
   ['/register', 'REGISTER PAGE'],
   ['/milestones', 'MILESTONES PAGE'],
   ['/gantt', 'GANTT PAGE'],
@@ -131,6 +135,20 @@ describe('no current season: every season-scoped route shows the gate, never its
   it('/inbox renders regardless — it is not season-scoped', async () => {
     renderAt('/inbox')
     await waitFor(() => expect(screen.getByText('INBOX PAGE')).toBeInTheDocument())
+    expect(screen.queryByText('No current season')).not.toBeInTheDocument()
+  })
+
+  // Your first steps and the club's tools do not belong to a season.
+  it('/team renders regardless — it is not season-scoped', async () => {
+    renderAt('/team')
+    await waitFor(() => expect(screen.getByText('TEAM PAGE')).toBeInTheDocument())
+    expect(screen.queryByText('No current season')).not.toBeInTheDocument()
+  })
+
+  // A person's record spans seasons, so it must not wait on one.
+  it('/contributions renders regardless — it is not season-scoped', async () => {
+    renderAt('/contributions')
+    await waitFor(() => expect(screen.getByText('CONTRIBUTIONS PAGE')).toBeInTheDocument())
     expect(screen.queryByText('No current season')).not.toBeInTheDocument()
   })
 })

@@ -30,7 +30,7 @@ export function BackupsGuide({ defaultAudience = 'leaders' }: { defaultAudience?
               aria-selected={audience === t.id}
               aria-controls={`guide-panel-${t.id}`}
               onClick={() => setAudience(t.id)}
-              className={`rounded border px-3 py-1.5 text-sm ${
+              className={`min-h-11 rounded border px-3 py-1.5 text-sm focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:outline-none sm:min-h-0 ${
                 audience === t.id ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
               }`}
             >

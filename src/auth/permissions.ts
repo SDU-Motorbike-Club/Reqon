@@ -196,11 +196,23 @@ export type TaskActor = {
   governs?: readonly string[]
 }
 
-// can_edit_contacts() (20260136000000): the Head of any active department,
-// the President, the Vice President or a Developer.
-export function canEditContacts(actor: TaskActor | null): boolean {
+// is_task_leader() (20260142000000): an active Head of any department, the
+// President, the Vice President or a Developer. A leader may edit ANY task, in any
+// department, and create one directly. A Treasurer is not a leader.
+export function isTaskLeader(actor: TaskActor | null): boolean {
   if (!actor || actor.status !== 'active') return false
   return actor.isDeveloper || actor.isGovernance === true || actor.headOf.length > 0
+}
+
+// can_edit_contacts() (20260136000100): the same people.
+export function canEditContacts(actor: TaskActor | null): boolean {
+  return isTaskLeader(actor)
+}
+
+// create_task() (20260142000000): a task leader creates a task straight on the Board.
+// Everyone else suggests it as a proposal.
+export function canCreateTask(actor: TaskActor | null): boolean {
+  return isTaskLeader(actor)
 }
 
 // department_authority(key) is not null (20260130000000): the Head (directly
@@ -213,8 +225,9 @@ export function hasDepartmentAuthority(actor: TaskActor, subteamKey: string | nu
   return actor.headOf.includes(subteamKey) || (actor.governs ?? []).includes(subteamKey)
 }
 
-// can_edit_task(id): the active owner, or department authority over the
-// task's department — and the task must not be archived.
+// can_edit_task(id): the active owner, department authority over the task's
+// department, or any task leader (a Head of ANY department, the President, the
+// Vice President, a Developer) — and the task must not be archived.
 export function canEditTask(
   actor: TaskActor,
   task: Pick<Task, 'owner_id' | 'subteam_key' | 'archived_at'>,
@@ -222,17 +235,17 @@ export function canEditTask(
   if (actor.status !== 'active') return false
   if (task.archived_at !== null) return false
   if (task.owner_id === actor.id) return true
-  return hasDepartmentAuthority(actor, task.subteam_key)
+  return hasDepartmentAuthority(actor, task.subteam_key) || isTaskLeader(actor)
 }
 
-// guard_task_edit()'s owner-reassignment rule: department authority only —
-// never the owner reassigning themselves away, which is why this is not
+// guard_task_edit()'s owner-reassignment rule: department authority or any task
+// leader — never the owner reassigning themselves away, which is why this is not
 // folded into canEditTask above.
 export function canReassignTaskOwner(
   actor: TaskActor,
   task: Pick<Task, 'subteam_key'>,
 ): boolean {
-  return hasDepartmentAuthority(actor, task.subteam_key)
+  return hasDepartmentAuthority(actor, task.subteam_key) || isTaskLeader(actor)
 }
 
 // archive_task(): department authority — deliberately NOT the plain owner.

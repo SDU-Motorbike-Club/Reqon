@@ -87,7 +87,7 @@ export default function Archive() {
 
   return (
     <main id="main-content" tabIndex={-1} className={pageMain()}>
-      <PageHeader title="Archive" description="Work that is no longer live: archived tasks, and proposals that were approved, rejected or decided. Everyone can read it; nothing here is deleted." />
+      <PageHeader title="Archive" description="Work that is no longer live: tasks archived by hand or automatically 24 hours after they were done, and proposals that were approved, rejected or decided. Everyone can read it; nothing here is deleted." />
 
       <div role="group" aria-label="What to browse" className="mb-3 flex flex-wrap gap-1 rounded-md bg-slate-50 p-1" data-testid="archive-tabs">
         {(['tasks', 'proposals'] as const).map((tab) => (

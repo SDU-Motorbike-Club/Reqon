@@ -95,6 +95,8 @@ export function presentActivity(row: ActivityRow, names: ReadonlyMap<string, str
       return { ...base, icon: '✎', summary: 'Review note updated' }
     case 'requirements_changed':
       return { ...base, icon: '§', summary: 'Proposal requirements changed' }
+    case 'called':
+      return { ...base, icon: '☎', summary: `Meeting called for ${text(d.subteam_key) ?? 'a department'}` }
     case 'commented':
       return { ...base, icon: '✎', summary: `Discussion: ${text(d.kind)?.replaceAll('_', ' ') ?? 'comment'} added` }
     case 'revised':

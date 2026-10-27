@@ -71,15 +71,14 @@ describe('Milestones: linked work', () => {
     expect(screen.queryByText('No linked work')).not.toBeInTheDocument()
   })
 
-  it('names the checklist as a drafting checklist, not as task progress', async () => {
+  it('has no drafting checklist: sections are listed by name, with no tick and no count', async () => {
     progress.data = []
     renderPage()
-    expect(screen.getByTestId('sections-M1')).toHaveTextContent('1/2')
+    expect(screen.queryByTestId('sections-M1')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /M1 Team Plan/ }))
-    // Said once, in the panel, not on every section.
-    expect(screen.getByText(/Drafting checklist — tick a section once its text is drafted \(1\/2\)\. Ticks are not task progress\./)).toBeInTheDocument()
-    expect(screen.getByRole('checkbox', { name: 'Cover drafted' })).toBeChecked()
-    expect(screen.queryByText(/a checklist tick, not task completion/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Drafting checklist/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.getByText('Cover')).toBeInTheDocument()
   })
 })
 
@@ -186,7 +185,7 @@ describe('Milestones: work, submission and acceptance are three facts', () => {
   })
 })
 
-describe('Milestones: reference text, errors and the drafting tick', () => {
+describe('Milestones: reference text and errors', () => {
   it('shows the F.14 format rules and penalties from the imported clauses, in book order', () => {
     extra.clauses = [
       { clause_key: 'F.14.2.2', printed_ref: 'F.14.2.2', body: 'Use A4.' },
@@ -208,14 +207,5 @@ describe('Milestones: reference text, errors and the drafting tick', () => {
     await userEvent.click(screen.getByRole('button', { name: /try again/i }))
     expect(extra.refetch).toHaveBeenCalled()
     extra.loadError = null
-  })
-
-  it('ticks a section as drafted through its own command, and nothing else', async () => {
-    progress.data = []
-    const user = userEvent.setup()
-    renderPage()
-    await user.click(screen.getByRole('button', { name: /M1 Team Plan/ }))
-    await user.click(screen.getByRole('checkbox', { name: /Cover/ }))
-    expect(extra.drafted).toHaveBeenCalledWith({ id: 's1', isDrafted: false })
   })
 })

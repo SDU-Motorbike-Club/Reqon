@@ -6,10 +6,13 @@ import {
   type Meeting,
   type MeetingDraft,
 } from '../data/useMeetings.ts'
+import { useSubteams } from '../data/useSubteams.ts'
+import { isActive } from '../departments/types.ts'
 import { Dialog } from '../ui/Dialog.tsx'
 import { buttonPrimary, buttonSecondary } from '../ui/buttons.ts'
 import { ActionError } from '../ui/states.tsx'
 import { MarkdownField } from './MarkdownField.tsx'
+import { isPastDay } from './meetingText.ts'
 
 // Calling a meeting, or editing one that has happened.
 //
@@ -103,6 +106,14 @@ function Form({
   const [startsAt, setStartsAt] = useState((meeting?.starts_at ?? '').slice(0, 5))
   const [endsAt, setEndsAt] = useState((meeting?.ends_at ?? '').slice(0, 5))
   const [location, setLocation] = useState(meeting?.location ?? '')
+  const [subteamKey, setSubteamKey] = useState(meeting?.subteam_key ?? '')
+  const departments = useSubteams().data ?? []
+  // A saved department that has since been archived stays choosable, so opening
+  // and saving an old meeting never silently drops it.
+  const choices = departments.filter((d) => isActive(d) || d.key === meeting?.subteam_key)
+  // Warn about a date the person has just picked, not about a past meeting they
+  // are only adding minutes to.
+  const pastDate = heldOn !== (meeting?.held_on ?? '') && isPastDay(heldOn)
   const [agenda, setAgenda] = useState(meeting ? (meeting.agenda ?? '') : template)
   const [notes, setNotes] = useState(meeting?.notes ?? '')
   const [attendees, setAttendees] = useState(meeting?.attendees ?? '')
@@ -137,6 +148,7 @@ function Form({
       startsAt: startsAt || null,
       endsAt: endsAt || null,
       location: location.trim() || null,
+      subteamKey: subteamKey || null,
       agenda: agenda.trim() || null,
       notes: notes.trim() || null,
       attendees: attendees.trim() || null,
@@ -197,6 +209,11 @@ function Form({
                 {errors.heldOn}
               </p>
             )}
+            {pastDate && !errors.heldOn && (
+              <p role="status" data-testid="past-date-warning" className="mt-1 text-xs text-amber-900">
+                That day has already passed. You can still save it, for example to record a meeting that took place. Nobody is notified for a past date.
+              </p>
+            )}
           </div>
           <div>
             <label className={label} htmlFor={fieldId('starts-at')}>
@@ -245,6 +262,31 @@ function Form({
             placeholder="Workshop, or a link"
             className={field}
           />
+        </div>
+
+        <div>
+          <label className={label} htmlFor={fieldId('subteam')}>
+            For (optional)
+          </label>
+          <select
+            id={fieldId('subteam')}
+            name="subteam_key"
+            value={subteamKey}
+            onChange={(e) => setSubteamKey(e.target.value)}
+            aria-describedby={fieldId('subteam-note')}
+            className={field}
+          >
+            <option value="">The whole club</option>
+            {choices.map((d) => (
+              <option key={d.key} value={d.key}>
+                {d.name}
+                {isActive(d) ? '' : ' (archived)'}
+              </option>
+            ))}
+          </select>
+          <p id={fieldId('subteam-note')} className="mt-1 text-xs text-slate-600">
+            A department is told in its inbox, together with its Head. Leave it on the whole club to tell nobody.
+          </p>
         </div>
 
         <MarkdownField

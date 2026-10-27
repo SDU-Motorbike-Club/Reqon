@@ -125,8 +125,9 @@ begin
   perform pg_temp.chk('G14 an unrelated member changes nothing (the task stays readable, not editable)',
     (select milestone_key from tasks where id = t) = 'GL-A2', q);
   q := pg_temp.act(hdB, format('update tasks set milestone_key = %L, section_id = %L where id = %L', 'GL-A1', secA1, t));
-  perform pg_temp.chk('G15 the Head of ANOTHER department changes nothing',
-    (select milestone_key from tasks where id = t) = 'GL-A2', q);
+  perform pg_temp.chk('G15 the Head of ANOTHER department may relink it too (any Head is a task leader, 20260142)',
+    (select milestone_key from tasks where id = t) = 'GL-A1', q);
+  q := pg_temp.act(hdB, format('update tasks set milestone_key = %L, section_id = %L where id = %L', 'GL-A2', secA2, t)); -- put it back
   q := pg_temp.act(hdA, format('update tasks set milestone_key = %L, section_id = %L where id = %L', 'GL-A1', secA1, t));
   perform pg_temp.chk('G16 the Head of the task''s department relinks it',
     q = 'ok' and (select milestone_key from tasks where id = t) = 'GL-A1' and (select section_id from tasks where id = t) = secA1, q);

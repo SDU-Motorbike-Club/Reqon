@@ -811,6 +811,7 @@ export type Database = {
           notes: string | null
           season_id: string
           starts_at: string | null
+          subteam_key: string | null
           summary: string | null
           title: string
           updated_at: string
@@ -827,6 +828,7 @@ export type Database = {
           notes?: string | null
           season_id: string
           starts_at?: string | null
+          subteam_key?: string | null
           summary?: string | null
           title: string
           updated_at?: string
@@ -843,6 +845,7 @@ export type Database = {
           notes?: string | null
           season_id?: string
           starts_at?: string | null
+          subteam_key?: string | null
           summary?: string | null
           title?: string
           updated_at?: string
@@ -875,6 +878,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_subteam_progress"
             referencedColumns: ["season_id"]
+          },
+          {
+            foreignKeyName: "meetings_subteam_key_fkey"
+            columns: ["subteam_key"]
+            isOneToOne: false
+            referencedRelation: "subteams"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "meetings_subteam_key_fkey"
+            columns: ["subteam_key"]
+            isOneToOne: false
+            referencedRelation: "v_subteam_progress"
+            referencedColumns: ["key"]
           },
         ]
       }
@@ -1995,6 +2012,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "task_attachments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_list"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "task_attachments_uploaded_by_fkey"
             columns: ["uploaded_by"]
             isOneToOne: false
@@ -2041,6 +2065,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "task_dependencies_depends_on_task_id_fkey"
+            columns: ["depends_on_task_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_list"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "task_dependencies_season_id_fkey"
             columns: ["season_id"]
             isOneToOne: false
@@ -2066,6 +2097,13 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_dependencies_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_list"
             referencedColumns: ["id"]
           },
         ]
@@ -2306,6 +2344,13 @@ export type Database = {
             referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "task_requirements_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_list"
+            referencedColumns: ["id"]
+          },
         ]
       }
       tasks: {
@@ -2467,6 +2512,51 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_subteam_progress"
             referencedColumns: ["key"]
+          },
+        ]
+      }
+      tools: {
+        Row: {
+          created_at: string
+          held_by: string | null
+          id: string
+          item: string
+          location: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          held_by?: string | null
+          id?: string
+          item: string
+          location?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          held_by?: string | null
+          id?: string
+          item?: string
+          location?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tools_held_by_fkey"
+            columns: ["held_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tools_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2742,6 +2832,76 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "members"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_task_list: {
+        Row: {
+          archived_at: string | null
+          department_name: string | null
+          due_date: string | null
+          id: string | null
+          milestone_key: string | null
+          milestone_name: string | null
+          owner_id: string | null
+          owner_name: string | null
+          priority: Database["public"]["Enums"]["task_priority"] | null
+          season_id: string | null
+          starts_on: string | null
+          state: Database["public"]["Enums"]["task_state"] | null
+          subteam_key: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_milestone_key_fkey"
+            columns: ["milestone_key"]
+            isOneToOne: false
+            referencedRelation: "milestones"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "tasks_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "v_current_season"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "v_subteam_progress"
+            referencedColumns: ["season_id"]
+          },
+          {
+            foreignKeyName: "tasks_subteam_key_fkey"
+            columns: ["subteam_key"]
+            isOneToOne: false
+            referencedRelation: "subteams"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "tasks_subteam_key_fkey"
+            columns: ["subteam_key"]
+            isOneToOne: false
+            referencedRelation: "v_subteam_progress"
+            referencedColumns: ["key"]
           },
         ]
       }
@@ -3092,6 +3252,53 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_task: {
+        Args: {
+          p_clause_keys: string[]
+          p_detail?: string
+          p_due_date: string
+          p_milestone_key: string
+          p_owner_id: string
+          p_priority?: Database["public"]["Enums"]["task_priority"]
+          p_season_id: string
+          p_starts_on?: string
+          p_subteam_key: string
+          p_title: string
+        }
+        Returns: {
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          blocked_reason: string | null
+          blocked_since: string | null
+          completed_at: string | null
+          completion_source: string | null
+          created_at: string
+          created_by: string | null
+          detail: string | null
+          due_date: string | null
+          id: string
+          links_required: boolean
+          milestone_key: string | null
+          owner_id: string | null
+          priority: Database["public"]["Enums"]["task_priority"]
+          season_id: string
+          section_id: string | null
+          source_proposal: string | null
+          starred: boolean
+          starts_on: string | null
+          state: Database["public"]["Enums"]["task_state"]
+          subteam_key: string | null
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tasks"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       dearmor: { Args: { "": string }; Returns: string }
       delete_attachment: { Args: { p_attachment_id: string }; Returns: boolean }
       department_authority: { Args: { p_key: string }; Returns: string }
@@ -3148,6 +3355,7 @@ export type Database = {
       is_developer: { Args: never; Returns: boolean }
       is_finite_number: { Args: { n: number }; Returns: boolean }
       is_member: { Args: never; Returns: boolean }
+      is_task_leader: { Args: never; Returns: boolean }
       lapse_spec_readiness: {
         Args: { p_by?: string; p_reason: string; p_spec_id: string }
         Returns: boolean

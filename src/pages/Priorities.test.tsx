@@ -140,14 +140,14 @@ describe('the list', () => {
 
   it('gives every owner control an accessible name', () => {
     renderPage()
-    // Three rows may be reassigned by this viewer; the fourth is read-only.
-    expect(screen.getAllByLabelText('Owner')).toHaveLength(3)
+    // A Head reassigns any task, so every row has the control (any Head is a task leader, 20260142).
+    expect(screen.getAllByLabelText('Owner')).toHaveLength(4)
   })
 
-  it('offers no owner control for another department\'s task, and names the owner instead', () => {
+  it('offers the owner control for another department\'s task too: a Head is a task leader', () => {
     renderPage()
-    expect(screen.queryByLabelText('Owner', { selector: '#owner-task-2' })).not.toBeInTheDocument()
-    expect(screen.getByTestId('owner-readonly-task-2')).toHaveTextContent('Owner: Bo Wrench')
+    expect(screen.getByLabelText('Owner', { selector: '#owner-task-2' })).toBeInTheDocument()
+    expect(screen.queryByTestId('owner-readonly-task-2')).not.toBeInTheDocument()
     expect(state.taskWrites).toHaveLength(0)
   })
 })

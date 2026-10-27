@@ -32,11 +32,10 @@ test.describe('giving a task a department (F6-01)', () => {
     await expect(panel).toBeVisible()
     await expect(panel).toContainText('No department yet.')
     await panel.getByLabel('Give it a department').selectOption({ label: m.departments.headA.name })
-    const move = panel.getByRole('button', { name: 'Move task' })
-    await expect(move).toBeDisabled() // a reason is required
-    await panel.getByLabel('Why? (kept in the history)').fill('Mechanical owns the frame jig')
-    await move.click()
-    await expect(panel.getByRole('status')).toContainText(`Moved to ${m.departments.headA.name}.`)
+    // The department is saved with Save details; the first department needs no reason.
+    await panel.getByLabel('Why? (optional, kept in the history)').fill('Mechanical owns the frame jig')
+    await page.getByTestId(`task-save-${taskId}`).click()
+    await expect(page.getByTestId(`task-save-result-${taskId}`)).toContainText('Saved: department.')
 
     await expect.poll(() => runSql(`select subteam_key from tasks where id = '${taskId}'`).trim()).toBe(m.departments.headA.key)
     expect(
@@ -62,8 +61,8 @@ test.describe('giving a task a department (F6-01)', () => {
   })
 
   // Role hierarchy (20260130000000): the Vice President ranks above every Head, so they edit a member's task in a
-  // department that HAS a Head (MECH, headed by the fixture Head A); the Head of another department still cannot.
-  test('the Vice President edits a member\'s task in a department that has a Head; another Head cannot', async ({ page }) => {
+  // department that HAS a Head (MECH, headed by the fixture Head A); the Head of another department may too (any Head is a task leader).
+  test('the Vice President edits a member\'s task in a department that has a Head; so can another Head (any Head is a task leader)', async ({ page }) => {
     const m = readManifest()
     // Fixture only: the department is set the way set_task_department does it (an internal write the guard allows).
     runSql(`begin; set local reqon.task_lifecycle_write = 'on'; update tasks set subteam_key = '${m.departments.headA.key}' where id = '${taskId}'; commit;`)
@@ -76,6 +75,8 @@ test.describe('giving a task a department (F6-01)', () => {
     await login(page, m.users.headB.email, m.password)
     await page.goto(`/board?task=${taskId}`)
     await expect(page.getByTestId(`task-details-${taskId}`)).toBeVisible()
-    await expect(page.getByTestId(`task-${taskId}`).getByLabel(/Move .* to another lane/)).toHaveCount(0)
+    // 20260142: a Head of ANY department may edit any task, so Head B moves it too.
+    await page.getByTestId(`task-${taskId}`).getByLabel(/Move .* to another lane/).selectOption('todo')
+    await expect.poll(() => runSql(`select state from tasks where id = '${taskId}'`).trim()).toBe('todo')
   })
 })

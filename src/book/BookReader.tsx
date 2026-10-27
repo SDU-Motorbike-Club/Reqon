@@ -9,6 +9,7 @@ import { embedUrl } from './source.ts'
 
 // pdf.js is fetched only when a reader actually opens.
 const PdfPageView = lazy(() => import('./PdfPageView.tsx'))
+const PdfScrollView = lazy(() => import('./PdfScrollView.tsx'))
 
 const linkButton =
   'inline-flex min-h-11 items-center rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0'
@@ -29,6 +30,7 @@ export function BookReader({
   note,
   notice,
   compact = false,
+  mode = 'page',
   toolbarExtra,
 }: {
   // The printed page to show, or null for the start of the document.
@@ -41,6 +43,9 @@ export function BookReader({
   // A problem with the requested page itself (out of range, not a number).
   notice?: string | null
   compact?: boolean
+  // 'page' draws one page with Previous and Next (the Register, beside a rule). 'scroll' draws the
+  // whole book as one scrollable column (the Book screen); the page in the middle is kept in ?page=.
+  mode?: 'page' | 'scroll'
   toolbarExtra?: ReactNode
 }) {
   const season = useSeason()
@@ -153,11 +158,13 @@ export function BookReader({
       </p>
 
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Page">
-        <button type="button" className={buttonSecondary} onClick={() => go(printed - 1)} disabled={printed <= 1}>
-          <span aria-hidden="true">←</span> Previous
-        </button>
+        {mode === 'page' && (
+          <button type="button" className={buttonSecondary} onClick={() => go(printed - 1)} disabled={printed <= 1}>
+            <span aria-hidden="true">←</span> Previous
+          </button>
+        )}
         <label className="flex items-center gap-1 text-sm text-slate-700">
-          Page
+          {mode === 'scroll' ? 'Go to page' : 'Page'}
           <input
             inputMode="numeric"
             value={draft ?? String(printed)}
@@ -175,9 +182,11 @@ export function BookReader({
             of {lastPrinted}
           </span>
         )}
-        <button type="button" className={buttonSecondary} onClick={() => go(printed + 1)} disabled={lastPrinted !== null && printed >= lastPrinted}>
-          Next <span aria-hidden="true">→</span>
-        </button>
+        {mode === 'page' && (
+          <button type="button" className={buttonSecondary} onClick={() => go(printed + 1)} disabled={lastPrinted !== null && printed >= lastPrinted}>
+            Next <span aria-hidden="true">→</span>
+          </button>
+        )}
         <a href={openUrl} target="_blank" rel="noopener noreferrer" className={linkButton} data-testid="book-open-external">
           Open the PDF in a new tab
           <span className="sr-only"> (opens in a new tab)</span>
@@ -194,6 +203,24 @@ export function BookReader({
           </button>
         </div>
       ) : (
+        mode === 'scroll' ? (
+          <Suspense fallback={<LoadingState label="Loading the reader…" />}>
+            <PdfScrollView
+              key={`${current?.identity ?? ''}#${current?.attempt ?? 0}`}
+              url={current?.url ?? file.data.url}
+              // With no page asked for, the book opens at its very start, the cover included.
+              pageIndex={page === null ? 1 : index}
+              label={`Requirements Book, ${regsRef}`}
+              maxHeightClass={compact ? 'max-h-[70vh]' : 'h-[calc(100dvh-14rem)] min-h-[24rem]'}
+              onDocument={setPdfPages}
+              onVisiblePage={(visible) => {
+                const next = Math.max(1, visible - offset)
+                if (next !== printed) onPageChange(next)
+              }}
+              onError={setReadError}
+            />
+          </Suspense>
+        ) : (
         <div className={`overflow-auto rounded border border-slate-300 bg-slate-100 ${compact ? 'max-h-[70vh]' : 'max-h-[80vh]'}`}>
           <Suspense fallback={<LoadingState label="Loading the reader…" />}>
             <PdfPageView
@@ -206,6 +233,7 @@ export function BookReader({
             />
           </Suspense>
         </div>
+        )
       )}
     </div>
   )

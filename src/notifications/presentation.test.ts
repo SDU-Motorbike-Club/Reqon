@@ -34,6 +34,13 @@ describe('describeNotification', () => {
     expect(describeNotification(n('role_granted', null, 'm1'), null).text).toBe('Someone gave you a new role.')
   })
 
+  it('tells a department about a meeting called for it', () => {
+    expect(describeNotification(n('meeting_called', 'Chassis sync', 'mt1'), 'Ada Rider')).toEqual({
+      text: 'Ada Rider called a meeting for your department: “Chassis sync”.', to: '/meetings',
+    })
+    expect(describeNotification(n('meeting_called', null, 'mt1'), null).text).toBe('Someone called a meeting for your department.')
+  })
+
   it('does not break on a kind this client does not know yet', () => {
     expect(describeNotification(n('meeting_requested', 'Weekly'), 'Ada Rider')).toEqual({ text: 'Ada Rider: meeting requested — Weekly.', to: '/' })
   })

@@ -2,7 +2,7 @@ import { useId, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useClauses } from '../../data/useClauses.ts'
 import { useAddTaskDependency, useRemoveTaskDependency } from '../../data/useTaskDependencies.ts'
-import { useArchiveTask, useLinkTaskRequirement, useUnlinkTaskRequirement, useUpdateTask, type Task, type TaskEdit } from '../../data/useTasks.ts'
+import { useArchiveTask, useLinkTaskRequirement, useSetTaskDepartment, useUnlinkTaskRequirement, useUpdateTask, type Task, type TaskEdit } from '../../data/useTasks.ts'
 import { formatDay, formatInstantDay } from '../../lib/dates.ts'
 import { isSatisfied, openPrerequisites, scheduleConflict, type TaskRef } from '../../tasks/dependencies.ts'
 import { TASK_STATE_LABEL } from '../../tasks/taskState.ts'
@@ -15,7 +15,8 @@ import type { AttachmentPermissions } from '../../auth/permissions.ts'
 import { AttachmentsSection } from '../../attachments/AttachmentsSection.tsx'
 import { buttonDanger, buttonPrimary, buttonSecondary } from '../../ui/buttons.ts'
 import { ActionError } from '../../ui/states.tsx'
-import { DepartmentMove } from './DepartmentMove.tsx'
+import { DepartmentMove, FIRST_ASSIGNMENT_REASON } from './DepartmentMove.tsx'
+import { TaskPicker } from './TaskPicker.tsx'
 import { MAX_BLOCKER_REASON, planTaskEdit, type EditPlan } from './taskEditPlan.ts'
 
 export type TaskPermissions = {
@@ -39,7 +40,6 @@ type Props = {
   owners: { id: string; name: string }[]
   milestones: { value: string; label: string }[]
   requirementKeys: string[]
-  source: { id: string; title: string } | null
   // What this task waits for and what waits for it, and the tasks that could be
   // added as a prerequisite (already filtered for the season, archived and
   // circles). Optional so a view without the links still renders.
@@ -74,6 +74,7 @@ export function TaskDetails(props: Props) {
   const link = useLinkTaskRequirement()
   const unlink = useUnlinkTaskRequirement()
   const archive = useArchiveTask()
+  const setDepartment = useSetTaskDepartment()
   const clauses = useClauses()
   const options = useMemo(() => buildRequirementOptions(clauses.data ?? []), [clauses.data])
   const printedRef = useMemo(() => new Map((clauses.data ?? []).map((c) => [c.clause_key, c.printed_ref])), [clauses.data])
@@ -95,6 +96,9 @@ export function TaskDetails(props: Props) {
   // live reason until the person edits it.
   const [blockedDraft, setBlockedDraft] = useState<string | null>(null)
   const [pick, setPick] = useState('')
+  // The department chosen in the Department section, sent by Save details (set_task_department).
+  const [deptTarget, setDeptTarget] = useState('')
+  const [deptReason, setDeptReason] = useState('')
   const links = props.links ?? NO_LINKS
   const addDependency = useAddTaskDependency()
   const removeDependency = useRemoveTaskDependency()
@@ -180,9 +184,16 @@ export function TaskDetails(props: Props) {
         { hasPrerequisites: openPrerequisites(links.prerequisites).length > 0 },
       )
       if (plan.kind === 'invalid') throw new Error(plan.reason)
+      // A department picked in the Department section. Judged before anything is written, so a
+      // missing reason never leaves half of a save done.
+      const department = (perms.moveTo ?? []).some((d) => d.key === deptTarget) ? deptTarget : ''
+      const departmentReason = deptReason.trim() || (task.subteam_key === null ? FIRST_ASSIGNMENT_REASON : '')
+      if (department !== '' && departmentReason === '') {
+        throw new Error('Say why the task moves to another department, in “Why?” under Department.')
+      }
       const toAdd = keys.filter((k) => !props.requirementKeys.includes(k))
       const toRemove = props.requirementKeys.filter((k) => !keys.includes(k))
-      if (plan.kind === 'unchanged' && toAdd.length === 0 && toRemove.length === 0) {
+      if (plan.kind === 'unchanged' && toAdd.length === 0 && toRemove.length === 0 && department === '') {
         setResult({ kind: 'nothing' })
         return
       }
@@ -196,7 +207,18 @@ export function TaskDetails(props: Props) {
       }
       for (const clauseKey of toAdd) await link.mutateAsync({ taskId: task.id, clauseKey })
       for (const clauseKey of toRemove) await unlink.mutateAsync({ taskId: task.id, clauseKey })
-      const what = [...(plan.kind === 'edit' ? plan.changed : []), ...(toAdd.length + toRemove.length > 0 ? ['requirements'] : [])]
+      // The department last: it is its own command (it moves the row's version too, so it is marked as ours).
+      if (department !== '') {
+        await setDepartment.mutateAsync({ id: task.id, departmentKey: department, reason: departmentReason })
+        setSelfSave(true)
+        setDeptTarget('')
+        setDeptReason('')
+      }
+      const what = [
+        ...(plan.kind === 'edit' ? plan.changed : []),
+        ...(toAdd.length + toRemove.length > 0 ? ['requirements'] : []),
+        ...(department !== '' ? ['department'] : []),
+      ]
       setResult({ kind: 'saved', what: what.join(', ') })
     })
 
@@ -214,6 +236,34 @@ export function TaskDetails(props: Props) {
 
   return (
     <div className="space-y-3" data-testid={`task-details-${task.id}`}>
+      {/* THE ORDER OF THIS PANEL. Each part has a weight: how soon the eye needs it. Lower comes first.
+           1  alerts: access lost, changed by someone else (stop and read before editing)
+           2  the blocker, when the task is blocked (the one thing that explains its state)
+           3  title and description (what the task is)
+           4  owner, priority, deadline, start (who and when, the facts people edit most)
+           5  waits for (what it depends on and what depends on it)
+           6  linked work: milestone and requirements
+           7  department
+           8  attachments
+           9  Save details (below everything it saves; sticky)
+          10  archive (last: it is the one dangerous action)
+          The lane (state) is above all of this, in the dialog header. */}
+      {lostAccess && (
+        <p role="status" className="rounded bg-amber-50 p-2 text-sm text-amber-900" data-testid="task-lost-access">
+          You can no longer change this task: its owner or its department&apos;s Head changed. What you typed is
+          still here, but it cannot be saved.
+        </p>
+      )}
+      {changedElsewhere && (
+        <div role="status" className="rounded bg-blue-50 p-2 text-sm text-blue-900" data-testid="task-changed-elsewhere">
+          Someone else changed this task while you had it open. Your unsaved edits are kept; saving replaces only the
+          fields you changed.{' '}
+          <button type="button" onClick={takeServerValues} className="font-medium underline underline-offset-2">
+            Discard mine and show theirs
+          </button>
+        </div>
+      )}
+
       {/* Description and blocker as text only for someone who cannot edit; an
           editor finds both as fields in the form below, not twice. */}
       {!perms.canEdit && (
@@ -247,6 +297,116 @@ export function TaskDetails(props: Props) {
             <p className="mt-0.5 text-xs text-amber-900">Blocked since {formatInstantDay(task.blocked_since)}.</p>
           )}
         </section>
+      )}
+
+      {perms.canEdit ? (
+        <form
+          id={fid('edit')}
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault()
+            void save()
+          }}
+          className="space-y-3"
+        >
+          <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2">
+            <legend className="sr-only">Edit this task</legend>
+            <div className="sm:col-span-2">
+              <label htmlFor={fid('title')} className={LABEL}>
+                Title
+              </label>
+              <input id={fid('title')} value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} className={FIELD} />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor={fid('detail')} className={LABEL}>
+                Description
+              </label>
+              <textarea id={fid('detail')} rows={3} value={detail} onChange={(e) => setDetail(e.target.value)} className={FIELD} />
+            </div>
+            {task.state === 'blocked' && (
+              <div className="sm:col-span-2">
+                <label htmlFor={fid('blocker')} className={LABEL}>
+                  Why is it blocked?
+                </label>
+                <textarea
+                  id={fid('blocker')}
+                  rows={2}
+                  value={blockedDraft ?? task.blocked_reason ?? ''}
+                  maxLength={MAX_BLOCKER_REASON}
+                  onChange={(e) => setBlockedDraft(e.target.value)}
+                  className={FIELD}
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Name the outside thing being waited for (a supplier, a decision, an event) or link the task under “Waits for”.
+                  {task.blocked_since ? ` Blocked since ${formatInstantDay(task.blocked_since)}.` : ''}
+                </p>
+              </div>
+            )}
+            <div>
+              <label htmlFor={fid('owner')} className={LABEL}>
+                Owner
+              </label>
+              {perms.canReassign ? (
+                <select id={fid('owner')} value={owner} onChange={(e) => setOwner(e.target.value)} className={FIELD}>
+                  <option value="">Unassigned</option>
+                  {/* The signed-in member first, so taking a task is one pick. */}
+                  {[...props.owners.filter((o) => o.id === props.viewerId), ...props.owners.filter((o) => o.id !== props.viewerId)].map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.id === props.viewerId ? `Me (${o.name})` : o.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p id={fid('owner')} className="mt-1 min-h-11 py-2 text-sm text-slate-800 sm:min-h-0 sm:py-1.5">
+                  {props.owners.find((o) => o.id === task.owner_id)?.name ?? 'Unassigned'}{' '}
+                  <span className="text-xs text-slate-500">(only the department Head can reassign)</span>
+                </p>
+              )}
+            </div>
+            <div>
+              <label htmlFor={fid('priority')} className={LABEL}>
+                Priority
+              </label>
+              <select id={fid('priority')} value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)} className={FIELD}>
+                {TASK_PRIORITIES.map((p) => (
+                  <option key={p} value={p}>
+                    {TASK_PRIORITY_LABEL[p]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor={fid('due')} className={LABEL}>
+                Deadline
+              </label>
+              <input id={fid('due')} type="date" value={due} onChange={(e) => setDue(e.target.value)} className={FIELD} />
+              {!task.due_date && <p className="mt-1 text-xs text-slate-500">No deadline yet.</p>}
+              {task.links_required && task.due_date && (
+                <p className="mt-1 text-xs text-slate-500">Created from a proposal: the deadline can change but not be removed.</p>
+              )}
+            </div>
+            <div>
+              <label htmlFor={fid('start')} className={LABEL}>
+                Start date
+              </label>
+              <input id={fid('start')} type="date" value={start} onChange={(e) => setStart(e.target.value)} className={FIELD} />
+              {!task.starts_on && <p className="mt-1 text-xs text-slate-500">No start date recorded.</p>}
+            </div>
+          </fieldset>
+
+          <ActionError error={error} />
+        </form>
+      ) : (
+        <div className="space-y-1 text-sm text-slate-700" data-testid={`task-readonly-${task.id}`}>
+          <p>
+            <span className="font-medium">Start:</span> {task.starts_on ? formatDay(task.starts_on) : 'not recorded'} ·{' '}
+            <span className="font-medium">Deadline:</span> {task.due_date ? formatDay(task.due_date) : 'not set'} ·{' '}
+            <span className="font-medium">Priority:</span> {TASK_PRIORITY_LABEL[task.priority]}
+          </p>
+          <p className="text-xs text-slate-500">
+            Read-only for you. Its owner, its department&apos;s Head, the President or the Vice President can change it.
+          </p>
+        </div>
       )}
 
       <section data-testid={`task-deps-${task.id}`} aria-labelledby={fid('h-deps')}>
@@ -300,17 +460,15 @@ export function TaskDetails(props: Props) {
         {perms.canEdit && (
           <div className="mt-1 flex flex-wrap items-end gap-2">
             <div className="min-w-0 flex-1">
-              <label htmlFor={fid('prereq')} className={LABEL}>
-                Add a prerequisite (any department)
-              </label>
-              <select id={fid('prereq')} value={chosen} onChange={(e) => setPick(e.target.value)} className={FIELD}>
-                <option value="">Choose a task…</option>
-                {candidates.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.title} — {links.departmentName(c.subteam_key)}
-                  </option>
-                ))}
-              </select>
+              <TaskPicker
+                id={fid('prereq')}
+                label="Add a prerequisite (any department)"
+                candidates={candidates}
+                departmentName={links.departmentName}
+                value={chosen}
+                onChange={setPick}
+                disabled={addDependency.isPending}
+              />
             </div>
             <button
               type="button"
@@ -341,152 +499,17 @@ export function TaskDetails(props: Props) {
         )}
       </section>
 
-      <AttachmentsSection taskId={task.id} perms={perms.attachments} />
-
-      <section data-testid={`task-links-${task.id}`}>
+      <section data-testid={`task-links-${task.id}`} aria-labelledby={fid('h-links')}>
         <h4 id={fid('h-links')} className={SECTION_HEADING}>
           Linked work
         </h4>
-        <ul className="mt-0.5 space-y-0.5 text-sm text-slate-700">
-          <li>
-            Milestone:{' '}
-            {task.milestone_key ? (
-              <Link className="underline underline-offset-2" to={`/gantt?open=${encodeURIComponent(task.milestone_key)}`}>
-                {props.milestones.find((m) => m.value === task.milestone_key)?.label ?? task.milestone_key}
-              </Link>
-            ) : (
-              <span className="text-slate-500 italic">none</span>
-            )}
-            {task.milestone_key && <span className="text-slate-500">{task.section_id ? ' · in a section' : ' · not in a section'}</span>}
-          </li>
-          <li>
-            Requirements:{' '}
-            {refs.length === 0 ? (
-              <span className="text-slate-500 italic">none linked</span>
-            ) : (
-              refs.map((r, i) => (
-                <span key={r.key}>
-                  {i > 0 && ', '}
-                  <Link className="font-mono text-xs underline underline-offset-2" to={`/register?search=${encodeURIComponent(r.ref)}`}>
-                    {r.ref}
-                  </Link>
-                </span>
-              ))
-            )}
-          </li>
-        </ul>
-      </section>
-
-      <section>
-        <h4 id={fid('h-prov')} className={SECTION_HEADING}>
-          Where it came from
-        </h4>
-        {props.source ? (
-          <p className="mt-0.5 text-xs text-slate-600" data-testid={`task-source-${task.id}`}>
-            Created from the proposal{' '}
-            <Link className="font-medium underline underline-offset-2" to={`/archive?tab=proposals&id=${props.source.id}`}>
-              “{props.source.title}”
-            </Link>
-            .
-          </p>
-        ) : (
-          <p className="mt-0.5 text-xs text-slate-600">Not created from a proposal (an older task).</p>
-        )}
-        {completed && <p className="text-xs text-slate-600">{completed}</p>}
-      </section>
-
-      {lostAccess && (
-        <p role="status" className="rounded bg-amber-50 p-2 text-sm text-amber-900" data-testid="task-lost-access">
-          You can no longer change this task: its owner or its department&apos;s Head changed. What you typed is
-          still here, but it cannot be saved.
-        </p>
-      )}
-      {changedElsewhere && (
-        <div role="status" className="rounded bg-blue-50 p-2 text-sm text-blue-900" data-testid="task-changed-elsewhere">
-          Someone else changed this task while you had it open. Your unsaved edits are kept; saving replaces only the
-          fields you changed.{' '}
-          <button type="button" onClick={takeServerValues} className="font-medium underline underline-offset-2">
-            Discard mine and show theirs
-          </button>
-        </div>
-      )}
-
-      {perms.canEdit ? (
-        <form
-          noValidate
-          onSubmit={(e) => {
-            e.preventDefault()
-            void save()
-          }}
-          className="space-y-3"
-        >
-          <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2">
-            <legend className="sr-only">Edit this task</legend>
-            <div className="sm:col-span-2">
-              <label htmlFor={fid('title')} className={LABEL}>
-                Title
-              </label>
-              <input id={fid('title')} value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} className={FIELD} />
-            </div>
-            <div className="sm:col-span-2">
-              <label htmlFor={fid('detail')} className={LABEL}>
-                Description
-              </label>
-              <textarea id={fid('detail')} rows={3} value={detail} onChange={(e) => setDetail(e.target.value)} className={FIELD} />
-            </div>
-            <div>
-              <label htmlFor={fid('start')} className={LABEL}>
-                Start date
-              </label>
-              <input id={fid('start')} type="date" value={start} onChange={(e) => setStart(e.target.value)} className={FIELD} />
-              {!task.starts_on && <p className="mt-1 text-xs text-slate-500">No start date recorded.</p>}
-            </div>
-            <div>
-              <label htmlFor={fid('due')} className={LABEL}>
-                Deadline
-              </label>
-              <input id={fid('due')} type="date" value={due} onChange={(e) => setDue(e.target.value)} className={FIELD} />
-              {!task.due_date && <p className="mt-1 text-xs text-slate-500">No deadline yet.</p>}
-              {task.links_required && task.due_date && (
-                <p className="mt-1 text-xs text-slate-500">Created from a proposal: the deadline can change but not be removed.</p>
-              )}
-            </div>
-            {task.state === 'blocked' && (
-              <div className="sm:col-span-2">
-                <label htmlFor={fid('blocker')} className={LABEL}>
-                  Why is it blocked?
-                </label>
-                <textarea
-                  id={fid('blocker')}
-                  rows={2}
-                  value={blockedDraft ?? task.blocked_reason ?? ''}
-                  maxLength={MAX_BLOCKER_REASON}
-                  onChange={(e) => setBlockedDraft(e.target.value)}
-                  className={FIELD}
-                />
-                <p className="mt-1 text-xs text-slate-500">
-                  Name the outside thing being waited for (a supplier, a decision, an event) or link the task under “Waits for”.
-                  {task.blocked_since ? ` Blocked since ${formatInstantDay(task.blocked_since)}.` : ''}
-                </p>
-              </div>
-            )}
-            <div>
-              <label htmlFor={fid('priority')} className={LABEL}>
-                Priority
-              </label>
-              <select id={fid('priority')} value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)} className={FIELD}>
-                {TASK_PRIORITIES.map((p) => (
-                  <option key={p} value={p}>
-                    {TASK_PRIORITY_LABEL[p]}
-                  </option>
-                ))}
-              </select>
-            </div>
+        {perms.canEdit ? (
+          <div className="mt-1 space-y-3">
             <div>
               <label htmlFor={fid('milestone')} className={LABEL}>
                 Milestone
               </label>
-              <select id={fid('milestone')} value={milestone} onChange={(e) => setMilestone(e.target.value)} className={FIELD}>
+              <select id={fid('milestone')} value={milestone} disabled={busy} onChange={(e) => setMilestone(e.target.value)} className={FIELD}>
                 <option value="">{task.milestone_key ? 'Keep the current milestone' : 'No milestone'}</option>
                 {props.milestones.map((m) => (
                   <option key={m.value} value={m.value}>
@@ -494,71 +517,85 @@ export function TaskDetails(props: Props) {
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="sm:col-span-2">
-              <label htmlFor={fid('owner')} className={LABEL}>
-                Owner
-              </label>
-              {perms.canReassign ? (
-                <select id={fid('owner')} value={owner} onChange={(e) => setOwner(e.target.value)} className={FIELD}>
-                  <option value="">Unassigned</option>
-                  {/* The signed-in member first, so taking a task is one pick. */}
-                  {[...props.owners.filter((o) => o.id === props.viewerId), ...props.owners.filter((o) => o.id !== props.viewerId)].map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.id === props.viewerId ? `Me (${o.name})` : o.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <p id={fid('owner')} className="mt-1 min-h-11 py-2 text-sm text-slate-800 sm:min-h-0 sm:py-1.5">
-                  {props.owners.find((o) => o.id === task.owner_id)?.name ?? 'Unassigned'}{' '}
-                  <span className="text-xs text-slate-500">(only the department Head can reassign)</span>
-                </p>
+              {task.milestone_key && (
+                <Link className="mt-1 inline-block text-xs text-slate-700 underline underline-offset-2" to={`/gantt?open=${encodeURIComponent(task.milestone_key)}`}>
+                  Open it in the Gantt
+                </Link>
               )}
             </div>
-            <div className="sm:col-span-2" role="group" aria-labelledby={fid('req')}>
+            <div role="group" aria-labelledby={fid('req')}>
               <p id={fid('req')} className={LABEL}>
-                Related requirements
+                Requirements
               </p>
               <RequirementPicker id={fid('reqpick')} options={options} selected={keys} onChange={setKeys} disabled={busy} />
               {task.links_required && (
                 <p className="mt-1 text-xs text-slate-500">A task created from a proposal must keep at least one requirement.</p>
               )}
             </div>
-          </fieldset>
-
-          <ActionError error={error} />
-          {/* Sticky: the form is longer than the dialog, and Save must stay in reach. */}
-          <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-2 border-t border-slate-100 bg-white px-1 py-2">
-            <button type="submit" className={buttonPrimary} disabled={busy} data-testid={`task-save-${task.id}`}>
-              {busy ? 'Saving…' : dirtyKeys ? 'Save details and requirements' : 'Save details'}
-            </button>
-            {result && !busy && (
-              <span role="status" className={`text-sm ${result.kind === 'saved' ? 'text-green-700' : 'text-slate-600'}`} data-testid={`task-save-result-${task.id}`}>
-                {result.kind === 'saved' ? `Saved: ${result.what}.` : 'Nothing to save — no field was changed.'}
-              </span>
-            )}
+            <p className="text-xs text-slate-500">Saved with “Save details”.</p>
           </div>
-        </form>
-      ) : (
-        <div className="space-y-1 text-sm text-slate-700" data-testid={`task-readonly-${task.id}`}>
-          <p>
-            <span className="font-medium">Start:</span> {task.starts_on ? formatDay(task.starts_on) : 'not recorded'} ·{' '}
-            <span className="font-medium">Deadline:</span> {task.due_date ? formatDay(task.due_date) : 'not set'} ·{' '}
-            <span className="font-medium">Priority:</span> {TASK_PRIORITY_LABEL[task.priority]}
-          </p>
-          <p className="text-xs text-slate-500">
-            Read-only for you. Its owner, its department&apos;s Head, the President or the Vice President can change it.
-          </p>
-        </div>
-      )}
+        ) : (
+          <ul className="mt-0.5 space-y-0.5 text-sm text-slate-700">
+            <li>
+              Milestone:{' '}
+              {task.milestone_key ? (
+                <Link className="underline underline-offset-2" to={`/gantt?open=${encodeURIComponent(task.milestone_key)}`}>
+                  {props.milestones.find((m) => m.value === task.milestone_key)?.label ?? task.milestone_key}
+                </Link>
+              ) : (
+                <span className="text-slate-500 italic">none</span>
+              )}
+            </li>
+            <li>
+              Requirements:{' '}
+              {refs.length === 0 ? (
+                <span className="text-slate-500 italic">none linked</span>
+              ) : (
+                refs.map((r, i) => (
+                  <span key={r.key}>
+                    {i > 0 && ', '}
+                    <Link className="font-mono text-xs underline underline-offset-2" to={`/register?search=${encodeURIComponent(r.ref)}`}>
+                      {r.ref}
+                    </Link>
+                  </span>
+                ))
+              )}
+            </li>
+          </ul>
+        )}
+        {completed && <p className="mt-2 text-xs text-slate-600">{completed}</p>}
+      </section>
 
-      {perms.moveTo && perms.moveTo.length > 0 && (
+      {perms.canEdit && perms.moveTo && perms.moveTo.length > 0 && (
         <DepartmentMove
           taskId={task.id}
           currentName={task.subteam_key ? links.departmentName(task.subteam_key) : null}
           targets={perms.moveTo}
+          value={deptTarget}
+          reason={deptReason}
+          onValue={setDeptTarget}
+          onReason={setDeptReason}
+          disabled={busy}
         />
+      )}
+
+      <AttachmentsSection taskId={task.id} perms={perms.attachments} />
+
+      {perms.canEdit && (
+        <>
+        {/* Below the Department section, and sticky: the panel is longer than the dialog, and Save must stay in reach.
+            It belongs to the edit form above through its `form` attribute. */}
+        <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-2 border-t border-slate-100 bg-white px-1 py-2">
+          <button type="submit" form={fid('edit')} className={buttonPrimary} disabled={busy} data-testid={`task-save-${task.id}`}>
+            {busy ? 'Saving…' : dirtyKeys ? 'Save details and requirements' : 'Save details'}
+          </button>
+          {result && !busy && (
+            <span role="status" className={`text-sm ${result.kind === 'saved' ? 'text-green-700' : 'text-slate-600'}`} data-testid={`task-save-result-${task.id}`}>
+              {result.kind === 'saved' ? `Saved: ${result.what}.` : 'Nothing to save — no field was changed.'}
+            </span>
+          )}
+        </div>
+        </>
       )}
 
       {perms.canArchive && (

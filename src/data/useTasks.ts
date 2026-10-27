@@ -294,6 +294,46 @@ export function useRestoreTask() {
   })
 }
 
+// A task leader creates a task straight on the Board (create_task, 20260142000000): no
+// proposal, but the same facts a promoted task has. The new task appears in To do.
+export type NewTask = {
+  title: string
+  detail: string | null
+  departmentKey: string
+  ownerId: string | null
+  dueDate: string
+  // Both optional at creation: they can be added later on the task.
+  milestoneKey: string | null
+  clauseKeys: string[]
+  priority: TaskPriority
+}
+
+export function useCreateTask() {
+  const refresh = useRefreshTaskViews()
+  const seasonId = useSeasonId()
+  return useMutation<Task, Error, NewTask>({
+    mutationFn: async (t) => {
+      if (!seasonId) throw new DataError('create the task: there is no current season', null)
+      return unwrap(
+        'create that task',
+        await supabase.rpc('create_task', {
+          p_season_id: seasonId,
+          p_title: t.title,
+          p_subteam_key: t.departmentKey,
+          // null is a valid owner (unassigned); the generated type has no default for this argument.
+          p_owner_id: t.ownerId as string,
+          p_due_date: t.dueDate,
+          p_milestone_key: t.milestoneKey as string,
+          p_clause_keys: t.clauseKeys,
+          p_detail: t.detail ?? undefined,
+          p_priority: t.priority,
+        }),
+      )
+    },
+    onSuccess: refresh,
+  })
+}
+
 // Giving a task a department, or moving it to another one: never part of the
 // ordinary edit (guard_task_edit refuses subteam_key there), but its own command,
 // set_task_department(), with a required reason that the audit trail keeps. The

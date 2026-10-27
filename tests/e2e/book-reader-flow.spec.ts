@@ -47,29 +47,43 @@ async function openRule(page: Page, clauseKey: string, search: string) {
 }
 
 test.describe('Book reader (R22-R23)', () => {
-  test('the real document opens, draws the requested page, and validates page bounds', async ({ page }) => {
+  test('the real document opens as one scrollable column, draws the requested page, and validates page bounds', async ({ page }) => {
     const m = readManifest()
     await login(page, m.users.member.email, m.password)
 
     await page.goto('/book')
     await expect(page.getByTestId('book-location')).toContainText('The start of the book')
-    await expect(drawn(page)).toHaveAttribute('data-rendered-page', '1', { timeout: 20_000 })
+    const scroll = page.getByTestId('book-scroll')
+    await expect(scroll).toHaveAttribute('data-pages', '234', { timeout: 20_000 })
     await expect(page.getByTestId('book-open-external')).toBeVisible()
     await expect(page.getByText('of 234')).toBeVisible()
+    // There is no Previous or Next on this screen: the book is one long page.
+    await expect(page.getByRole('button', { name: /Next/ })).toHaveCount(0)
+    // Page 1 is drawn (a canvas with ink), and a far page is not drawn until it is near.
+    await expect(scroll.getByRole('img').first()).toBeVisible({ timeout: 20_000 })
+    expect(await scroll.locator('canvas').count()).toBeLessThan(20)
 
+    // Asking for a page scrolls to it, and scrolling keeps the page in the address.
     await page.goto('/book?page=50')
-    await expect(drawn(page)).toHaveAttribute('data-rendered-page', '50', { timeout: 20_000 })
-    expect((await canvasSignature(page)).ink).toBeGreaterThan(100)
-    // Next turns the page in the same reader and keeps it in the address.
-    await page.getByRole('button', { name: /Next/ }).click()
-    await expect(drawn(page)).toHaveAttribute('data-rendered-page', '51', { timeout: 20_000 })
-    await expect(page).toHaveURL(/page=51/)
+    await expect(page.getByTestId('book-scroll')).toHaveAttribute('data-pages', '234', { timeout: 20_000 })
+    await expect(page.getByTestId('book-location')).toContainText('Page 50')
+    const ink = await page.getByTestId('book-scroll').locator('canvas').first().evaluate((canvas: HTMLCanvasElement) => {
+      const ctx = canvas.getContext('2d')
+      if (!ctx || canvas.width === 0) return 0
+      const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      let n = 0
+      for (let i = 0; i < data.length; i += 16) if (data[i] < 200) n++
+      return n
+    })
+    expect(ink).toBeGreaterThan(100)
+    await page.getByTestId('book-scroll').evaluate((el) => el.scrollBy(0, 3 * 1100))
+    await expect(page).toHaveURL(/page=5[1-9]/, { timeout: 10_000 })
     await page.reload()
-    await expect(drawn(page)).toHaveAttribute('data-rendered-page', '51', { timeout: 20_000 })
+    await expect(page.getByTestId('book-location')).toContainText('Page 5')
 
     await page.goto('/book?page=9999')
     await expect(page.getByTestId('book-page-notice')).toContainText('Page 9999 does not exist. This edition has 234 pages.')
-    await expect(drawn(page)).toHaveAttribute('data-rendered-page', '1', { timeout: 20_000 })
+    await expect(page.getByTestId('book-scroll')).toHaveAttribute('data-pages', '234', { timeout: 20_000 })
   })
 
   test('Register rules open on their own pages, and another rule moves the open reader', async ({ page }) => {

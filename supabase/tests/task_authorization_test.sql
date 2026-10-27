@@ -161,7 +161,7 @@ begin
     ('owner1 edits own task',                    owner1, format('update tasks set detail = ''mine'' where id = %L', t_own), 'write', 'ALLOWED'),
     ('owner2 cannot edit owner1''s task',         owner2, format('update tasks set detail = ''nope'' where id = %L', t_own), 'write', 'DENIED'),
     ('headx edits a task in dept X (not owner)',  headx,  format('update tasks set detail = ''head edit'' where id = %L', t_own), 'write', 'ALLOWED'),
-    ('headx cannot edit a task in dept Z',        headx,  format('update tasks set detail = ''nope'' where id = %L', t_other_dep), 'write', 'DENIED'),
+    ('headx (a Head, so a task leader) edits a task in dept Z', headx,  format('update tasks set detail = ''nope'' where id = %L', t_other_dep), 'write', 'ALLOWED'),
     ('headx CAN edit a task he owns in dept Z',   headx,  format('update tasks set detail = ''own in other dept'' where id = %L', t_head_owns), 'write', 'ALLOWED'),
     ('heady heads Z, edits owner2''s task there', heady,  format('update tasks set detail = ''heady edit'' where id = %L', t_other_dep), 'write', 'ALLOWED'),
     ('treasurer alone cannot edit any task',      tre,    format('update tasks set detail = ''nope'' where id = %L', t_own), 'write', 'DENIED'),

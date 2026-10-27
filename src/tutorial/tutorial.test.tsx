@@ -448,6 +448,8 @@ describe('what each role is taught', () => {
 // Every step of the REAL tour must point at an attribute some screen renders.
 // Renaming data-tutorial="register-row" without updating steps.ts fails here,
 // instead of silently showing the "isn't showing" fallback to a new member.
+// A screen counts when its source holds the name, e.g. as <PageHeader tutorialId="…">.
+// Locally, Vitest caches this file list: after adding a screen (Tasks, Team), edit this file to refresh it.
 const sources = import.meta.glob<string>('../**/*.tsx', { query: '?raw', import: 'default', eager: true })
 
 describe('the real tour', () => {

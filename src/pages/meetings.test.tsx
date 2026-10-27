@@ -19,6 +19,14 @@ const state = vi.hoisted(() => ({
   writeError: null as Error | null,
 }))
 
+vi.mock('../data/useSubteams.ts', () => ({
+  useSubteams: () => ({
+    data: [
+      { key: 'chassis', name: 'Chassis', archived_at: null },
+      { key: 'old', name: 'Old team', archived_at: '2026-01-01T00:00:00Z' },
+    ],
+  }),
+}))
 vi.mock('../auth/usePermissions.ts', () => ({ usePermissions: () => state.can }))
 vi.mock('../data/useMeetings.ts', async () => {
   const { useState } = await import('react')
@@ -75,6 +83,36 @@ beforeEach(() => {
   state.updated = []
   state.deleted = []
   state.writeError = null
+})
+
+describe('sharing a meeting', () => {
+  it('shows the department and ready-made texts anyone can copy', async () => {
+    state.meetings = [meeting({ subteam_key: 'chassis', agenda: '## Agenda\n\n- Frame' })]
+    const user = userEvent.setup()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    renderPage()
+    expect(screen.getByText(/For Chassis/)).toBeInTheDocument()
+    await user.click(screen.getByText('Share this meeting'))
+    expect(screen.getByLabelText('WhatsApp message')).toHaveValue(
+      '*Weekly build*\nWhen: Thu, 10 Sept 2026, 18:00\nWhere: Workshop\nFor: Chassis\n\n*Agenda*\n\n- Frame',
+    )
+    await user.click(screen.getByRole('button', { name: 'Copy WhatsApp text' }))
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('*Weekly build*'))
+    expect(await screen.findByText('WhatsApp text copied.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Copy email text' }))
+    expect(writeText).toHaveBeenLastCalledWith(expect.stringMatching(/^Subject: Weekly build, Thu, 10 Sept 2026, 18:00\n\nHi all,/))
+  })
+
+  it('says so when the browser will not copy, and selects the text instead', async () => {
+    state.meetings = [meeting()]
+    const user = userEvent.setup()
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) }, configurable: true })
+    renderPage()
+    await user.click(screen.getByText('Share this meeting'))
+    await user.click(screen.getByRole('button', { name: 'Copy WhatsApp text' }))
+    expect(await screen.findByText(/Could not copy on its own/)).toBeInTheDocument()
+  })
 })
 
 describe('reading a meeting', () => {
@@ -196,10 +234,51 @@ describe('calling and editing a meeting', () => {
     await user.click(dialog.getByRole('button', { name: 'Add meeting' }))
     await waitFor(() => expect(state.created).toHaveLength(1))
     expect(state.created[0]).toEqual({
-      title: 'Weekly build', heldOn: '2026-10-01', startsAt: null, endsAt: null, location: null,
+      title: 'Weekly build', heldOn: '2026-10-01', startsAt: null, endsAt: null, location: null, subteamKey: null,
       agenda: '## Agenda\n\n- tyres', notes: null, attendees: null,
     })
     expect(screen.getByText('Meeting added.')).toBeInTheDocument()
+  })
+
+  it('lets the meeting be called for a department, and offers only active ones', async () => {
+    admin()
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(screen.getByRole('button', { name: 'New meeting' }))
+    const dialog = within(screen.getByRole('dialog'))
+    const options = dialog.getAllByRole('option').map((o) => o.textContent)
+    expect(options).toEqual(expect.arrayContaining(['The whole club', 'Chassis']))
+    expect(options).not.toContain('Old team')
+    await user.type(dialog.getByLabelText('Name'), 'Chassis sync')
+    await user.type(dialog.getByLabelText('Date'), '2099-01-01')
+    await user.selectOptions(dialog.getByLabelText('For (optional)'), 'chassis')
+    expect(dialog.queryByTestId('past-date-warning')).not.toBeInTheDocument()
+    await user.click(dialog.getByRole('button', { name: 'Add meeting' }))
+    await waitFor(() => expect(state.created).toHaveLength(1))
+    expect(state.created[0]).toMatchObject({ title: 'Chassis sync', subteamKey: 'chassis' })
+  })
+
+  it('warns about a past date but still saves it', async () => {
+    admin()
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(screen.getByRole('button', { name: 'New meeting' }))
+    const dialog = within(screen.getByRole('dialog'))
+    await user.type(dialog.getByLabelText('Name'), 'Minutes after the fact')
+    await user.type(dialog.getByLabelText('Date'), '2020-01-01')
+    expect(dialog.getByTestId('past-date-warning')).toHaveTextContent('already passed')
+    await user.click(dialog.getByRole('button', { name: 'Add meeting' }))
+    await waitFor(() => expect(state.created).toHaveLength(1))
+    expect(state.created[0]).toMatchObject({ heldOn: '2020-01-01' })
+  })
+
+  it('does not warn when editing a meeting that already happened', async () => {
+    admin()
+    state.meetings = [meeting({ held_on: '2020-01-01' })]
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(screen.getByRole('button', { name: 'Edit Weekly build' }))
+    expect(within(screen.getByRole('dialog')).queryByTestId('past-date-warning')).not.toBeInTheDocument()
   })
 
   it('keeps what was typed when the save is refused', async () => {
