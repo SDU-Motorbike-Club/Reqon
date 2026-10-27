@@ -56,15 +56,18 @@ test.describe('keyboard-only interaction (R8.2, R24.1, R34.1, tutorial)', () => 
     // Choosing a department kept the scope chosen before it.
     await expect(allTasksButton).toHaveAttribute('aria-pressed', 'true')
 
-    // ---- A native <summary> disclosure opens on Enter, purely by keyboard ----
-    // The focusable, tabbable element is <summary> itself, not the wrapping
-    // <details> (which is not in the tab order) — a real keyboard user tabs
-    // to the summary text, which is exactly what this focuses.
+    // ---- A card's details open on Enter and close on Escape, purely by keyboard ----
+    // "Details" is a real <button> that opens the task in a dialog.
     const firstCard = page.locator('[data-testid^="task-more-"]').first()
     await expect(firstCard).toBeVisible()
-    await firstCard.locator('summary').focus()
+    await firstCard.focus()
     await page.keyboard.press('Enter')
-    await expect(firstCard).toHaveJSProperty('open', true)
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await expect(firstCard).toHaveAttribute('aria-expanded', 'true')
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    // Focus goes back to the button that opened it.
+    await expect(firstCard).toBeFocused()
 
     // ---- A dialog opens and closes by keyboard only (Tab to it, Enter to
     // open, Escape to close) — the proposal Review dialog. ----

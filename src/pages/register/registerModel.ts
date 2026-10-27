@@ -1,4 +1,4 @@
-import { criticalityInfo, type LabelInfo } from '../../clauses/labels.ts'
+import { criticalityInfo, obligationName, type LabelInfo } from '../../clauses/labels.ts'
 import type { Clause, ClauseState, ClauseStatus } from '../../clauses/types.ts'
 
 // One rule, joined to what the team did about it this season.
@@ -165,7 +165,7 @@ function bucketOf(
       }
     }
     case 'kind':
-      return { key: row.clause.obligation, label: row.clause.obligation, sort: row.clause.obligation }
+      return { key: row.clause.obligation, label: obligationName(row.clause.obligation), sort: row.clause.obligation }
     case 'milestone': {
       const key = row.clause.milestone_key ?? '(none)'
       return {

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tan
 import { supabase } from '../lib/supabase.ts'
 import type { Database } from '../lib/database.types.ts'
 import { DataError } from '../core/errors.ts'
+import { invokeEdgeFunction } from './edgeFunctions.ts'
 import { fetchAllRows } from './errors.ts'
 import { queryKeys } from './queryKeys.ts'
 
@@ -49,12 +50,14 @@ export function useAddMember() {
 
 export type NewMember = {
   email: string
-  // A first password they change in Settings -> Your account. Sent once over
-  // HTTPS to the Edge Function; never stored or shown by the app.
-  password: string
   fullName: string
   jobTitle: string
 }
+
+// What the admin is shown ONCE after adding someone or resetting a password:
+// the temporary password the Edge Function generated. The app never stores it;
+// the person is made to replace it at their first sign-in.
+export type IssuedPassword = { id: string; password: string }
 
 // Creates the login AND the roster row in one step, through the `create-member`
 // Edge Function (supabase/functions/create-member). The service-role key lives
@@ -62,38 +65,36 @@ export type NewMember = {
 // token. The function asks the database — as that person — whether they may
 // add members (can_add_members(): active President, Vice President or
 // Developer), and inserts the roster row as them too, so RLS decides twice.
-// Returns the new person's id.
+// It generates the first password itself and returns it with the new id.
 export function useCreateMember() {
   const queryClient = useQueryClient()
-  return useMutation<string, Error, NewMember>({
+  return useMutation<IssuedPassword, Error, NewMember>({
     mutationFn: async (member) => {
       const what = 'add people to the roster'
-      const { data, error } = await supabase.functions.invoke<{ id: string }>('create-member', { body: member })
-      if (error) {
-        // A refusal or a validation problem comes back as JSON { error }; the
-        // function words it for a club member, so it is shown as written.
-        const response = (error as { context?: unknown }).context
-        let status = 0
-        let message: string | null = null
-        if (response instanceof Response) {
-          status = response.status
-          try {
-            const body: unknown = await response.json()
-            if (body && typeof body === 'object' && typeof (body as { error?: unknown }).error === 'string') {
-              message = (body as { error: string }).error
-            }
-          } catch {
-            // Not JSON (a gateway error page): fall back to the generic wording.
-          }
-        }
-        // 401 is an expired or missing session, not a refusal: say so instead
-        // of "you don't have permission".
-        if (status === 401) throw new DataError(message ?? 'Your session has expired. Sign in again.', null)
-        if (status === 403) throw new DataError(what, null, { permission: true })
-        throw new DataError(message ?? `${what}: ${error.message}`, null)
+      const data = await invokeEdgeFunction<{ id?: unknown; password?: unknown }>('create-member', member, what)
+      if (typeof data.id !== 'string' || typeof data.password !== 'string') {
+        throw new DataError(`${what}: the server sent no answer`, null)
       }
-      if (!data?.id) throw new DataError(`${what}: the server sent no answer`, null)
-      return data.id
+      return { id: data.id, password: data.password }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.members })
+    },
+  })
+}
+
+// Issues someone a new temporary password, through the `reset-member-password`
+// Edge Function. The database decides as the caller (can_reset_password():
+// never yourself, and only someone whose roles you could change) and logs the
+// reset; the person must choose a new password at their next sign-in.
+export function useResetPassword() {
+  const queryClient = useQueryClient()
+  return useMutation<IssuedPassword, Error, { id: string }>({
+    mutationFn: async ({ id }) => {
+      const what = 'reset this person’s password'
+      const data = await invokeEdgeFunction<{ password?: unknown }>('reset-member-password', { memberId: id }, what)
+      if (typeof data.password !== 'string') throw new DataError(`${what}: the server sent no answer`, null)
+      return { id, password: data.password }
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.members })

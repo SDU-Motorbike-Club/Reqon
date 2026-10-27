@@ -14,7 +14,10 @@ import type { Database } from '../../lib/database.types.ts'
 export type RosterMember = Pick<
   Database['public']['Tables']['members']['Row'],
   'id' | 'full_name' | 'role' | 'status'
->
+> &
+  // Optional so a roster built from older rows (or a test fixture) still fits;
+  // absent means the same as false.
+  Partial<Pick<Database['public']['Tables']['members']['Row'], 'must_change_password'>>
 
 // The schema default (20260101000000_paddock_control_schema.sql: role text not
 // null default 'Member'), so it is always an offered choice.

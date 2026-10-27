@@ -620,6 +620,9 @@ describe('the proposal form', () => {
     renderApp('/proposals')
     await openProposalForm(user)
     await user.type(await screen.findByLabelText(/^Title/), 'Just a title')
+    // Department and milestone start from a suggestion; this person clears both.
+    await user.selectOptions(screen.getByLabelText(/^Department \*/), '')
+    await user.selectOptions(screen.getByLabelText(/^Related milestone/), '')
     await user.click(screen.getByRole('button', { name: 'Raise proposal' }))
 
     const summary = await screen.findByTestId('proposal-summary')
@@ -776,7 +779,8 @@ describe('task board', () => {
     await user.click(within(card).getByText(/^Details/))
     const panel = within(await screen.findByTestId('task-details-k1'))
     const owner = panel.getByLabelText('Owner')
-    expect([...(owner as HTMLSelectElement).options].map((o) => o.textContent)).toEqual(['Unassigned', 'Ada Rider', 'Bo Wrench'])
+    // The signed-in member first, named as such.
+    expect([...(owner as HTMLSelectElement).options].map((o) => o.textContent)).toEqual(['Unassigned', 'Me (Ada Rider)', 'Bo Wrench'])
     await user.selectOptions(owner, 'm2')
     await user.click(panel.getByTestId('task-save-k1'))
     await waitFor(() => expect(db.tasks[0].owner_id).toBe('m2'))

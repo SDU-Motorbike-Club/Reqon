@@ -48,7 +48,7 @@ export const PROBLEM_LABEL: Record<SubmissionProblem, string> = {
 export const PROBLEM_MESSAGE: Record<SubmissionProblem, string> = {
   title: `Enter a title of 1 to ${MAX_TITLE_LENGTH} characters.`,
   department: 'Choose the department this is for.',
-  dueDate: 'Choose a deadline. It is never filled in for you.',
+  dueDate: 'Choose a deadline.',
   milestone: 'Choose the milestone it belongs to.',
   requirement: 'Choose at least one requirement it serves.',
 }

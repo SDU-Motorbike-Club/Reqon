@@ -22,10 +22,19 @@ function Harness({ initial = [] as string[] }) {
 }
 
 describe('RequirementPicker', () => {
+  it('lists nothing until something is typed, and says what to do', () => {
+    render(<Harness />)
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+    expect(screen.getByTestId('requirement-count')).toHaveTextContent('Type a reference or a word to find a requirement.')
+  })
+
   it('selects several requirements and keeps clause_key as the value', async () => {
     const user = userEvent.setup()
     render(<Harness />)
+    await user.type(screen.getByLabelText('Find a requirement'), 'a.1')
     await user.click(screen.getByRole('checkbox', { name: /A\.1 — The vehicle/ }))
+    await user.clear(screen.getByLabelText('Find a requirement'))
+    await user.type(screen.getByLabelText('Find a requirement'), 'fairing')
     await user.click(screen.getByRole('checkbox', { name: /Fairing width/ }))
     expect(screen.getByTestId('value')).toHaveTextContent('A.1,B.2#1')
   })
@@ -33,7 +42,9 @@ describe('RequirementPicker', () => {
   it('narrows the list as you type and says how many are shown', async () => {
     const user = userEvent.setup()
     render(<Harness />)
+    await user.type(screen.getByLabelText('Find a requirement'), 'e')
     expect(screen.getAllByRole('checkbox')).toHaveLength(3)
+    await user.clear(screen.getByLabelText('Find a requirement'))
     await user.type(screen.getByLabelText('Find a requirement'), 'fairing')
     expect(screen.getAllByRole('checkbox')).toHaveLength(1)
     expect(screen.getByTestId('requirement-count')).toHaveTextContent('1 shown')
@@ -45,6 +56,7 @@ describe('RequirementPicker', () => {
   it('tells two requirements with the same printed reference apart, and selects each on its own', async () => {
     const user = userEvent.setup()
     render(<Harness />)
+    await user.type(screen.getByLabelText('Find a requirement'), 'b.2')
     const first = screen.getByRole('checkbox', { name: /key B\.2#1/ })
     const second = screen.getByRole('checkbox', { name: /key B\.2#2/ })
     await user.click(second)

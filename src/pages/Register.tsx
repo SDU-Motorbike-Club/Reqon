@@ -2,6 +2,7 @@ import { PageHeader } from '../ui/PageHeader.tsx'
 import { pageMain } from '../ui/layout.ts'
 import { ErrorState } from '../ui/states.tsx'
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { obligationName } from '../clauses/labels.ts'
 import { Link } from 'react-router-dom'
 import { canEditTask } from '../auth/permissions.ts'
 import { BookReader } from '../book/BookReader.tsx'
@@ -11,7 +12,7 @@ import { useTasks } from '../data/useTasks.ts'
 import { mergeSearchParams } from '../lib/searchParams.ts'
 import { AssignContext, type AssignContextValue } from './register/assignContext.ts'
 import type { ClauseState } from '../data/useClauseStatus.ts'
-import { useClauseStatus, useSetClauseStatus } from '../data/useClauseStatus.ts'
+import { useClauseStatus, useSetClauseStatus, type ClauseStatusEdit } from '../data/useClauseStatus.ts'
 import { useClauses } from '../data/useClauses.ts'
 import { useMembers } from '../data/useMembers.ts'
 import { useSubteams } from '../data/useSubteams.ts'
@@ -34,6 +35,10 @@ import {
   type SubteamInfo,
 } from './register/registerModel.ts'
 import { useUrlParams } from '../lib/useUrlParams.ts'
+
+// With no search, "Team duties only" is on; a search (often a link to one rule)
+// turns it off so the rule is found even if it is a definition.
+const impliedDuties = (search: string) => search === ''
 
 export default function Register() {
   const clauses = useClauses()
@@ -67,22 +72,41 @@ export default function Register() {
   const grouping: GroupingId = GROUPINGS.some((g) => g.id === rawGroup) ? (rawGroup as GroupingId) : 'subsystem'
   const setGrouping = (id: GroupingId) =>
     setSearchParams((current) => mergeSearchParams(current, { group: id === 'subsystem' ? null : id }), { replace: true })
-  const [otherFilters, setOtherFilters] = useState<Omit<Filters, 'search'>>(() => ({
-    ...DEFAULT_FILTERS,
-    teamDutiesOnly: urlSearch ? false : DEFAULT_FILTERS.teamDutiesOnly,
-  }))
+  // The other filters live in the address too, so a reload or Back keeps them,
+  // and a link can ask for a narrower list (Now's chapter rows send ?unresolved=1).
+  // "Team duties only" defaults on, except for a link that arrives with a search
+  // (the Spec sheet's ?search=B.2.1.9), where the rule must be found.
+  const otherFilters: Omit<Filters, 'search'> = useMemo(
+    () => ({
+      teamDutiesOnly: searchParams.has('duties') ? searchParams.get('duties') === '1' : impliedDuties(urlSearch),
+      unresolvedOnly: searchParams.get('unresolved') === '1',
+      obligation: searchParams.get('kind') ?? DEFAULT_FILTERS.obligation,
+      owner: searchParams.get('owner') ?? DEFAULT_FILTERS.owner,
+    }),
+    [searchParams, urlSearch],
+  )
   // The box keeps its own value (typing must never wait for the router) and the
   // address follows it. It starts from the address; a link from another screen
   // (Now, the Spec sheet) arrives as a fresh visit, so it is picked up here.
   const [search, setSearch] = useState(urlSearch)
   const filters: Filters = useMemo(() => ({ ...otherFilters, search }), [otherFilters, search])
   const setFilters = (update: (f: Filters) => Filters) => {
-    const { search: nextSearch, ...rest } = update(filters)
-    setOtherFilters(rest)
-    if (nextSearch !== search) {
-      setSearch(nextSearch)
-      setSearchParams((current) => mergeSearchParams(current, { search: nextSearch }), { replace: true })
-    }
+    const next = update(filters)
+    if (next.search !== search) setSearch(next.search)
+    // Every filter written out, each only when it differs from its default, so the
+    // address stays short. "Team duties only" is written whenever it differs from
+    // what the search alone would imply, so typing a search never flips it.
+    setSearchParams(
+      (current) =>
+        mergeSearchParams(current, {
+          search: next.search,
+          duties: next.teamDutiesOnly === impliedDuties(next.search) ? null : next.teamDutiesOnly ? '1' : '0',
+          unresolved: next.unresolvedOnly ? '1' : null,
+          kind: next.obligation !== DEFAULT_FILTERS.obligation ? next.obligation : null,
+          owner: next.owner !== DEFAULT_FILTERS.owner ? next.owner : null,
+        }),
+      { replace: true },
+    )
   }
 
   // The rule open in the Book reader (?rule=<clause_key> — clause_key, never the
@@ -187,23 +211,32 @@ export default function Register() {
   // All four writes are the same upsert on (season_id, clause_key) — the real
   // unique key from the schema. Writes go to clause_status; `clauses` is the
   // rulebook and is never edited to record progress.
-  const onSetState = useCallback(
-    (clauseKey: string, state: ClauseState) => setStatus.mutate({ clauseKey, state }),
-    [setStatus],
+  // Each save reports back on its own row: "Saved" for a moment, or what went
+  // wrong, beside the controls that were changed — not at the top of a long page.
+  const [rowNote, setRowNote] = useState<{ key: string; error: string | null } | null>(null)
+  const saveStatus = setStatus.mutateAsync
+  const saveRow = useCallback(
+    (edit: ClauseStatusEdit) => {
+      saveStatus(edit).then(
+        () => setRowNote({ key: edit.clauseKey, error: null }),
+        (e: unknown) => setRowNote({ key: edit.clauseKey, error: e instanceof Error ? e.message : 'That change was not saved.' }),
+      )
+    },
+    [saveStatus],
   )
-  const onSetOwner = useCallback(
-    (clauseKey: string, ownerId: string | null) => setStatus.mutate({ clauseKey, ownerId }),
-    [setStatus],
-  )
+  useEffect(() => {
+    if (!rowNote || rowNote.error) return
+    const shown = rowNote
+    const timer = setTimeout(() => setRowNote((current) => (current === shown ? null : current)), 2500)
+    return () => clearTimeout(timer)
+  }, [rowNote])
+  const onSetState = useCallback((clauseKey: string, state: ClauseState) => saveRow({ clauseKey, state }), [saveRow])
+  const onSetOwner = useCallback((clauseKey: string, ownerId: string | null) => saveRow({ clauseKey, ownerId }), [saveRow])
   const onSetEvidence = useCallback(
-    (clauseKey: string, evidence: string) =>
-      setStatus.mutate({ clauseKey, evidence: evidence || null }),
-    [setStatus],
+    (clauseKey: string, evidence: string) => saveRow({ clauseKey, evidence: evidence || null }),
+    [saveRow],
   )
-  const onToggleStar = useCallback(
-    (clauseKey: string, starred: boolean) => setStatus.mutate({ clauseKey, starred }),
-    [setStatus],
-  )
+  const onToggleStar = useCallback((clauseKey: string, starred: boolean) => saveRow({ clauseKey, starred }), [saveRow])
 
   const error = clauses.error ?? statuses.error ?? members.error ?? subteams.error
   if (error) {
@@ -310,7 +343,7 @@ export default function Register() {
             <option value="all">All kinds</option>
             {obligations.map((o) => (
               <option key={o} value={o}>
-                {o}
+                {obligationName(o)}
               </option>
             ))}
           </select>
@@ -392,11 +425,6 @@ export default function Register() {
         </p>
       )}
 
-      {setStatus.isError && (
-        <p role="alert" className="mb-3 rounded border border-red-300 bg-red-50 p-2 text-sm text-red-800">
-          Could not save that change: {setStatus.error.message}
-        </p>
-      )}
 
       {!loading && shown === 0 && (
         <p className="rounded border border-slate-200 bg-slate-50 p-6 text-center text-slate-600">
@@ -433,6 +461,8 @@ export default function Register() {
                   departmentNames={departmentNames}
                   onOpenBook={openBook}
                   reading={row.clause.clause_key === readingKey}
+                  saved={rowNote?.key === row.clause.clause_key && rowNote.error === null}
+                  saveError={rowNote?.key === row.clause.clause_key ? rowNote.error : null}
                 />
               ))}
             </ul>

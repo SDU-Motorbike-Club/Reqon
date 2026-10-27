@@ -7,19 +7,16 @@ import { ActionError } from '../../ui/states.tsx'
 import { milestoneLabel } from '../../milestones/label.ts'
 
 // A milestone's WORK, its SUBMISSION and its ACCEPTANCE are three different facts. The bar above this is
-// work (linked tasks done). Submitted and accepted are dates a person records — never inferred from the
-// bar, and never set by finishing tasks. Until someone records them they read "Not recorded".
+// work (linked tasks done) and says so itself. Submitted and accepted are dates a person records — never
+// inferred from the bar, and never set by finishing tasks. Until someone records them they read "Not recorded".
 export function SubmissionState({
   milestone,
   canRecord,
   memberNames,
-  workLabel,
 }: {
   milestone: Milestone
   canRecord: boolean
   memberNames: ReadonlyMap<string, string>
-  // e.g. "3 of 4 tasks done", or "No linked work": what the bar says, repeated here so the three sit together.
-  workLabel: string
 }) {
   const save = useSetMilestoneSubmission()
   const key = milestone.key
@@ -47,6 +44,8 @@ export function SubmissionState({
   }
   const open = () => {
     load()
+    // Nothing recorded yet: the submission is almost always being recorded the day it was sent.
+    if (!milestone.submitted_on && !milestone.accepted_on) setSubmitted(today)
     setEditing(true)
   }
   const problem =
@@ -61,10 +60,6 @@ export function SubmissionState({
   return (
     <div className="mt-1 text-xs" data-testid={`submission-${key}`}>
       <dl className="flex flex-wrap gap-x-4 gap-y-0.5 text-slate-700">
-        <div className="flex gap-1">
-          <dt className="font-medium">Work:</dt>
-          <dd data-testid={`work-${key}`}>{workLabel}</dd>
-        </div>
         <div className="flex gap-1">
           <dt className="font-medium">Submitted:</dt>
           <dd data-testid={`submitted-${key}`}>

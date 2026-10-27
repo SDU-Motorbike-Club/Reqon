@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // difference between "the UI hid the button" and "the write was refused".
 // The rules are those of supabase/migrations/20260105000000_privileged_roles.sql;
 // the real database is checked by supabase/tests/roles_rls_test.sql.
-type Member = { id: string; full_name: string; role: string; status: string }
+type Member = { id: string; full_name: string; role: string; status: string; must_change_password?: boolean }
 type RoleRow = { member_id: string; role: string; assigned_by?: string | null }
 
 // Job titles deliberately differ from the privileged roles: a title is a label.
@@ -24,7 +24,7 @@ const LAST_PRESIDENT =
 
 let db: Record<string, Record<string, unknown>[]>
 let rpcCalls: { fn: string; args: unknown }[]
-// Every call to an Edge Function, in order (create-member).
+// Every call to an Edge Function, in order (create-member, reset-member-password).
 let functionCalls: { name: string; body: Record<string, unknown> }[] = []
 // Every role write the fake accepted, in order.
 let writes: string[] = []
@@ -297,14 +297,24 @@ const emails = new Set<string>()
 ;(supabase as Record<string, unknown>).functions = {
   invoke: async (name: string, { body }: { body: Record<string, unknown> }) => {
     functionCalls.push({ name, body })
+    if (name === 'reset-member-password') {
+      // mark_password_reset() / can_reset_password(): never yourself, and only
+      // someone whose every role the caller could grant.
+      const target = db.members.find((m) => m.id === body.memberId) as Member | undefined
+      if (!target || !isAdmin(caller) || target.id === caller.id || !rolesOf(target.id).every((r) => canGrant(caller, r))) {
+        return functionError(403, 'You may not reset this person’s password.')
+      }
+      target.must_change_password = true
+      return { data: { password: `Rset-${target.id}-pass` }, error: null }
+    }
     if (name !== 'create-member') return functionError(404, 'No such function.')
     if (!isAdmin(caller)) return functionError(403, 'Only an active President, Vice President or Developer may add people to the roster. Nothing was changed.')
     const email = String(body.email).toLowerCase()
     if (emails.has(email)) return functionError(409, `A login already exists for ${email}. If they are not on the roster yet, link it by UUID instead.`)
     emails.add(email)
     const id = `login-${emails.size}`
-    db.members.push({ id, full_name: body.fullName, role: body.jobTitle, status: 'active' })
-    return { data: { id }, error: null }
+    db.members.push({ id, full_name: body.fullName, role: body.jobTitle, status: 'active', must_change_password: true })
+    return { data: { id, password: `Temp-${emails.size}-pass` }, error: null }
   },
 }
 vi.mock('../lib/supabase.ts', () => ({ get supabase() { return supabase } }))
@@ -320,7 +330,7 @@ vi.mock('../auth/context.ts', () => ({
 
 const { default: Settings } = await import('./Settings.tsx')
 const { buildSeasonExport } = await import('../data/exportSeason.ts')
-const { useAddMember, useCreateMember, useUpdateMember } = await import('../data/useMembers.ts')
+const { useAddMember, useCreateMember, useResetPassword, useUpdateMember } = await import('../data/useMembers.ts')
 const { useUpdateSubteam } = await import('../data/useSubteams.ts')
 const { useUpdateMilestone } = await import('../data/useMilestones.ts')
 const { useSetCurrentSeason } = await import('../data/useSeasons.ts')
@@ -726,20 +736,30 @@ describe('roster', () => {
 
     await user.type(screen.getByLabelText('Full name'), 'Cam Newbie')
     await user.type(screen.getByLabelText('Email they sign in with'), 'Cam@Club.test')
-    await user.type(screen.getByLabelText('First password'), 'first-pass-123')
+    // Nobody types the first password any more: the function generates it.
+    expect(within(screen.getByRole('form', { name: 'Add someone to the roster' })).queryByLabelText(/password/i)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Add to roster' }))
 
     await waitFor(() => expect(db.members).toHaveLength(before + 1))
     // Only the Edge Function is asked; the browser never writes auth or roles.
     expect(functionCalls).toEqual([
-      { name: 'create-member', body: { email: 'Cam@Club.test', password: 'first-pass-123', fullName: 'Cam Newbie', jobTitle: 'Member' } },
+      { name: 'create-member', body: { email: 'Cam@Club.test', fullName: 'Cam Newbie', jobTitle: 'Member' } },
     ])
     const added = db.members.find((m) => m.full_name === 'Cam Newbie')!
     expect(rolesOf(String(added.id))).toEqual([])
     expect(writes).toEqual([])
-    expect(await screen.findByText(/Cam Newbie is on the roster/)).toBeInTheDocument()
-    // The password does not linger in the form after it was used.
-    expect(screen.getByLabelText('First password')).toHaveValue('')
+    expect(await screen.findByText('Cam Newbie is on the roster.')).toBeInTheDocument()
+    // The generated password is shown once, with who it is for.
+    const panel = screen.getByRole('group', { name: 'Temporary password for Cam Newbie' })
+    expect(within(panel).getByTestId('issued-password')).toHaveTextContent('Temp-1-pass')
+    expect(within(panel).getByText('Cam@Club.test')).toBeInTheDocument()
+    // The new row says they still have to choose their own.
+    const row = await screen.findByTestId(`member-${String(added.id)}`)
+    expect(within(row).getByText('temporary password')).toBeInTheDocument()
+    // "Done" drops it; nothing keeps it.
+    await user.click(within(panel).getByRole('button', { name: 'Done' }))
+    expect(screen.queryByTestId('issued-password')).not.toBeInTheDocument()
+    expect(screen.queryByText('Temp-1-pass')).not.toBeInTheDocument()
   })
 
   it('lets the President add someone too', async () => {
@@ -748,7 +768,6 @@ describe('roster', () => {
     await screen.findByText('Add someone to the roster')
     await user.type(screen.getByLabelText('Full name'), 'Dee New')
     await user.type(screen.getByLabelText('Email they sign in with'), 'dee@club.test')
-    await user.type(screen.getByLabelText('First password'), 'first-pass-123')
     await user.click(screen.getByRole('button', { name: 'Add to roster' }))
     await waitFor(() => expect(db.members.some((m) => m.full_name === 'Dee New')).toBe(true))
   })
@@ -762,7 +781,6 @@ describe('roster', () => {
       await user.type(screen.getByLabelText('Full name'), name)
       await user.clear(screen.getByLabelText('Email they sign in with'))
       await user.type(screen.getByLabelText('Email they sign in with'), 'same@club.test')
-      await user.type(screen.getByLabelText('First password'), 'first-pass-123')
       await user.click(screen.getByRole('button', { name: 'Add to roster' }))
       await waitFor(() => expect(functionCalls.at(-1)?.body.fullName).toBe(name))
     }
@@ -777,16 +795,53 @@ describe('roster', () => {
       renderSettings()
       await screen.findByTestId('member-m2')
       expect(screen.queryByText('Add someone to the roster')).not.toBeInTheDocument()
-      expect(screen.queryByLabelText('First password')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Email they sign in with')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Reset password/ })).not.toBeInTheDocument()
     })
   }
+
+  it('lets the President reset a member’s password, after a second click, and shows the new one once', async () => {
+    const user = userEvent.setup()
+    renderSettings()
+    const row = await screen.findByTestId('member-m2')
+    await user.click(within(row).getByRole('button', { name: 'Reset password for Bo Wrench' }))
+    // The first click only asks.
+    expect(functionCalls).toEqual([])
+    await user.click(within(row).getByRole('button', { name: 'Confirm: reset the password of Bo Wrench' }))
+
+    const panel = await screen.findByRole('group', { name: 'Temporary password for Bo Wrench' })
+    expect(within(panel).getByTestId('issued-password')).toHaveTextContent('Rset-m2-pass')
+    expect(functionCalls).toEqual([{ name: 'reset-member-password', body: { memberId: 'm2' } }])
+    expect(await within(row).findByText('temporary password')).toBeInTheDocument()
+  })
+
+  it('offers a reset only where the database allows one', async () => {
+    caller = VP
+    renderSettings()
+    await screen.findByTestId('member-m2')
+    // A Vice President may reset a member and the Treasurer...
+    expect(screen.getByRole('button', { name: 'Reset password for Bo Wrench' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reset password for Eve Ledger' })).toBeInTheDocument()
+    // ...never the President or a Developer, whose roles they cannot change,
+    // and never themselves (Settings → Your account is for that).
+    expect(screen.queryByRole('button', { name: 'Reset password for Ada Rider' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reset password for Di Coder' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reset password for Cy Deputy' })).not.toBeInTheDocument()
+  })
+
+  it('refuses a reset of the President by the Vice President even if the UI is bypassed', async () => {
+    caller = VP
+    const reset = hook(() => useResetPassword())
+    await expect(reset.current.mutateAsync({ id: 'm1' })).rejects.toThrow(/don't have permission to reset this person’s password/)
+    expect(db.members.find((m) => m.id === 'm1')?.must_change_password).toBeUndefined()
+  })
 
   it('refuses the create-member call for a treasurer even if the UI is bypassed', async () => {
     caller = TREAS
     const before = db.members.length
     const create = hook(() => useCreateMember())
     await expect(
-      create.current.mutateAsync({ email: 'x@club.test', password: 'first-pass-123', fullName: 'Sneaky', jobTitle: 'Member' }),
+      create.current.mutateAsync({ email: 'x@club.test', fullName: 'Sneaky', jobTitle: 'Member' }),
     ).rejects.toThrow(/don't have permission to add people to the roster/)
     expect(db.members).toHaveLength(before)
   })

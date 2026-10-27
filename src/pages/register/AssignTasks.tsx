@@ -67,12 +67,12 @@ export function AssignTasks({
       // pair is only ever linked once (the table's key).
       if (linked.has(task.id)) {
         const changed = await unlink.mutateAsync({ taskId: task.id, clauseKey })
-        setDone(changed ? `“${task.title}” is no longer linked to ${printedRef}.` : `“${task.title}” was already not linked to ${printedRef}.`)
+        setDone(changed ? `Unlinked “${task.title}” from ${printedRef}.` : `“${task.title}” was already not linked to ${printedRef}.`)
       } else {
         const changed = await link.mutateAsync({ taskId: task.id, clauseKey })
         setDone(
           changed
-            ? `“${task.title}” is now linked to ${printedRef}. Its owner, department and status are unchanged.`
+            ? `Linked “${task.title}” to ${printedRef}.`
             : `“${task.title}” was already linked to ${printedRef} — nothing was added twice.`,
         )
       }
@@ -103,10 +103,7 @@ export function AssignTasks({
           Done
         </button>
       </div>
-      <p className="mt-1 text-xs text-slate-600">
-        Linking keeps the task as it is — same id, owner, department and progress — and does not make the rule compliant.
-        You can link tasks you own, or that belong to a department you head.
-      </p>
+      <p className="mt-1 text-xs text-slate-600">You can link tasks you own or whose department you head.</p>
       <ActionError error={error} className="mt-2" />
       {done && (
         <p role="status" className="mt-2 text-xs text-emerald-800">

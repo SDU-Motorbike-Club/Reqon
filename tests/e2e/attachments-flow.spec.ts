@@ -66,8 +66,9 @@ async function openFiles(page: Page) {
   await page.goto(`/board?task=${taskId}`)
   const card = page.getByTestId(`task-${taskId}`)
   await expect(card).toBeVisible()
+  // ?task= opens the card's details dialog; open it by its button if it is not already.
   const details = card.getByTestId(`task-more-${taskId}`)
-  if (!(await details.evaluate((el) => (el as HTMLDetailsElement).open))) await details.locator('summary').click()
+  if ((await details.getAttribute('aria-expanded')) !== 'true') await details.click()
   const files = page.getByTestId(`task-files-${taskId}`)
   await expect(files).toBeVisible()
   return files

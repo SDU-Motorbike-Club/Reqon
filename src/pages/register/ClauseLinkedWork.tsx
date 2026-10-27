@@ -84,7 +84,7 @@ export function ClauseLinkedWork({ clauseKey, printedRef, state, work, availabil
             className="min-h-11 rounded border border-slate-300 bg-white px-2 py-0.5 text-xs text-slate-800 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
             data-testid={`assign-open-${clauseKey}`}
           >
-            Assign existing tasks
+            Link tasks
             <span className="sr-only"> to {printedRef}</span>
           </button>
         )}

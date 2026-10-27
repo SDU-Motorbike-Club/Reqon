@@ -5,6 +5,7 @@ import { useAuth } from '../auth/context.ts'
 import { ROLE_LABELS, sortRoles } from '../auth/permissions.ts'
 import { usePermissions } from '../auth/usePermissions.ts'
 import { useCurrentSeason } from '../data/useCurrentSeason.ts'
+import { useUnreadCount } from '../data/useNotifications.ts'
 import { useTutorial } from '../tutorial/context.ts'
 import { buttonSecondary } from './buttons.ts'
 import { SHELL } from './layout.ts'
@@ -29,6 +30,7 @@ export function AppHeader() {
   const can = usePermissions()
   const tutorial = useTutorial()
   const season = useCurrentSeason()
+  const unread = useUnreadCount().data ?? 0
   const location = useLocation()
   // Remember which page the phone menu was opened on. Any navigation changes
   // the path, which closes it — no effect needed to keep the two in sync.
@@ -95,7 +97,27 @@ export function AppHeader() {
           </span>
         )}
 
-        <div className="ml-auto hidden items-center gap-2 sm:flex">
+        {/* Visible on every width, outside the phone menu: the count is the
+            point, so it must not hide behind a button. */}
+        <NavLink
+          to="/inbox"
+          aria-label={unread > 0 ? `Inbox, ${unread} new` : 'Inbox'}
+          className={({ isActive }) =>
+            `ml-auto inline-flex min-h-11 items-center gap-1.5 rounded px-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0 sm:py-1.5 ${
+              isActive ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+            }`
+          }
+          data-testid="inbox-link"
+        >
+          Inbox
+          {unread > 0 && (
+            <span aria-hidden="true" className="rounded-full bg-sky-600 px-1.5 text-xs font-semibold text-white tabular-nums">
+              {unread > 99 ? '99+' : unread}
+            </span>
+          )}
+        </NavLink>
+
+        <div className="hidden items-center gap-2 sm:flex">
           {name && (
             <span className="text-xs text-slate-600" data-tutorial="account-roles">
               {name}
@@ -118,7 +140,7 @@ export function AppHeader() {
           aria-expanded={menuOpen}
           aria-controls={menuOpen ? 'phone-menu' : undefined}
           onClick={() => setMenuOpenOn(menuOpen ? null : location.pathname)}
-          className={`ml-auto sm:hidden ${buttonSecondary}`}
+          className={`sm:hidden ${buttonSecondary}`}
           data-tutorial="main-nav help-button account-roles"
         >
           {menuOpen ? 'Close' : 'Menu'}

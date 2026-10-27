@@ -106,11 +106,11 @@ const task = (id: string, over: Row = {}): Row => ({
   archived_at: null, section_id: null, milestone_key: null, ...over,
 })
 
-function renderRegister() {
+function renderRegister(path = '/register') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
         <Register />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -235,6 +235,39 @@ describe('compliance stays a person\'s decision', () => {
     expect(fake.upserts[0].table).toBe('clause_status')
     expect(fake.upserts[0].row).toMatchObject({ clause_key: 'F.5.2.3#2', state: 'compliant', season_id: 's1' })
     expect(fake.upserts[0].row.state).not.toBe('verified')
+    // The row itself says the change was saved.
+    expect(await within(rowOf('F.5.2.3#2')).findByTestId('saved-F.5.2.3#2')).toHaveTextContent('Saved')
+  })
+})
+
+describe('filters in the address', () => {
+  const filterBar = () => within(document.querySelector<HTMLElement>('[role="search"]')!)
+
+  it('honours ?unresolved=1, as sent by the Now screen\'s chapter rows', async () => {
+    renderRegister('/register?unresolved=1')
+    await waitFor(() => expect(rowOf('K.0')).toBeTruthy())
+    expect(filterBar().getByLabelText('Unresolved only')).toBeChecked()
+    expect(filterBar().getByLabelText('Team duties only')).toBeChecked()
+  })
+
+  it('keeps a changed filter in the address, so it survives a reload', async () => {
+    const user = userEvent.setup()
+    renderRegister()
+    await waitFor(() => expect(rowOf('K.0')).toBeTruthy())
+    await user.click(filterBar().getByLabelText('Unresolved only'))
+    expect(filterBar().getByLabelText('Unresolved only')).toBeChecked()
+    await user.click(filterBar().getByLabelText('Team duties only'))
+    expect(filterBar().getByLabelText('Team duties only')).not.toBeChecked()
+  })
+
+  it('turns "Team duties only" off for a link that arrives with a search, and typing a search never flips it', async () => {
+    const user = userEvent.setup()
+    renderRegister('/register?search=K.0')
+    await waitFor(() => expect(rowOf('K.0')).toBeTruthy())
+    expect(filterBar().getByLabelText('Team duties only')).not.toBeChecked()
+    await user.click(filterBar().getByLabelText('Team duties only'))
+    await user.type(searchBox(), 'x')
+    expect(filterBar().getByLabelText('Team duties only')).toBeChecked()
   })
 })
 
@@ -278,7 +311,7 @@ describe('the Requirements Book inside the Register', () => {
   })
 })
 
-describe('Assign existing tasks', () => {
+describe('Link tasks', () => {
   it('links an existing task through the link command, and offers only tasks this person may edit', async () => {
     const user = userEvent.setup()
     renderRegister()
@@ -289,13 +322,13 @@ describe('Assign existing tasks', () => {
     expect(panel.getByTestId('assign-row-b')).toHaveTextContent('Not yours to link')
     await user.click(within(panel.getByTestId('assign-row-a')).getByRole('button', { name: /Link/ }))
     await waitFor(() => expect(fake.rpcs).toEqual([{ name: 'link_task_requirement', args: { p_task_id: 'a', p_clause_key: 'K.0' } }]))
-    expect(await panel.findByText(/owner, department and status are unchanged/)).toBeInTheDocument()
+    expect(await panel.findByText(/Linked “.+” to K\.0\./)).toBeInTheDocument()
     // No task was written, and the rule's own status was not touched.
     expect(fake.upserts).toEqual([])
   })
 })
 
-describe('Assign existing tasks: the saved state and its limits', () => {
+describe('Link tasks: the saved state and its limits', () => {
   it('shows a linked task as linked after the list reloads, and unlinks it with the unlink command', async () => {
     const user = userEvent.setup()
     renderRegister()
@@ -309,7 +342,7 @@ describe('Assign existing tasks: the saved state and its limits', () => {
     const unlink = within(panel.getByTestId('assign-row-a')).getByRole('button', { name: /^Unlink/ })
     await user.click(unlink)
     await waitFor(() => expect(fake.rpcs.at(-1)).toEqual({ name: 'unlink_task_requirement', args: { p_task_id: 'a', p_clause_key: 'K.0' } }))
-    expect(await panel.findByText(/is no longer linked to K\.0/)).toBeInTheDocument()
+    expect(await panel.findByText(/Unlinked “.+” from K\.0\./)).toBeInTheDocument()
     await waitFor(() => expect(within(rowOf('K.0')).getByTestId('link-progress')).toHaveTextContent('No linked work'))
     expect(fake.upserts).toEqual([])
   })

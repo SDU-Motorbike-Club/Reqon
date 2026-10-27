@@ -27,7 +27,10 @@ export function RequirementPicker({
 }) {
   const [text, setText] = useState('')
   const listId = useId()
-  const matches = useMemo(() => searchRequirements(options, text), [options, text])
+  // Nothing is listed until something is typed: the first 30 rules of the book
+  // are never the ones wanted, and they pushed the form's own button out of view.
+  const searching = text.trim() !== ''
+  const matches = useMemo(() => (searching ? searchRequirements(options, text) : []), [options, text, searching])
   const chosen = new Set(selected)
   const byKey = useMemo(() => new Map(options.map((o) => [o.key, o])), [options])
 
@@ -76,11 +79,13 @@ export function RequirementPicker({
       <fieldset id={listId} className="mt-2" disabled={disabled}>
         <legend className="sr-only">Matching requirements</legend>
         <p role="status" className="mb-1 text-xs text-slate-500" data-testid="requirement-count">
-          {matches.length === 0
-            ? 'No requirement matches that search.'
-            : `${matches.length} shown${matches.length >= 30 ? ' — type more to narrow them' : ''}.`}
+          {!searching
+            ? 'Type a reference or a word to find a requirement.'
+            : matches.length === 0
+              ? 'No requirement matches that search.'
+              : `${matches.length} shown${matches.length >= 30 ? ' — type more to narrow them' : ''}.`}
         </p>
-        <ul className="max-h-56 space-y-0.5 overflow-y-auto rounded border border-slate-200 p-1">
+        <ul hidden={matches.length === 0} className="max-h-56 space-y-0.5 overflow-y-auto rounded border border-slate-200 p-1">
           {matches.map((o) => (
             <li key={o.key}>
               <label className="flex min-h-11 cursor-pointer items-start gap-2 rounded px-2 py-1.5 text-sm hover:bg-slate-50 sm:min-h-0">

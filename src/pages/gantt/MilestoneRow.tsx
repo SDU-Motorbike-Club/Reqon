@@ -46,7 +46,7 @@ export function MilestoneRow({
   const topSections = topLevelSections(sections, milestone.key)
   const marks = milestoneMarks(milestone, env.today)
   const progress = milestoneProgress(mySections, progressTasks, milestone.key)
-  const words = progressLabel(progress, 'submission', 'done')
+  const words = progressLabel(progress, 'submission', 'drafted')
   const lens = env.lens.active
     ? lensProgress(mySections, progressTasks.filter(env.lens.matches), milestone.key)
     : null
@@ -57,7 +57,7 @@ export function MilestoneRow({
     progress.basis === 'tasks'
       ? `Overall ${progress.percent}%`
       : progress.basis === 'drafted'
-        ? `${progress.done}/${progress.total} done`
+        ? `${progress.done}/${progress.total} drafted`
         : 'No linked work'
 
   return (

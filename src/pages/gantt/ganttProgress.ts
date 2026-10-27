@@ -111,7 +111,7 @@ export function lensProgress(
 }
 
 // The words for a figure. Always says what it counts. `tick` names the section
-// tick: Milestones calls it "drafted", the Gantt calls it "done".
+// tick; both screens call it "drafted" (a drafted section is not done work).
 export function progressLabel(
   view: ProgressView,
   unit: 'submission' | 'section' = 'submission',

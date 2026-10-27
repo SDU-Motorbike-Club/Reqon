@@ -55,11 +55,13 @@ describe('Milestones: linked work', () => {
     expect(screen.getByTestId('linked-M1')).toHaveTextContent('Linked work: 2 of 3 tasks done, incl. 1 archived done')
   })
 
-  it('does not call a submission with no tasks "0%": it falls back to the drafting checklist, labelled', () => {
+  it('does not call a submission with no tasks "0%", and never shows the drafting checklist as progress', () => {
     progress.data = []
     renderPage()
-    expect(screen.getByTestId('linked-M1')).toHaveTextContent('1 of 2 sections drafted (no tasks linked)')
-    expect(screen.getByTestId('linked-M2')).toHaveTextContent('No linked work')
+    // M1 has drafted sections but no tasks: the bar says so, and stays empty.
+    expect(screen.getByTestId('linked-M1')).toHaveTextContent('Linked work: No linked tasks yet')
+    expect(screen.getByTestId('linked-M1')).not.toHaveTextContent('drafted')
+    expect(screen.getByTestId('linked-M2')).toHaveTextContent('No linked tasks yet')
   })
 
   it('says it is loading rather than "No linked work" while the progress list has not arrived', () => {
@@ -74,9 +76,10 @@ describe('Milestones: linked work', () => {
     renderPage()
     expect(screen.getByTestId('sections-M1')).toHaveTextContent('1/2')
     await userEvent.click(screen.getByRole('button', { name: /M1 Team Plan/ }))
-    expect(screen.getByText(/Drafting checklist — sections drafted/)).toBeInTheDocument()
-    expect(screen.getByRole('checkbox', { name: /Cover/ })).toBeChecked()
-    expect(screen.getAllByText(/a checklist tick, not task completion/).length).toBeGreaterThanOrEqual(1)
+    // Said once, in the panel, not on every section.
+    expect(screen.getByText(/Drafting checklist — tick a section once its text is drafted \(1\/2\)\. Ticks are not task progress\./)).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Cover drafted' })).toBeChecked()
+    expect(screen.queryByText(/a checklist tick, not task completion/)).not.toBeInTheDocument()
   })
 })
 
@@ -112,7 +115,7 @@ describe('Milestones: ordered expandable rows', () => {
     progress.data = [row('b', { state: 'done' })]
     renderPage()
     expect(screen.getByTestId('linked-M1')).toHaveTextContent('1 of 1 tasks done')
-    expect(screen.getByText(/does not mean a submission was sent or accepted/)).toBeInTheDocument()
+    expect(screen.getByText(/Submitted and accepted are recorded by hand/)).toBeInTheDocument()
   })
 })
 
@@ -120,7 +123,7 @@ describe('Milestones: work, submission and acceptance are three facts', () => {
   it('reads "Not recorded" for both submitted and accepted even when every task is done', () => {
     progress.data = [row('b', { state: 'done' })]
     renderPage()
-    expect(screen.getByTestId('work-M1')).toHaveTextContent('1 of 1 tasks done')
+    expect(screen.getByTestId('linked-M1')).toHaveTextContent('1 of 1 tasks done')
     expect(screen.getByTestId('submitted-M1')).toHaveTextContent('Not recorded')
     expect(screen.getByTestId('accepted-M1')).toHaveTextContent('Not recorded')
   })
@@ -144,6 +147,8 @@ describe('Milestones: work, submission and acceptance are three facts', () => {
     const user = userEvent.setup()
     renderPage()
     await user.click(screen.getByTestId('submission-edit-M1'))
+    // A first record starts from today; this one was sent earlier.
+    await user.clear(screen.getByLabelText('Submitted on'))
     await user.type(screen.getByLabelText('Submitted on'), '2020-01-10')
     await user.type(screen.getByLabelText('Accepted on'), '2020-01-12')
     await user.click(screen.getByRole('button', { name: /Save record for M1/ }))
@@ -158,6 +163,7 @@ describe('Milestones: work, submission and acceptance are three facts', () => {
     const user = userEvent.setup()
     renderPage()
     await user.click(screen.getByTestId('submission-edit-M1'))
+    await user.clear(screen.getByLabelText('Submitted on'))
     await user.type(screen.getByLabelText('Accepted on'), '2020-01-12')
     expect(screen.getByTestId('submission-problem-M1')).toHaveTextContent('before it was submitted')
     expect(screen.getByRole('button', { name: /Save record for M1/ })).toBeDisabled()
@@ -174,6 +180,8 @@ describe('Milestones: work, submission and acceptance are three facts', () => {
     await user.click(screen.getByRole('button', { name: /M1 Team Plan/ }))
     const sub = screen.getByTestId('milestone-section-s1a')
     expect(sub).toHaveTextContent('subsection')
+    // No task under it yet: a way straight to that subsection on the Gantt, where tasks are linked.
+    expect(within(sub).getByRole('link', { name: 'Link a task on the Gantt' })).toHaveAttribute('href', '/gantt?open=M1&sections=s1%2Cs1a')
     expect(screen.getByTestId('milestone-section-s1')).toBeInTheDocument()
   })
 })

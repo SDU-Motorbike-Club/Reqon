@@ -78,6 +78,7 @@ describe('ReviewDialog discussion and revision', () => {
     const user = userEvent.setup()
     const { dialog, onDone } = open(proposal())
     fireEvent.change(dialog.getByLabelText('Deadline'), { target: { value: '2027-02-01' } })
+    await user.type(dialog.getByLabelText('Find a requirement'), 'B.2')
     await user.click(dialog.getByRole('checkbox', { name: /B\.2/ }))
     await user.type(dialog.getByLabelText('Revision note (optional)'), 'Updated scope')
     await user.click(dialog.getByTestId('review-save'))
@@ -131,7 +132,33 @@ describe('ReviewDialog approval and promotion', () => {
     await user.click(dialog.getByTestId('review-promote'))
     await waitFor(() => expect(onDone).toHaveBeenCalled())
     expect(calls).toEqual([expect.stringMatching(/^promote /)])
-    expect(onDone.mock.calls[0][1]).toEqual({ toBoard: true })
+    // The message links straight to the new task.
+    expect(onDone.mock.calls[0][1]).toEqual({ taskId: 't1' })
+  })
+
+  it('approves and creates the task in one click: approval first, then promotion, then closes', async () => {
+    const user = userEvent.setup()
+    const { dialog, onDone, onClose } = open(proposal())
+    expect(dialog.getByTestId('review-approve-create')).toBeDisabled()
+    await user.type(dialog.getByLabelText('Review note'), 'Checked against the plan')
+    await user.click(dialog.getByTestId('review-approve-create'))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(calls).toEqual(['approve {"id":"p1","expectedRevision":2,"note":"Checked against the plan"}', expect.stringMatching(/^promote /)])
+    expect(onDone.mock.calls.at(-1)?.[1]).toEqual({ taskId: 't1' })
+  })
+
+  it('keeps the dialog open after "Approve only", so the task can be made next', async () => {
+    const user = userEvent.setup()
+    const { dialog, onClose } = open(proposal())
+    await user.type(dialog.getByLabelText('Review note'), 'Checked')
+    await user.click(dialog.getByTestId('review-approve'))
+    await waitFor(() => expect(calls).toHaveLength(1))
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('says under the note field that a note is needed to approve', () => {
+    const { dialog } = open(proposal())
+    expect(dialog.getByLabelText('Review note')).toHaveAccessibleDescription('Needed to approve or to request changes.')
   })
 
   it('records a change request separately from comments and edits', async () => {

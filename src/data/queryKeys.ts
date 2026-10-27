@@ -30,6 +30,10 @@ export const queryKeys = {
   // person's own permissions (AuthProvider) together.
   memberRoles: ['member_roles'] as const,
   subteams: ['subteams'] as const,
+  // The signed-in person's own inbox (RLS returns nobody else's). Not season-
+  // scoped: a role granted or a review requested matters whatever season is
+  // on screen. Keyed by member so a sign-in swap never shows the last inbox.
+  notifications: (memberId: string | null) => ['notifications', memberId ?? 'none'] as const,
   // The club's default meeting agenda. One row, not season-scoped.
   meetingTemplate: ['meeting_template'] as const,
 

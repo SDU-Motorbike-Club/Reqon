@@ -21,6 +21,10 @@ const state = {
   signOutThrows: false,
   memberQueries: 0,
   memberColumns: '',
+  // set-own-password: what the Edge Function answers, and every call to it.
+  invokeError: null as { status: number; message: string } | null,
+  invokes: [] as { name: string; body: unknown }[],
+  othersSignedOut: 0,
 }
 
 const supabase = {
@@ -31,12 +35,33 @@ const supabase = {
       return { data: { subscription: { unsubscribe: vi.fn() } } }
     }),
     signInWithPassword: vi.fn(async () => state.signInResult),
-    signOut: vi.fn(async () => {
+    signOut: vi.fn(async (options?: { scope?: string }) => {
+      // Signing out the OTHER devices leaves this one signed in.
+      if (options?.scope === 'others') {
+        state.othersSignedOut += 1
+        return { error: null }
+      }
       state.signOutCalls += 1
       if (state.signOutThrows) throw new Error('offline')
       state.session = null
       state.callbacks.forEach((cb) => cb('SIGNED_OUT', null))
       return { error: null }
+    }),
+  },
+  functions: {
+    invoke: vi.fn(async (name: string, { body }: { body: unknown }) => {
+      state.invokes.push({ name, body })
+      if (state.invokeError) {
+        return {
+          data: null,
+          error: Object.assign(new Error('Edge Function returned a non-2xx status code'), {
+            context: new Response(JSON.stringify({ error: state.invokeError.message }), { status: state.invokeError.status }),
+          }),
+        }
+      }
+      // The function clears the flag once the new password is set.
+      state.memberRow = { ...(state.memberRow as object), must_change_password: false }
+      return { data: { ok: true }, error: null }
     }),
   },
   from: vi.fn(() => ({
@@ -107,6 +132,9 @@ beforeEach(() => {
   state.signOutThrows = false
   state.memberQueries = 0
   state.memberColumns = ''
+  state.invokeError = null
+  state.invokes = []
+  state.othersSignedOut = 0
   vi.clearAllMocks()
 })
 
@@ -145,6 +173,81 @@ describe('signed in and on the roster', () => {
     state.memberRow = MEMBER_ROW
     renderApp()
     expect(await screen.findByText('SECRET BIKE DATA')).toBeInTheDocument()
+  })
+})
+
+describe('signed in with a temporary password', () => {
+  beforeEach(() => {
+    state.session = ROSTERED_SESSION
+    state.memberRow = { ...MEMBER_ROW, must_change_password: true }
+  })
+
+  it('asks for a new password before anything else', async () => {
+    renderApp()
+    expect(await screen.findByRole('heading', { name: 'Choose your password' })).toBeInTheDocument()
+    expect(screen.getByText(/Welcome, Ada\./)).toBeInTheDocument()
+    expect(screen.queryByText('SECRET BIKE DATA')).not.toBeInTheDocument()
+  })
+
+  it('checks the two passwords locally before asking the server', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    await user.type(await screen.findByLabelText('New password'), 'short')
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }))
+    expect(await screen.findByText('Use at least 8 characters.')).toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText('New password'))
+    await user.type(screen.getByLabelText('New password'), 'my-own-secret')
+    await user.type(screen.getByLabelText('Confirm new password'), 'my-own-secreT')
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }))
+    expect(await screen.findByText('The two passwords don’t match.')).toBeInTheDocument()
+    expect(state.invokes).toEqual([])
+  })
+
+  it('saves it through set-own-password, signs out other devices, then opens the app', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    await user.type(await screen.findByLabelText('New password'), 'my-own-secret')
+    await user.type(screen.getByLabelText('Confirm new password'), 'my-own-secret')
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }))
+
+    expect(await screen.findByText('SECRET BIKE DATA')).toBeInTheDocument()
+    expect(state.invokes).toEqual([{ name: 'set-own-password', body: { password: 'my-own-secret' } }])
+    // The Admin API ended this session too, so it signs straight back in.
+    expect(supabase.auth.signInWithPassword).toHaveBeenCalledWith({ email: 'rostered@sdu.dk', password: 'my-own-secret' })
+    expect(state.othersSignedOut).toBe(1)
+    // This device stays signed in.
+    expect(state.signOutCalls).toBe(0)
+  })
+
+  it('shows the server’s reason and stays on the screen when it refuses', async () => {
+    state.invokeError = { status: 400, message: 'Choose something other than your temporary password.' }
+    const user = userEvent.setup()
+    renderApp()
+    await user.type(await screen.findByLabelText('New password'), 'Temp-1-pass')
+    await user.type(screen.getByLabelText('Confirm new password'), 'Temp-1-pass')
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Choose something other than your temporary password.')
+    expect(screen.queryByText('SECRET BIKE DATA')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('New password')).toBeEnabled()
+  })
+
+  it('can still sign out', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    expect(await screen.findByLabelText('Email')).toBeInTheDocument()
+  })
+})
+
+describe('signed in with a password they chose themselves', () => {
+  it('never sees the screen: an existing member has no flag', async () => {
+    state.session = ROSTERED_SESSION
+    state.memberRow = { ...MEMBER_ROW, must_change_password: false }
+    renderApp()
+    expect(await screen.findByText('SECRET BIKE DATA')).toBeInTheDocument()
+    expect(screen.queryByText('Choose your password')).not.toBeInTheDocument()
   })
 })
 

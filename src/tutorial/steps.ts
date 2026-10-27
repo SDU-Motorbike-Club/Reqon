@@ -232,7 +232,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/register',
     target: 'register-links',
     title: 'Linked work and the book',
-    body: '“n / m linked tasks done” counts the Board tasks on a rule; “Assign existing tasks” links yours. Done tasks never make it compliant — you decide. “Open in Requirements Book” shows its page beside the list.',
+    body: '“n / m linked tasks done” counts the Board tasks on a rule; “Link tasks” links yours. Done tasks never make it compliant — you decide. “Open in Requirements Book” shows its page beside the list.',
   },
 
   // ---------------------------------------------------------------------- Book
@@ -320,7 +320,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/board',
     target: 'board-card',
     title: 'A task',
-    body: 'Department, owner, deadline, milestone, requirements. Move it with the dropdown (if you may); Blocked asks why. Details hold the description, blocker, tasks it waits for, links and the editor.',
+    body: 'Department, owner, deadline, milestone, requirements. Move it with the dropdown (if you may); Blocked asks why. Details opens the description, blocker, tasks it waits for, links and the editor.',
   },
 
   // ------------------------------------------------------------------ Meetings
@@ -329,7 +329,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     chapter: 'proposals',
     route: '/proposals',
     target: 'proposal-raise',
-    title: 'Task proposals — suggest work',
+    title: 'Task proposals — raise work',
     body: 'Anything the club should take on. Open “Raise a proposal” and give its department, deadline, milestone and requirement so its Head can decide. A folded-away draft is kept.',
   },
   {
@@ -338,7 +338,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/proposals',
     target: 'proposal-flow',
     title: 'How a proposal moves',
-    body: 'Suggested, Under review (the Head may ask for changes), Approved, then Decided once it becomes a task or is rejected. Parked sets one aside without deleting it.',
+    body: 'Raised, Under review (the Head may ask for changes), Approved, then Decided once it becomes a task or is rejected. Parked sets one aside without deleting it.',
   },
   {
     id: 'proposal-card',
@@ -346,7 +346,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/proposals',
     target: 'proposal-card',
     title: 'A proposal',
-    body: 'Who suggested it, its department, deadline and milestone, and where it stands. Its department’s Head decides; the President and the Vice President can decide for any department.',
+    body: 'Who raised it, its department, deadline and milestone, and where it stands. Its department’s Head decides; the President and the Vice President can decide for any department.',
   },
   {
     id: 'proposal-decision',
@@ -355,7 +355,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     target: 'proposal-decision',
     audience: 'proposalReviewer',
     title: 'Reviewing a proposal',
-    body: 'Review opens the discussion with the author. Ask for changes or Approve with a note, then make the task. Editing an approved proposal withdraws the approval. Its Head decides, and so can the President or Vice President.',
+    body: 'Review opens the discussion with the author. Write a note, then Approve and create task — or ask for changes. Editing an approved proposal withdraws the approval. Its Head decides, and so can the President or Vice President.',
   },
   {
     id: 'proposal-promote',
@@ -583,7 +583,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     target: 'add-member',
     audience: 'admins',
     title: 'Adding a new member',
-    body: 'Type their name, email and a first password, then Add to roster. That creates their login and adds them in one step, with no privileged role; they change the password in Settings → Your account.',
+    body: 'Type their name and email, then Add to roster. That creates their login and adds them in one step, with no privileged role, and shows you a temporary password once to hand over; they choose their own the first time they sign in.',
   },
   {
     id: 'settings-departments',

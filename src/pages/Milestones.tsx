@@ -143,9 +143,7 @@ export default function Milestones() {
       )}
 
       <p className="mb-3 text-xs text-slate-600">
-        The bar counts linked Board tasks done (cancelled left out, archived Done kept). It is not the drafting checklist
-        and it does not mean a submission was sent or accepted: those two are recorded by a person, below each
-        milestone, and read “Not recorded” until then. Unknown dates stay TBC.{' '}
+        The bar counts linked Board tasks done. Submitted and accepted are recorded by hand.{' '}
         <span data-testid="ms1-total">Points: up to {totalPoints} across the MS1 deliverables, awarded by the organisers.</span>
       </p>
 
@@ -190,13 +188,16 @@ export default function Milestones() {
 
                 <div className="min-w-0">
                   <span aria-hidden="true" className="block h-2 overflow-hidden rounded bg-slate-200">
+                    {/* Linked tasks only: with none linked the bar stays empty — the
+                        drafting checklist below is a separate count, never progress. */}
                     <span
-                      className={`block h-full ${view?.basis === 'drafted' ? 'bg-slate-400' : 'bg-slate-800'}`}
-                      style={{ width: `${view?.percent ?? 0}%` }}
+                      className="block h-full bg-slate-800"
+                      style={{ width: `${view?.basis === 'tasks' ? (view.percent ?? 0) : 0}%` }}
                     />
                   </span>
                   <p className="mt-0.5 text-xs text-slate-700" data-testid={`linked-${milestone.key}`}>
-                    Linked work: {view ? progressLabel(view) : progress.error ? 'could not be loaded' : 'loading…'}
+                    Linked work:{' '}
+                    {view ? (view.basis === 'tasks' ? progressLabel(view) : 'No linked tasks yet') : progress.error ? 'could not be loaded' : 'loading…'}
                   </p>
                 </div>
 
@@ -225,7 +226,9 @@ export default function Milestones() {
                         }`}
                         data-testid={`days-${milestone.key}`}
                       >
-                        {window.passed ? `deadline passed ${Math.abs(window.daysRemaining)} days ago` : `${window.daysRemaining} days remaining`}
+                        {window.passed
+                          ? `deadline passed ${Math.abs(window.daysRemaining)} day${Math.abs(window.daysRemaining) === 1 ? '' : 's'} ago`
+                          : `${window.daysRemaining} day${window.daysRemaining === 1 ? '' : 's'} remaining`}
                       </span>
                     </>
                   )}
@@ -241,7 +244,6 @@ export default function Milestones() {
                 milestone={milestone}
                 canRecord={permissions.canManageMilestoneStructure}
                 memberNames={memberName}
-                workLabel={view ? progressLabel(view) : progress.error ? 'could not be loaded' : 'loading…'}
               />
 
               <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-slate-500">
@@ -266,7 +268,9 @@ export default function Milestones() {
                     <p className="text-xs text-slate-600">No sections and no linked tasks yet.</p>
                   )}
                   {mySections.length > 0 && (
-                    <p className="text-xs font-medium text-slate-600">Drafting checklist — sections drafted {drafted}/{total}</p>
+                    <p className="text-xs font-medium text-slate-600">
+                      Drafting checklist — tick a section once its text is drafted ({drafted}/{total}). Ticks are not task progress.
+                    </p>
                   )}
                   <ul className="mt-1 space-y-2">
                     {topLevelSections(sections.data ?? [], milestone.key).map((section) => {
@@ -279,15 +283,24 @@ export default function Milestones() {
                               <input
                                 type="checkbox"
                                 checked={sec.is_drafted}
+                                aria-label={`${sec.name}${nested ? ' (subsection)' : ''} drafted`}
                                 onChange={(e) => setDrafted.mutate({ id: sec.id, isDrafted: e.target.checked })}
                                 className="h-5 w-5 accent-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
                               />
                               {nested && <span aria-hidden="true" className="text-slate-400">↳</span>}
                               {sec.name}
-                              <span className="text-xs font-normal text-slate-500">({nested ? 'subsection, ' : ''}drafted — a checklist tick, not task completion)</span>
+                              {nested && <span className="sr-only"> (subsection)</span>}
                             </label>
                             {under.length === 0 ? (
-                              <p className="ml-7 text-xs text-slate-500">No tasks linked to this {nested ? 'subsection' : 'section'}.</p>
+                              // Linking a task to a section happens on the Gantt; go straight to this section there.
+                              <p className="ml-7 text-xs text-slate-500">
+                                <Link
+                                  to={`/gantt?open=${encodeURIComponent(milestone.key)}&sections=${encodeURIComponent(nested && sec.parent_section_id ? `${sec.parent_section_id},${sec.id}` : sec.id)}`}
+                                  className="font-medium text-slate-700 underline underline-offset-2"
+                                >
+                                  Link a task on the Gantt
+                                </Link>
+                              </p>
                             ) : (
                               <ul className="ml-7 text-sm">{under.map(taskLine)}</ul>
                             )}

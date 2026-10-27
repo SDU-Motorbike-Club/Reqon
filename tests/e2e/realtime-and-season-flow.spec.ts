@@ -50,7 +50,7 @@ test.describe('two-session realtime propagation and season switching (R38-R39)',
       await pageB.getByTestId('review-approve').click()
       await expect(pageB.getByTestId('review-approve')).toHaveCount(0, { timeout: 10_000 })
       await expect.poll(() => runSql(`select state from task_proposals where id = '${proposalId}'`).trim()).toBe('approved')
-      await pageB.getByTestId(`review-open-${proposalId}`).click()
+      // "Approve only" keeps the dialog open; the task is made from the same dialog.
       await pageB.getByTestId('review-promote').click()
       await expect(pageB.getByTestId('review-promote')).toHaveCount(0, { timeout: 10_000 })
 
@@ -64,7 +64,7 @@ test.describe('two-session realtime propagation and season switching (R38-R39)',
       // Session B (Head A) reassigns the owner to Head B, an active member
       // of a different department reused here purely as "someone else".
       await pageB.goto('/board')
-      await pageB.getByTestId(`task-more-${taskId}`).getByText('Details and edit', { exact: true }).click()
+      await pageB.getByTestId(`task-more-${taskId}`).click()
       await expect(pageB.getByLabel('Owner', { exact: true })).toBeVisible({ timeout: 5_000 })
       await pageB.getByLabel('Owner', { exact: true }).selectOption(m.users.headB.id)
       await pageB.getByTestId(`task-save-${taskId}`).click()
@@ -72,7 +72,7 @@ test.describe('two-session realtime propagation and season switching (R38-R39)',
       // Reflected live on A's still-open card, no reload.
       await expect(pageA.getByTestId(`task-${taskId}`)).toContainText('E2E e2e-head-b', { timeout: 10_000 })
 
-      // Archive it (a real Head action, same still-open panel) and confirm A drops it live too.
+      // Archive it (a real Head action, same still-open dialog) and confirm A drops it live too.
       await pageB.getByTestId(`task-archive-${taskId}`).click()
       await pageB.getByTestId(`task-archive-confirm-${taskId}`).click()
       await expect(pageA.getByTestId(`task-${taskId}`)).toHaveCount(0, { timeout: 10_000 })

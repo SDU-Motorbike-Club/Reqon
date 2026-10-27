@@ -55,6 +55,12 @@ export function obligationInfo(obligation: string): LabelInfo {
   }
 }
 
+// The kind of work as a word in a sentence or a list ("Deliverable"), where the
+// badge shows it in capitals and the database keeps it lower-case.
+export function obligationName(obligation: string): string {
+  return obligation ? `${obligation[0].toUpperCase()}${obligation.slice(1)}` : obligation
+}
+
 export const PARKED_INFO: LabelInfo = {
   label: 'PARKED',
   summary:

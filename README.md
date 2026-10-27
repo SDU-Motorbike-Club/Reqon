@@ -543,10 +543,21 @@ secret is kept — names only, never values). The design history stays in the gi
 ## 7. Adding someone to the club
 
 **In the app: Settings → Roster → Add someone to the roster.** Enter their full
-name, the email they will sign in with, a first password (at least 8
-characters) and a job title, then press **Add to roster**. That creates their
-login and their roster row in one step. Give them the password privately; they
-change it in **Settings → Your account**.
+name, the email they will sign in with and a job title, then press **Add to
+roster**. That creates their login and their roster row in one step, and shows
+you a **temporary password** once, with a Copy button. Give it to them
+privately. The first time they sign in, the app shows nothing but **Choose your
+password** until they replace it, so after that nobody else knows it
+(`members.must_change_password`, migration
+`20260138000000_temporary_passwords.sql`). People already on the roster are not
+affected: their passwords are left alone.
+
+**Forgotten password: Settings → Roster → Reset password** on their row (a
+second click confirms). It issues a new temporary password the same way, ends
+their open sessions and logs the reset in the activity history. Only the
+President, Vice President or a Developer can, never for themselves, and only
+for someone whose roles they could change themselves — so a Vice President
+cannot reset the President (`can_reset_password()`).
 
 Only an active **President, Vice President or Developer** can do this
 (`can_add_members()`, migration `20260131000000_member_onboarding.sql`). A new
@@ -566,6 +577,8 @@ deleted, so no half-made account is left behind.
 
 ```bash
 npx supabase functions deploy create-member --project-ref zsmldveykmtmxuqqmddo
+npx supabase functions deploy set-own-password --project-ref zsmldveykmtmxuqqmddo
+npx supabase functions deploy reset-member-password --project-ref zsmldveykmtmxuqqmddo
 ```
 
 Supabase injects `SUPABASE_URL`, `SUPABASE_ANON_KEY` and
@@ -838,6 +851,19 @@ directly, so it cannot be faked or tampered with from the outside. It shows
 up as history on the Archive screen and on individual tasks/proposals; it is
 never keystroke-level and never contains a password, phone number or
 private roster note.
+
+**What needs you: the Inbox.** The same history also feeds each member's own
+inbox (the **Inbox** link in the header, with the unread count). A database
+trigger on `activity` (`20260139000000_notifications.sql`) tells the right
+person when a task is handed to them or blocked, when a proposal waits for
+their review, when their own proposal is approved, sent back, rejected,
+promoted or commented on, and when they are given a role. Nobody is told
+about their own action, retired members are never told, and each member can
+read and mark read only their own (RLS). Notifications read more than 90
+days ago are deleted by a scheduled job: enable `pg_cron` as above and run
+`supabase/scheduler/install_notification_purge_job.sql` once
+(`uninstall_notification_purge_job.sql` removes it). Without it, read
+notifications simply stay.
 
 **Realtime.** Ten tables stay live across every open browser without a
 reload: tasks, proposals, clause status, both requirement-link junctions,

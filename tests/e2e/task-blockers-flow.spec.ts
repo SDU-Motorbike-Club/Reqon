@@ -39,10 +39,11 @@ test.describe('blockers and prerequisites (Phase 3)', () => {
     const card = page.getByTestId(`task-${t1}`)
     await expect(card).toBeVisible()
 
-    await card.getByLabel(/Move .* to another lane/).selectOption('blocked')
+    // ?task= opens the task's details dialog, which has its own lane control.
+    await page.getByRole('dialog').getByLabel('Lane').selectOption('blocked')
     // Nothing is written until a reason is given.
     expect(runSql(`select state from tasks where id = '${t1}'`).trim()).toBe('todo')
-    const form = page.getByTestId(`task-block-form-${t1}`)
+    const form = page.getByTestId(`task-dialog-block-form-${t1}`)
     await form.getByLabel(/Why is/).fill('Waiting for the sponsor quote')
     await form.getByRole('button', { name: 'Block task' }).click()
 

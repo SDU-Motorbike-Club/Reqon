@@ -31,6 +31,7 @@ import { ProposalCard } from './ProposalCard.tsx'
 import { ProposalFilters } from './ProposalFilters.tsx'
 import { ProposalForm, type Option } from './ProposalForm.tsx'
 import { proposalStatusLabel } from './proposalStates.ts'
+import { nextDeadline } from '../pages/now/nowModel.ts'
 import { ReviewDialog } from './ReviewDialog.tsx'
 import { buildRequirementOptions } from './requirementOptions.ts'
 import { useUrlParams } from '../lib/useUrlParams.ts'
@@ -102,11 +103,22 @@ export function ProposalsPanel({
       { replace: true },
     )
 
-  const [reviewing, setReviewing] = useState<Proposal | null>(null)
-  const [message, setMessage] = useState<{ text: string; toBoard: boolean } | null>(null)
-  // The form is folded away until someone wants it, but stays MOUNTED (hidden),
-  // so a half-written proposal survives closing and reopening it.
-  const [formOpen, setFormOpen] = useState(false)
+  // The proposal under review, by id: the dialog always shows the live row, so it
+  // can stay open across a saved revision or an approval instead of closing.
+  const [reviewingId, setReviewingId] = useState<string | null>(null)
+  const reviewing = useMemo(() => (reviewingId ? (all.find((p) => p.id === reviewingId) ?? null) : null), [all, reviewingId])
+  const openReview = (proposal: Proposal) => {
+    setMessage(null)
+    setReviewingId(proposal.id)
+  }
+  // `taskId` set: the message links to that task on the Board.
+  const [message, setMessage] = useState<{ text: string; taskId: string | null } | null>(null)
+  // On a wide screen the form is the page's main write, so it starts open; on a
+  // phone it starts folded. Either way it stays MOUNTED (hidden) when folded, so
+  // a half-written proposal survives closing and reopening it.
+  const [formOpen, setFormOpen] = useState(
+    () => wide && typeof window !== 'undefined' && window.matchMedia?.('(min-width: 64rem)').matches === true,
+  )
 
   const tasksByProposal = useMemo(() => {
     const map = new Map<string, NonNullable<typeof tasks.data>[number]>()
@@ -140,6 +152,14 @@ export function ProposalsPanel({
     [milestones.data],
   )
   const requirementOptions = useMemo(() => buildRequirementOptions(clauses.data ?? []), [clauses.data])
+  // Where a new proposal most likely belongs: the department in view, else the one
+  // department the viewer heads; and the milestone due next. Only suggestions.
+  const suggestedDepartment =
+    filter.department !== ALL_DEPARTMENTS ? filter.department : actor?.headOf.length === 1 ? actor.headOf[0] : ''
+  const suggestedMilestone = useMemo(() => {
+    const next = nextDeadline(milestones.data ?? [], new Date())
+    return next.kind === 'due' ? next.milestoneKey : ''
+  }, [milestones.data])
 
   const visible = useMemo(() => filterProposals(all, filter, viewerId), [all, filter.scope, filter.department, filter.view, viewerId]) // eslint-disable-line react-hooks/exhaustive-deps
   const counts = useMemo(() => scopeCounts(all, filter, viewerId), [all, filter.department, filter.view, viewerId]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -230,7 +250,7 @@ export function ProposalsPanel({
             canReview={actor !== null && canReviewProposal(actor, proposal)}
             canDiscuss={actor?.status === 'active'}
             isAuthor={viewerId === proposal.raised_by}
-            onReview={setReviewing}
+            onReview={openReview}
             tutorial={index === 0}
           />
         ))}
@@ -272,10 +292,10 @@ export function ProposalsPanel({
                 <span className="font-medium text-slate-900">{p.title}</span>
                 <span className="block text-xs text-slate-600">
                   {nameOfDepartment(p.subteam_key) ?? 'No department'} · {proposalStatusLabel(p)}
-                  {p.due_date ? ` · due ${formatDay(p.due_date)}` : ''} · suggested by {nameOfMember(p.raised_by) ?? 'someone'}
+                  {p.due_date ? ` · due ${formatDay(p.due_date)}` : ''} · raised by {nameOfMember(p.raised_by) ?? 'someone'}
                 </span>
               </span>
-              <button type="button" className={buttonSecondary} onClick={() => setReviewing(p)}>
+              <button type="button" className={buttonSecondary} onClick={() => openReview(p)}>
                 Review<span className="sr-only"> {p.title}</span>
               </button>
             </li>
@@ -292,7 +312,7 @@ export function ProposalsPanel({
         Your proposals
       </h3>
       {mine.length === 0 ? (
-        <p className="mt-1 text-sm text-slate-600">You have not suggested anything this season.</p>
+        <p className="mt-1 text-sm text-slate-600">You have not raised anything this season.</p>
       ) : (
         <>
           <ul className="mt-1 space-y-1 text-sm">
@@ -334,7 +354,6 @@ export function ProposalsPanel({
       >
         {formOpen ? 'Hide the proposal form' : 'Raise a proposal'}
       </button>
-      <p className="mt-1 text-xs text-slate-600">Anyone on the roster may suggest work for any active department.</p>
       <div id={`${formId}-form`} hidden={!formOpen} className="mt-3">
         <ProposalForm
           departments={departmentOptions}
@@ -346,6 +365,8 @@ export function ProposalsPanel({
           canConfigure={can.canManageDepartments}
           loading={formLoading}
           loadError={formError}
+          defaultDepartment={suggestedDepartment}
+          defaultMilestone={suggestedMilestone}
         />
       </div>
     </div>
@@ -383,9 +404,9 @@ export function ProposalsPanel({
       {message && (
         <p role="status" className="mb-2 flex flex-wrap items-center gap-2 rounded bg-emerald-50 p-2 text-sm text-emerald-900" data-testid="proposal-message">
           {message.text}
-          {message.toBoard && (
-            <Link to="/board" className="inline-flex min-h-11 items-center font-medium underline underline-offset-2 sm:min-h-0">
-              Open the Board
+          {message.taskId && (
+            <Link to={`/board?task=${encodeURIComponent(message.taskId)}`} className="inline-flex min-h-11 items-center font-medium underline underline-offset-2 sm:min-h-0">
+              Open its task
             </Link>
           )}
         </p>
@@ -426,8 +447,9 @@ export function ProposalsPanel({
         isAuthor={reviewing !== null && viewerId === reviewing.raised_by}
         isDeveloper={actor?.isDeveloper ?? false}
         hasTask={reviewing ? tasksByProposal.has(reviewing.id) : false}
-        onClose={() => setReviewing(null)}
-        onDone={(text, options) => setMessage({ text, toBoard: options?.toBoard ?? false })}
+        onClose={() => setReviewingId(null)}
+        onDone={(text, options) => setMessage({ text, taskId: options?.taskId ?? null })}
+        notice={message?.text ?? null}
       />
     </section>
   )
@@ -444,7 +466,7 @@ function ProposalTally({ proposals, promoted }: { proposals: Proposal[]; promote
       <h3 className="text-xs font-medium text-slate-600">How a proposal moves</h3>
       <ol className="mt-2 space-y-1 text-sm">
         {[
-          ['Suggested', count('open')],
+          ['Raised', count('open')],
           ['Under review / changes requested', count('agenda') + count('changes_requested')],
           ['Approved, awaiting task', count('approved')],
           ['Board task created', promoted],
@@ -461,8 +483,8 @@ function ProposalTally({ proposals, promoted }: { proposals: Proposal[]; promote
         ))}
       </ol>
       <p className="mt-2 border-t border-slate-100 pt-2 text-xs text-pretty text-slate-600">
-        The department&apos;s Head reviews these; where there is no active Head, the President or Vice President acts.{' '}
-        Parked proposals (<span className="tabular-nums">{count('parked')}</span>) stay in the queue, marked; rejected and promoted proposals move to History.
+        Heads review their department; with no Head, the President or Vice President does. Parked ones (
+        <span className="tabular-nums">{count('parked')}</span>) stay in the queue.
       </p>
     </div>
   )

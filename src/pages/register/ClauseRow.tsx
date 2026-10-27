@@ -44,6 +44,9 @@ type Props = {
   onOpenBook?: (clauseKey: string) => void
   // True while this rule is the one shown in the reader.
   reading?: boolean
+  // The outcome of this row's last save: "Saved" for a moment, or what went wrong.
+  saved?: boolean
+  saveError?: string | null
 }
 
 function ClauseRowInner({
@@ -61,6 +64,8 @@ function ClauseRowInner({
   tutorialId,
   onOpenBook,
   reading = false,
+  saved = false,
+  saveError = null,
 }: Props) {
   const { clause } = row
   const badge = criticalityBadge(clause.criticality)
@@ -202,22 +207,25 @@ function ClauseRowInner({
           ))}
         </select>
 
-        <label className="sr-only" htmlFor={`evidence-${clause.clause_key}`}>
-          Evidence for {clause.printed_ref}
-        </label>
-        <input
-          id={`evidence-${clause.clause_key}`}
-          type="text"
-          placeholder="Evidence…"
-          value={evidence}
-          onChange={(e) => setEvidence(e.target.value)}
-          onBlur={() => {
-            if (evidence !== serverEvidence) {
-              onSetEvidence(clause.clause_key, evidence)
-            }
-          }}
-          className="min-h-11 w-full min-w-0 rounded border border-slate-300 px-2 py-1 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0 sm:w-auto sm:flex-1 xl:order-last xl:basis-full"
-        />
+        {/* A visible name that stays while typing (a placeholder disappears). */}
+        <div className="w-full min-w-0 sm:w-auto sm:flex-1 xl:order-last xl:basis-full">
+          <label className="block text-xs font-medium text-slate-600" htmlFor={`evidence-${clause.clause_key}`}>
+            Evidence<span className="sr-only"> for {clause.printed_ref}</span>
+          </label>
+          <input
+            id={`evidence-${clause.clause_key}`}
+            type="text"
+            placeholder="Link or document"
+            value={evidence}
+            onChange={(e) => setEvidence(e.target.value)}
+            onBlur={() => {
+              if (evidence !== serverEvidence) {
+                onSetEvidence(clause.clause_key, evidence)
+              }
+            }}
+            className="mt-0.5 min-h-11 w-full min-w-0 rounded border border-slate-300 px-2 py-1 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+          />
+        </div>
 
         <button
           type="button"
@@ -232,6 +240,16 @@ function ClauseRowInner({
         >
           {row.starred ? '★' : '☆'}
         </button>
+        {saved && (
+          <span role="status" className="text-xs font-medium text-emerald-800" data-testid={`saved-${clause.clause_key}`}>
+            Saved
+          </span>
+        )}
+        {saveError && (
+          <p role="alert" className="basis-full rounded border border-red-300 bg-red-50 p-1.5 text-xs text-red-800" data-testid={`save-error-${clause.clause_key}`}>
+            Not saved: {saveError}
+          </p>
+        )}
       </div>
     </li>
   )

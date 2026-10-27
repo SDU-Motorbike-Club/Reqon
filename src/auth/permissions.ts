@@ -40,6 +40,19 @@ export function canGrantRole(roles: readonly PrivilegedRole[], role: PrivilegedR
   return has('president') || has('vicepresident') || has('developer')
 }
 
+// can_reset_password(member) (20260138000000): issue someone a new temporary
+// password. President, Vice President or Developer, never for yourself, and
+// only for someone whose every role you could grant or remove — otherwise a
+// reset would let you sign in as someone more powerful.
+export function canResetPassword(
+  roles: readonly PrivilegedRole[],
+  targetRoles: readonly PrivilegedRole[],
+  isSelf: boolean,
+): boolean {
+  const canAddMembers = roles.includes('president') || roles.includes('vicepresident') || roles.includes('developer')
+  return canAddMembers && !isSelf && targetRoles.every((role) => canGrantRole(roles, role))
+}
+
 // Someone on the roster who holds no privileged role.
 export const NO_ROLE_LABEL = 'Member'
 

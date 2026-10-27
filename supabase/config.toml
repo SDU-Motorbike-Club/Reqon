@@ -398,6 +398,16 @@ deno_version = 2
 [functions.create-member]
 verify_jwt = true
 
+# The forced "Choose your password" screen after an app-issued password. Works
+# only while the caller's must_change_password flag is set (set-own-password).
+[functions.set-own-password]
+verify_jwt = true
+
+# Settings -> Roster -> "Reset password". The database decides, as the caller,
+# through mark_password_reset() (supabase/functions/reset-member-password).
+[functions.reset-member-password]
+verify_jwt = true
+
 # Task attachments (docs/ultraplan, Phase 2). The gateway refuses requests without a valid user JWT;
 # each function then re-checks the token with Auth and lets the database decide as the caller.
 [functions.attachment-upload-url]

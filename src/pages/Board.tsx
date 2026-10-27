@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { attachmentPermissions, canArchiveTask, canEditTask, canReassignTaskOwner, taskDepartmentTargets } from '../auth/permissions.ts'
+import { attachmentPermissions, canArchiveTask, canEditTask, canReassignTaskOwner, canRestoreTask, taskDepartmentTargets } from '../auth/permissions.ts'
 import { useAuth } from '../auth/context.ts'
 import { departmentChoices } from '../departments/filter.ts'
 import { DepartmentNav } from '../departments/DepartmentNav.tsx'
@@ -14,18 +14,20 @@ import { useSubteams } from '../data/useSubteams.ts'
 import { useTaskActor } from '../data/useTaskActor.ts'
 import { useTaskDependencies } from '../data/useTaskDependencies.ts'
 import { useSourceProposals, useTaskRequirements, useTasksForProgress } from '../data/useTaskHistory.ts'
-import { useTasks, useUpdateTask } from '../data/useTasks.ts'
+import { useRestoreTask, useTasks, useUpdateTask, type Task } from '../data/useTasks.ts'
 import { todayIso } from '../lib/dates.ts'
 import { milestoneLabel } from '../milestones/label.ts'
-import { dependentsOf, prerequisiteCandidates, prerequisitesOf, taskRefLookup } from '../tasks/dependencies.ts'
+import { dependentsOf, openPrerequisites, prerequisiteCandidates, prerequisitesOf, taskRefLookup } from '../tasks/dependencies.ts'
 import { applyTaskFilter, DEFAULT_TASK_FILTER, filterTasks, isDefaultTaskFilter, taskFilterFromParams, taskScopeCounts, type TaskFilter } from '../tasks/filters.ts'
 import type { TaskScope } from '../tasks/scope.ts'
 import { TASK_STATES } from '../tasks/taskState.ts'
 import { pageMain } from '../ui/layout.ts'
 import { PageHeader } from '../ui/PageHeader.tsx'
-import { ErrorState } from '../ui/states.tsx'
+import { ActionError, ErrorState } from '../ui/states.tsx'
+import { Dialog } from '../ui/Dialog.tsx'
+import { MoveControl } from './board/MoveControl.tsx'
 import { TaskCard } from './board/TaskCard.tsx'
-import type { TaskLinksView, TaskPermissions } from './board/TaskDetails.tsx'
+import { TaskDetails, type TaskLinksView, type TaskPermissions } from './board/TaskDetails.tsx'
 import { useUrlParams } from '../lib/useUrlParams.ts'
 
 // The five lanes, exactly the task_state values in the schema, from the one
@@ -88,6 +90,20 @@ export default function Board() {
   const focusTask = focusId ? allTasks.find((t) => t.id === focusId) : undefined
   const focusHidden = Boolean(focusTask) && !visible.some((t) => t.id === focusId)
   const focusMissing = Boolean(focusId) && !tasks.isLoading && !focusTask
+
+  // The one task whose details are open, in a dialog the Board owns: it stays
+  // open while its card changes lane. A link naming a task (?task=) opens it.
+  const [openTaskId, setOpenTaskId] = useState<string | null>(focusId)
+  const [seenFocus, setSeenFocus] = useState(focusId)
+  if (seenFocus !== focusId) {
+    setSeenFocus(focusId)
+    if (focusId) setOpenTaskId(focusId)
+  }
+  const openTask = openTaskId ? allTasks.find((t) => t.id === openTaskId) : undefined
+  const dialogTitleId = useId()
+  // After an archive the card is gone: say so, and offer Undo to whoever may restore.
+  const [archived, setArchived] = useState<{ id: string; title: string; canRestore: boolean; restored: boolean } | null>(null)
+  const restore = useRestoreTask()
   const counts = useMemo(() => taskScopeCounts(allTasks, filter.department, myId), [allTasks, filter.department, myId])
   // How many tasks each department entry would show under the current scope.
   const departmentCounts = useMemo(() => {
@@ -258,6 +274,35 @@ export default function Board() {
         </p>
       </div>
 
+      {archived && (
+        <div role="status" className="mb-3 flex flex-wrap items-center gap-2 rounded border border-slate-200 bg-slate-50 p-2 text-sm text-slate-800" data-testid="board-archived">
+          {archived.restored ? (
+            <>Restored “{archived.title}”.</>
+          ) : (
+            <>
+              Archived “{archived.title}”.
+              {archived.canRestore ? (
+                <button
+                  type="button"
+                  disabled={restore.isPending}
+                  onClick={() =>
+                    restore.mutate({ id: archived.id }, { onSuccess: () => setArchived({ ...archived, restored: true }) })
+                  }
+                  className="inline-flex min-h-11 items-center rounded font-medium underline underline-offset-2 sm:min-h-0"
+                  data-testid="board-archived-undo"
+                >
+                  {restore.isPending ? 'Restoring…' : 'Undo'}
+                </button>
+              ) : (
+                <Link to={`/archive?tab=tasks&id=${encodeURIComponent(archived.id)}`} className="inline-flex min-h-11 items-center underline underline-offset-2 sm:min-h-0">
+                  It is in the Archive
+                </Link>
+              )}
+            </>
+          )}
+          <ActionError error={restore.error} className="basis-full" />
+        </div>
+      )}
       {updateTask.isError && (
         <p role="alert" className="mb-3 rounded border border-red-300 bg-red-50 p-2 text-sm text-red-800">
           Could not change that task: {updateTask.error.message}
@@ -321,10 +366,10 @@ export default function Board() {
                         requirementKeys={keysByTask.get(task.id) ?? []}
                         source={source ? { id: source.id, title: source.title } : null}
                         perms={permsFor(task)}
-                        owners={ownersFor(task)}
-                        milestones={milestoneOptions}
                         moving={updateTask.isPending}
                         links={linksFor(task)}
+                        detailsOpen={task.id === openTaskId}
+                        onOpenDetails={() => setOpenTaskId(task.id)}
                         onMove={(id, state, blockedReason) => updateTask.mutate({ id, state, ...(blockedReason ? { blockedReason } : {}) })}
                       />
                     )
@@ -335,6 +380,51 @@ export default function Board() {
           )
         })}
       </div>
+
+      <Dialog open={openTask !== undefined} onClose={() => setOpenTaskId(null)} labelledBy={dialogTitleId}>
+        {openTask && (
+          <>
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <h2 id={dialogTitleId} className="text-base font-semibold text-balance text-slate-900">
+                {openTask.title}
+              </h2>
+              <button type="button" onClick={() => setOpenTaskId(null)} className="min-h-11 shrink-0 rounded px-2 text-sm underline underline-offset-2 sm:min-h-0">
+                Close
+              </button>
+            </div>
+            {/* The lane, here too: a task opened from a link can be moved without closing this. */}
+            {permsFor(openTask).canEdit && (
+              <div className="mb-3 max-w-xs">
+                <MoveControl
+                  task={openTask}
+                  openPrerequisites={openPrerequisites(linksFor(openTask).prerequisites).length}
+                  moving={updateTask.isPending}
+                  onMove={(id, state, blockedReason) => updateTask.mutate({ id, state, ...(blockedReason ? { blockedReason } : {}) })}
+                  idPrefix="task-dialog-state"
+                  testIdPrefix="task-dialog-block-form"
+                  visibleLabel="Lane"
+                />
+                <ActionError error={updateTask.isError ? updateTask.error : null} className="mt-1" />
+              </div>
+            )}
+            <TaskDetails
+              key={openTask.id}
+              task={openTask}
+              perms={permsFor(openTask)}
+              owners={ownersFor(openTask)}
+              milestones={milestoneOptions}
+              requirementKeys={keysByTask.get(openTask.id) ?? []}
+              source={openTask.source_proposal ? (sources.data?.get(openTask.source_proposal) ?? null) : null}
+              links={linksFor(openTask)}
+              viewerId={myId}
+              onArchived={(task: Task) => {
+                setOpenTaskId(null)
+                setArchived({ id: task.id, title: task.title, canRestore: actor ? canRestoreTask(actor, task) : false, restored: false })
+              }}
+            />
+          </>
+        )}
+      </Dialog>
     </main>
   )
 }

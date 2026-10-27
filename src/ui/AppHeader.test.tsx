@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { signOut, who } = vi.hoisted(() => ({ signOut: vi.fn(), who: { roles: [] as string[] } }))
+const { signOut, who, inbox } = vi.hoisted(() => ({ signOut: vi.fn(), who: { roles: [] as string[] }, inbox: { unread: 0 } }))
 vi.mock('../auth/context.ts', () => ({
   useAuth: () => ({ status: 'member', user: { id: 'm1' }, member: { id: 'm1', full_name: 'Ada Rider' }, roles: who.roles, signOut }),
 }))
@@ -14,6 +14,11 @@ vi.mock('../data/useCurrentSeason.ts', () => ({
 // it out of a real useSubteams()/QueryClient round trip.
 vi.mock('../data/useTaskActor.ts', () => ({
   useTaskActor: () => ({ id: 'm1', status: 'active', isDeveloper: who.roles.includes('developer'), headOf: [] }),
+}))
+
+// The inbox count is its own query; the header only reads the number.
+vi.mock('../data/useNotifications.ts', () => ({
+  useUnreadCount: () => ({ data: inbox.unread }),
 }))
 
 const { AppHeader } = await import('./AppHeader.tsx')
@@ -35,10 +40,35 @@ function renderHeader(path = '/register') {
 beforeEach(() => {
   signOut.mockClear()
   who.roles = []
+  inbox.unread = 0
   window.localStorage.setItem('reqon.tutorial.v2', 'completed')
 })
 
 const desktopNav = () => screen.getAllByRole('navigation', { name: 'Main' })[0]
+
+describe('inbox', () => {
+  it('is one link outside the menu, on every width, with the unread count in words', () => {
+    inbox.unread = 3
+    renderHeader()
+    const link = screen.getByRole('link', { name: 'Inbox, 3 new' })
+    expect(link).toHaveAttribute('href', '/inbox')
+    expect(link).toHaveTextContent('Inbox3')
+    // Not part of the screen list, and not hidden behind the phone Menu.
+    expect(within(desktopNav()).queryByRole('link', { name: /Inbox/ })).not.toBeInTheDocument()
+    expect(link.className).not.toMatch(/\bhidden\b/)
+  })
+
+  it('shows no count when nothing is new', () => {
+    renderHeader()
+    expect(screen.getByRole('link', { name: 'Inbox' })).toHaveTextContent(/^Inbox$/)
+  })
+
+  it('caps a long count at 99+', () => {
+    inbox.unread = 250
+    renderHeader()
+    expect(screen.getByRole('link', { name: 'Inbox, 250 new' })).toHaveTextContent('Inbox99+')
+  })
+})
 
 describe('main navigation', () => {
   it('lists every screen, grouped by how people use it', () => {

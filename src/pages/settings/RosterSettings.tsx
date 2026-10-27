@@ -1,15 +1,17 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { canGrantRole, type PrivilegedRole } from '../../auth/permissions.ts'
+import { canGrantRole, canResetPassword, type PrivilegedRole } from '../../auth/permissions.ts'
+import { useAuth } from '../../auth/context.ts'
 import { usePermissions } from '../../auth/usePermissions.ts'
-import { useAddMember, useCreateMember, useMembers, useUpdateMember, type MemberState } from '../../data/useMembers.ts'
+import { useAddMember, useCreateMember, useMembers, useResetPassword, useUpdateMember, type MemberState } from '../../data/useMembers.ts'
 import { useSubteams } from '../../data/useSubteams.ts'
 import { isActive } from '../../departments/types.ts'
 import { mergeSearchParams } from '../../lib/searchParams.ts'
 import { RoleBadges } from '../../roles/RoleBadges.tsx'
-import { buttonSecondary } from '../../ui/buttons.ts'
+import { buttonDanger, buttonQuiet, buttonSecondary } from '../../ui/buttons.ts'
 import { ActionError, ErrorState } from '../../ui/states.tsx'
 import { useState, type FormEvent } from 'react'
+import { IssuedPassword } from './IssuedPassword.tsx'
 import { JobTitleSelect } from './JobTitleSelect.tsx'
 import { DEFAULT_JOB_TITLE, jobTitleOptions, splitRoster, type RosterMember } from './rosterModel.ts'
 import { useRoleSettings } from './RoleSettings.tsx'
@@ -28,6 +30,9 @@ function RosterRow({
   statusLocked = false,
   heads,
   canManageDepartments,
+  canReset = false,
+  onResetPassword,
+  resetPending = false,
 }: {
   member: RosterMember
   roles: PrivilegedRole[]
@@ -44,8 +49,14 @@ function RosterRow({
   onEditRoles: () => void
   disabled: boolean
   statusLocked?: boolean
+  // can_reset_password(): issue them a new temporary password.
+  canReset?: boolean
+  onResetPassword?: () => void
+  resetPending?: boolean
 }) {
   const retired = member.status === 'alumni'
+  // Resetting stops their current password working, so it takes a second click.
+  const [confirmingReset, setConfirmingReset] = useState(false)
   return (
     <li className="px-3 py-2" data-testid={`member-${member.id}`}>
       <div className="flex flex-wrap items-center gap-2">
@@ -59,6 +70,14 @@ function RosterRow({
         <RoleBadges roles={roles} />
         {retired && (
           <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] text-slate-700">alumni</span>
+        )}
+        {member.must_change_password && (
+          <span
+            className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-900"
+            title="They have not yet replaced the password the app gave them."
+          >
+            temporary password
+          </span>
         )}
       </div>
       {/* Headship is a third, separate thing: set on the department, not on
@@ -145,6 +164,42 @@ function RosterRow({
               </button>
             </span>
           )}
+          {canReset && (
+            <span className="flex flex-col gap-0.5">
+              <span aria-hidden="true" className="text-[11px] font-medium text-slate-600">
+                Password
+              </span>
+              {confirmingReset ? (
+                <span className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={resetPending}
+                    onClick={() => {
+                      setConfirmingReset(false)
+                      onResetPassword?.()
+                    }}
+                    aria-label={`Confirm: reset the password of ${member.full_name}`}
+                    className={`${buttonDanger} text-xs`}
+                  >
+                    Reset — their current password stops working
+                  </button>
+                  <button type="button" onClick={() => setConfirmingReset(false)} className={`${buttonQuiet} text-xs`}>
+                    Cancel
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  disabled={resetPending}
+                  onClick={() => setConfirmingReset(true)}
+                  aria-label={`Reset password for ${member.full_name}`}
+                  className={`${buttonSecondary} text-xs`}
+                >
+                  {resetPending ? 'Resetting…' : 'Reset password'}
+                </button>
+              )}
+            </span>
+          )}
         </div>
       )}
     </li>
@@ -156,7 +211,10 @@ function RosterRow({
 // account" form. Split out of the former Settings.tsx (Phase 6 §6.1) — owns
 // its own members query, its own add/update mutations, its own form state.
 //
-const EMPTY_RECRUIT = { email: '', password: '', fullName: '', role: DEFAULT_JOB_TITLE }
+const EMPTY_RECRUIT = { email: '', fullName: '', role: DEFAULT_JOB_TITLE }
+
+// A temporary password just issued, and where it was asked for.
+type Issued = { where: 'add' | 'reset'; name: string; email?: string; password: string }
 
 // Asks usePermissions() itself rather than taking canAdminister/canManageRoles
 // as props: a President who hands over their own role mid-session must see
@@ -166,6 +224,8 @@ const EMPTY_RECRUIT = { email: '', password: '', fullName: '', role: DEFAULT_JOB
 // ancestor that has no other reason to re-render.
 export function RosterSettings() {
   const { canAdminister, canAddMembers, canManageRoles, canManageDepartments, canManageSeasons, roles: myRoles } = usePermissions()
+  const auth = useAuth()
+  const myId = auth.status === 'member' ? auth.member.id : null
   const members = useMembers()
   const subteams = useSubteams()
   const headsOf = (memberId: string) =>
@@ -173,9 +233,10 @@ export function RosterSettings() {
   const addMember = useAddMember()
   const createMember = useCreateMember()
   const updateMember = useUpdateMember()
+  const resetPassword = useResetPassword()
+  const [issued, setIssued] = useState<Issued | null>(null)
   const [newMember, setNewMember] = useState({ id: '', fullName: '', role: DEFAULT_JOB_TITLE })
   const [recruit, setRecruit] = useState(EMPTY_RECRUIT)
-  const [createdMessage, setCreatedMessage] = useState('')
 
   const roleSettings = useRoleSettings((members.data ?? []).map((m) => ({ id: m.id, name: m.full_name })))
 
@@ -194,22 +255,28 @@ export function RosterSettings() {
     if (createMember.isPending) return
     const fullName = recruit.fullName.trim()
     const email = recruit.email.trim()
-    if (!fullName || !email || !recruit.password) return
-    setCreatedMessage('')
+    if (!fullName || !email) return
+    setIssued(null)
     try {
-      await createMember.mutateAsync({
+      const { password } = await createMember.mutateAsync({
         email,
-        password: recruit.password,
         fullName,
         jobTitle: recruit.role.trim() || DEFAULT_JOB_TITLE,
       })
-      // The password is cleared at once; only the instruction stays on screen.
       setRecruit(EMPTY_RECRUIT)
-      setCreatedMessage(
-        `${fullName} is on the roster. They sign in with ${email} and the password you chose, then change it in Settings → Your account.`,
-      )
+      setIssued({ where: 'add', name: fullName, email, password })
     } catch {
       // Refused or failed: the message is shown, and what was typed stays.
+    }
+  }
+
+  async function reset(id: string, name: string) {
+    setIssued(null)
+    try {
+      const { password } = await resetPassword.mutateAsync({ id })
+      setIssued({ where: 'reset', name, password })
+    } catch {
+      // Refused or failed: the message is shown above the roster.
     }
   }
 
@@ -241,7 +308,12 @@ export function RosterSettings() {
           }}
         />
       )}
-      <ActionError error={addMember.error ?? updateMember.error} className="mb-2" />
+      <ActionError error={addMember.error ?? updateMember.error ?? resetPassword.error} className="mb-2" />
+      {issued?.where === 'reset' && (
+        <div className="mb-2">
+          <IssuedPassword name={issued.name} password={issued.password} onDone={() => setIssued(null)} />
+        </div>
+      )}
 
       {/* The one sentence that makes the rest of this section readable. Two
           different things are called a "role" in this club, and the roster
@@ -287,6 +359,11 @@ export function RosterSettings() {
                   onEditRoles={() => roleSettings.openFor(m.id, m.full_name)}
                   heads={headsOf(m.id)}
                   canManageDepartments={canManageDepartments}
+                  // can_reset_password(): never yourself, and only someone
+                  // whose every role you could change.
+                  canReset={canResetPassword(myRoles, roleSettings.rolesByMember.get(m.id) ?? [], m.id === myId)}
+                  onResetPassword={() => void reset(m.id, m.full_name)}
+                  resetPending={resetPassword.isPending && resetPassword.variables?.id === m.id}
                 />
               ))}
             </ul>
@@ -322,8 +399,10 @@ export function RosterSettings() {
                 place the service_role key lives. This browser sends only your
                 own session; the database checks can_add_members() for you. */}
             <p className="mt-1 mb-2 text-xs text-pretty text-slate-600">
-              This creates their login and puts them on the roster in one step. They start with no
-              privileged role — give one afterwards with <strong>Change roles</strong> if needed.
+              This creates their login and puts them on the roster in one step, and gives you a
+              temporary password to hand over. They choose their own the first time they sign in.
+              They start with no privileged role — give one afterwards with <strong>Change roles</strong>{' '}
+              if needed.
             </p>
             <label className="block text-xs font-medium text-slate-600" htmlFor="recruit-name">
               Full name
@@ -350,24 +429,6 @@ export function RosterSettings() {
               onChange={(e) => setRecruit((s) => ({ ...s, email: e.target.value }))}
               className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
             />
-            <label className="mt-2 block text-xs font-medium text-slate-600" htmlFor="recruit-password">
-              First password
-            </label>
-            <input
-              id="recruit-password"
-              type="password"
-              required
-              minLength={8}
-              maxLength={72}
-              autoComplete="new-password"
-              aria-describedby="recruit-password-hint"
-              value={recruit.password}
-              onChange={(e) => setRecruit((s) => ({ ...s, password: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
-            />
-            <p id="recruit-password-hint" className="mt-1 text-xs text-slate-500">
-              At least 8 characters. Give it to them privately; they change it in Settings → Your account.
-            </p>
             <span aria-hidden="true" className="mt-2 block text-xs font-medium text-slate-600">
               Job title
             </span>
@@ -394,8 +455,16 @@ export function RosterSettings() {
                 roster-row or link error shown above. */}
             <ActionError error={createMember.error} className="mt-2" />
             <p role="status" className="mt-1 min-h-4 text-xs font-medium text-emerald-800">
-              {createdMessage}
+              {issued?.where === 'add' ? `${issued.name} is on the roster.` : ''}
             </p>
+            {issued?.where === 'add' && (
+              <IssuedPassword
+                name={issued.name}
+                email={issued.email}
+                password={issued.password}
+                onDone={() => setIssued(null)}
+              />
+            )}
           </form>
 
           {/* The older path, kept for a login that already exists — made in the

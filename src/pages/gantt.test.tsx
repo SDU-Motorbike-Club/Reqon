@@ -271,18 +271,18 @@ describe('progress', () => {
     tasks = tasks.filter((t) => t.milestone_key !== 'MS1-2')
     renderGantt()
     // MS1-2 keeps its one section (unticked): the section ticks stand in, and say so.
-    expect(screen.getByTestId('gantt-overall-MS1-2')).toHaveTextContent('0/1 done')
+    expect(screen.getByTestId('gantt-overall-MS1-2')).toHaveTextContent('0/1 drafted')
     expect(screen.getByTestId('gantt-overall-MS1-7')).toHaveTextContent('No linked work')
   })
 
-  it('a ticked section reads as done, not drafted', async () => {
+  it('a ticked section reads as drafted, the same word as Milestones — never as done work', async () => {
     const user = userEvent.setup()
     renderGantt()
     await open(user, /MS1-1/)
     const empty = screen.getByTestId('gantt-section-sec2')
-    expect(empty).toHaveTextContent('Budget: Not done (no tasks linked)')
-    expect(within(empty).getByRole('checkbox', { name: 'Budget done' })).toBeEnabled()
-    expect(empty).not.toHaveTextContent(/drafted/i)
+    expect(empty).toHaveTextContent('Budget: Not drafted (no tasks linked)')
+    expect(within(empty).getByRole('checkbox', { name: 'Budget drafted' })).toBeEnabled()
+    expect(empty).not.toHaveTextContent(/\bdone\b/i)
   })
 
   it('counts a task attached to a milestone once, whether or not it has a section', () => {
@@ -463,7 +463,7 @@ describe('view only for plain members', () => {
     expect(screen.queryByRole('button', { name: /^Unlink/ })).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/Link an existing board task/)).not.toBeInTheDocument()
     expect(screen.queryByTestId('link-none')).not.toBeInTheDocument()
-    expect(screen.getByRole('checkbox', { name: 'Cover sheet done' })).toBeDisabled()
+    expect(screen.getByRole('checkbox', { name: 'Cover sheet drafted' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Show details of Draft the cover' }))
     expect(within(screen.getByTestId('gantt-task-more-t1')).queryByLabelText('Deadline')).not.toBeInTheDocument()
   })
@@ -729,7 +729,7 @@ describe('subsections, prerequisites and blockers', () => {
     tasks.push(task('t9', { title: 'Itemise the budget', section_id: 'sub1', milestone_key: 'MS1-1', state: 'done' }))
     renderGantt('/gantt?open=MS1-1')
     const parentRow = screen.getByTestId('gantt-section-sec2')
-    expect(within(parentRow).getByLabelText('Budget done').closest('label')).toHaveTextContent('1/1')
+    expect(within(parentRow).getByLabelText('Budget drafted').closest('label')).toHaveTextContent('1/1')
   })
 
   it('offers a subsection as a place to move a task, by name, from the keyboard-reachable select', async () => {

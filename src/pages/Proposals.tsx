@@ -23,13 +23,13 @@ export default function Proposals() {
     <main id="main-content" tabIndex={-1} className={pageMain()}>
       <PageHeader
         title="Task proposals"
-        description="Work anyone can suggest and discuss. The department's Head, the President or the Vice President reviews it. Approval is required before a Board task is created."
+        description="Work anyone can raise and discuss. Its department's Head, the President or the Vice President approves it before it becomes a Board task."
       />
 
       <ProposalsPanel
         layout="wide"
         heading="Proposals"
-        emptyHint="Nothing suggested yet. Suggest the first thing above — anything the club should take on."
+        emptyHint="Nothing raised yet. Raise the first proposal — anything the club should take on."
         proposals={proposals}
         realtime={realtime}
       />

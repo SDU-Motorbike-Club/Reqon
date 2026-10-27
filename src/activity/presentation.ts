@@ -115,6 +115,8 @@ export function presentActivity(row: ActivityRow, names: ReadonlyMap<string, str
       return { ...base, icon: '+', summary: `File added: “${text(d.name) ?? 'a file'}”` }
     case 'attachment_deleted':
       return { ...base, icon: '−', summary: `File deleted: “${text(d.name) ?? 'a file'}”` }
+    case 'password_reset':
+      return { ...base, icon: '⚿', summary: 'Temporary password issued; they choose a new one when they next sign in' }
     case 'legacy_repaired':
       return { ...base, icon: '✓', summary: 'Older proposal completed with required details' }
     default:

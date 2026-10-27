@@ -44,6 +44,10 @@ type Props = {
   // added as a prerequisite (already filtered for the season, archived and
   // circles). Optional so a view without the links still renders.
   links?: TaskLinksView
+  // The signed-in member, offered first as "Me" when reassigning.
+  viewerId?: string | null
+  // Called once the task has been archived, so the screen can say so (and offer Undo).
+  onArchived?: (task: Task) => void
 }
 
 export type TaskLinksView = {
@@ -199,6 +203,7 @@ export function TaskDetails(props: Props) {
   const doArchive = () =>
     run(async () => {
       await archive.mutateAsync({ id: task.id })
+      props.onArchived?.(task)
     })
 
   // A choice that has since stopped being a candidate (linked by someone else, archived) is dropped.
@@ -208,19 +213,23 @@ export function TaskDetails(props: Props) {
   const refs = props.requirementKeys.map((k) => ({ key: k, ref: printedRef.get(k) ?? k }))
 
   return (
-    <div className="mt-2 space-y-3 border-t border-slate-100 pt-2" data-testid={`task-details-${task.id}`}>
-      <section>
-        <h4 id={fid('h-desc')} className={SECTION_HEADING}>
-          Description
-        </h4>
-        {task.detail ? (
-          <p className="mt-0.5 text-sm whitespace-pre-line text-slate-700">{task.detail}</p>
-        ) : (
-          <p className="mt-0.5 text-sm text-slate-500 italic">No description.</p>
-        )}
-      </section>
+    <div className="space-y-3" data-testid={`task-details-${task.id}`}>
+      {/* Description and blocker as text only for someone who cannot edit; an
+          editor finds both as fields in the form below, not twice. */}
+      {!perms.canEdit && (
+        <section>
+          <h4 id={fid('h-desc')} className={SECTION_HEADING}>
+            Description
+          </h4>
+          {task.detail ? (
+            <p className="mt-0.5 text-sm whitespace-pre-line text-slate-700">{task.detail}</p>
+          ) : (
+            <p className="mt-0.5 text-sm text-slate-500 italic">No description.</p>
+          )}
+        </section>
+      )}
 
-      {task.state === 'blocked' && (
+      {task.state === 'blocked' && !perms.canEdit && (
         <section className="rounded border-l-4 border-amber-500 bg-amber-50 p-2" data-testid={`task-blocker-${task.id}`}>
           <h4 id={fid('h-block')} className="text-[11px] font-semibold tracking-wide text-amber-900 uppercase">
             Blocker
@@ -457,6 +466,7 @@ export function TaskDetails(props: Props) {
                 />
                 <p className="mt-1 text-xs text-slate-500">
                   Name the outside thing being waited for (a supplier, a decision, an event) or link the task under “Waits for”.
+                  {task.blocked_since ? ` Blocked since ${formatInstantDay(task.blocked_since)}.` : ''}
                 </p>
               </div>
             )}
@@ -492,9 +502,10 @@ export function TaskDetails(props: Props) {
               {perms.canReassign ? (
                 <select id={fid('owner')} value={owner} onChange={(e) => setOwner(e.target.value)} className={FIELD}>
                   <option value="">Unassigned</option>
-                  {props.owners.map((o) => (
+                  {/* The signed-in member first, so taking a task is one pick. */}
+                  {[...props.owners.filter((o) => o.id === props.viewerId), ...props.owners.filter((o) => o.id !== props.viewerId)].map((o) => (
                     <option key={o.id} value={o.id}>
-                      {o.name}
+                      {o.id === props.viewerId ? `Me (${o.name})` : o.name}
                     </option>
                   ))}
                 </select>
@@ -517,7 +528,8 @@ export function TaskDetails(props: Props) {
           </fieldset>
 
           <ActionError error={error} />
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Sticky: the form is longer than the dialog, and Save must stay in reach. */}
+          <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-2 border-t border-slate-100 bg-white px-1 py-2">
             <button type="submit" className={buttonPrimary} disabled={busy} data-testid={`task-save-${task.id}`}>
               {busy ? 'Saving…' : dirtyKeys ? 'Save details and requirements' : 'Save details'}
             </button>

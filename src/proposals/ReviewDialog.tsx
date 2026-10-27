@@ -33,7 +33,10 @@ type Props = {
   isDeveloper: boolean
   hasTask: boolean
   onClose: () => void
-  onDone: (message: string, options?: { toBoard?: boolean }) => void
+  // `taskId`: the task this action created, so the message can link straight to it.
+  onDone: (message: string, options?: { taskId?: string }) => void
+  // The outcome of the last action, shown inside the dialog while it stays open.
+  notice?: string | null
 }
 
 export function ReviewDialog({ proposal, onClose, ...rest }: Props) {
@@ -46,7 +49,7 @@ export function ReviewDialog({ proposal, onClose, ...rest }: Props) {
 }
 
 function Form({ proposal, comments, members, departments, milestones, requirementOptions, requirementKeys,
-  canReview, isAuthor, isDeveloper, hasTask, titleId, onClose, onDone,
+  canReview, isAuthor, isDeveloper, hasTask, titleId, onClose, onDone, notice,
 }: Omit<Props, 'proposal'> & { proposal: Proposal; titleId: string }) {
   const revise = useReviseProposal()
   const move = useSetProposalDepartment()
@@ -127,19 +130,30 @@ function Form({ proposal, comments, members, departments, milestones, requiremen
     }
   }
 
+  // The dialog stays open: it shows the live proposal and re-keys on the new
+  // revision, so the next review action is right here.
   const saveOnly = () => run(async () => {
     await saveRevision()
     onDone(`Saved the new revision of “${proposal.title}”.`)
-    onClose()
   })
   const sendComment = () => run(async () => {
     await addComment.mutateAsync({ id: proposal.id, body: comment })
     setComment('')
     onDone(`Added your comment to “${proposal.title}”.`)
   })
+  // Approve only: the dialog stays open and offers "Create Board task" next.
   const doApprove = () => run(async () => {
     await approve.mutateAsync({ id: proposal.id, expectedRevision: proposal.revision, note: actionNote })
-    onDone(`Approved revision ${proposal.revision} of “${proposal.title}”. It can now be made into a task.`)
+    onDone(`Approved revision ${proposal.revision} of “${proposal.title}”.`)
+  })
+  // The usual path: approve this revision, then make its task, in one go. Two
+  // commands, in order; if the second is refused the approval stands, the dialog
+  // stays open and "Create Board task" can be retried.
+  const doApproveAndCreate = () => run(async () => {
+    await approve.mutateAsync({ id: proposal.id, expectedRevision: proposal.revision, note: actionNote })
+    onDone(`Approved revision ${proposal.revision} of “${proposal.title}”.`)
+    const { task, created } = await promote.mutateAsync({ proposal })
+    onDone(created ? `“${proposal.title}” is on the Board.` : `“${proposal.title}” was already on the Board.`, { taskId: task.id })
     onClose()
   })
   const doRequestChanges = () => run(async () => {
@@ -148,8 +162,8 @@ function Form({ proposal, comments, members, departments, milestones, requiremen
     onClose()
   })
   const doPromote = () => run(async () => {
-    const { created } = await promote.mutateAsync({ proposal })
-    onDone(created ? `“${proposal.title}” is on the Board.` : `“${proposal.title}” was already on the Board.`, { toBoard: true })
+    const { task, created } = await promote.mutateAsync({ proposal })
+    onDone(created ? `“${proposal.title}” is on the Board.` : `“${proposal.title}” was already on the Board.`, { taskId: task.id })
     onClose()
   })
   const command = (action: ReviewAction) => run(async () => {
@@ -168,6 +182,7 @@ function Form({ proposal, comments, members, departments, milestones, requiremen
       <p className="mt-1 text-sm text-slate-700" data-testid="review-status">
         <span className="font-medium">{proposalStatusLabel(proposal)}</span> · revision {proposal.revision}
       </p>
+      {notice && <p role="status" className="mt-2 rounded bg-emerald-50 p-2 text-sm text-emerald-900" data-testid="review-notice">{notice}</p>}
       {proposal.legacy_incomplete && (
         <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-900" data-testid="review-legacy">
           This older proposal cannot be approved yet. It still needs {describeBlockers(blockers) || 'its details confirmed'}.
@@ -219,7 +234,7 @@ function Form({ proposal, comments, members, departments, milestones, requiremen
           : <div><label htmlFor={fid('revision-note')} className={LABEL}>Revision note (optional)</label><textarea id={fid('revision-note')} rows={2} value={revisionNote} onChange={(event) => setRevisionNote(event.target.value)} className={FIELD} maxLength={2000} /></div>}
       </fieldset>}
 
-      {canReview && !hasTask && !closed && <div className="mt-4"><label htmlFor={fid('action-note')} className={LABEL}>Review note</label><textarea id={fid('action-note')} rows={2} value={actionNote} onChange={(event) => setActionNote(event.target.value)} className={FIELD} maxLength={2000} disabled={busy} placeholder="Required for approval and change requests" /></div>}
+      {canReview && !hasTask && !closed && <div className="mt-4"><label htmlFor={fid('action-note')} className={LABEL}>Review note</label><textarea id={fid('action-note')} rows={2} value={actionNote} onChange={(event) => setActionNote(event.target.value)} className={FIELD} maxLength={2000} disabled={busy} aria-describedby={fid('action-note-hint')} /><p id={fid('action-note-hint')} className="mt-1 text-xs text-slate-600">Needed to approve or to request changes.</p></div>}
       {changed && canReview && <p className="mt-2 text-xs text-amber-800" data-testid="review-save-first">Save this revision before taking a review action.</p>}
       <ActionError error={localError} className="mt-3" />
 
@@ -234,7 +249,8 @@ function Form({ proposal, comments, members, departments, milestones, requiremen
         {actions.includes('reopen') && <button type="button" className={buttonSecondary} disabled={busy} onClick={() => void command('reopen')} data-testid="review-reopen">{REVIEW_ACTION_LABEL.reopen}</button>}
         {actions.includes('reject') && <button type="button" className={buttonDanger} disabled={busy || changed} onClick={() => setConfirmReject(true)} data-testid="review-reject">{REVIEW_ACTION_LABEL.reject}</button>}
         {canReview && ['open', 'agenda', 'approved'].includes(proposal.state) && <button type="button" className={buttonSecondary} disabled={busy || changed || !actionNote.trim()} onClick={() => void doRequestChanges()} data-testid="review-request-changes">Request changes</button>}
-        {canReview && ['open', 'agenda', 'changes_requested'].includes(proposal.state) && <button type="button" className={buttonPrimary} disabled={busy || !approvalReady} onClick={() => void doApprove()} data-testid="review-approve">{busy ? 'Working…' : 'Approve revision'}</button>}
+        {canReview && ['open', 'agenda', 'changes_requested'].includes(proposal.state) && <button type="button" className={buttonSecondary} disabled={busy || !approvalReady} onClick={() => void doApprove()} data-testid="review-approve">Approve only</button>}
+        {canReview && !hasTask && ['open', 'agenda', 'changes_requested'].includes(proposal.state) && <button type="button" className={buttonPrimary} disabled={busy || !approvalReady} onClick={() => void doApproveAndCreate()} data-testid="review-approve-create">{busy ? 'Working…' : 'Approve and create task'}</button>}
         {canReview && approved && !hasTask && <button type="button" className={buttonPrimary} disabled={busy} onClick={() => void doPromote()} data-testid="review-promote">{busy ? 'Working…' : 'Create Board task'}</button>}
       </div>}
     </form>

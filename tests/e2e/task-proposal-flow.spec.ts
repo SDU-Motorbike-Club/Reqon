@@ -52,7 +52,7 @@ test.describe('full task/proposal flow (R9-R16, R37-R38, R42-R43)', () => {
     await page.getByTestId('review-approve').click()
     await expect(page.getByTestId('review-approve')).toHaveCount(0, { timeout: 10_000 })
     await expect.poll(() => runSql(`select state from task_proposals where id = '${proposalId}'`).trim()).toBe('approved')
-    await page.getByTestId(`review-open-${proposalId}`).click()
+    // "Approve only" keeps the dialog open; the task is made from the same dialog.
     await page.getByTestId('review-promote').click()
     // A promoted proposal leaves the open queue (R13.4); rather than chase
     // which tab/view now shows it, confirm the dialog closed and let the

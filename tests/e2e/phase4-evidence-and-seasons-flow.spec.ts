@@ -94,13 +94,17 @@ test.describe('milestone work, submission and acceptance are three facts (Phase 
     try {
       await login(page, m.users.developer.email, m.password)
       await page.goto('/milestones')
-      await expect(page.getByTestId(`work-${key}`)).not.toHaveText('loading…', { timeout: 10_000 })
-      const workBefore = await page.getByTestId(`work-${key}`).innerText()
+      // The work figure is the bar's own line ("Linked work: …"), not repeated beside the dates.
+      await expect(page.getByTestId(`linked-${key}`)).not.toContainText('loading…', { timeout: 10_000 })
+      const workBefore = await page.getByTestId(`linked-${key}`).innerText()
       await expect(page.getByTestId(`submitted-${key}`)).toContainText('Not recorded')
       await expect(page.getByTestId(`accepted-${key}`)).toContainText('Not recorded')
 
       await page.getByTestId(`submission-edit-${key}`).click()
+      // A first record starts from today's submission date.
+      await expect(page.getByLabel('Submitted on')).toHaveValue(today())
       // Acceptance without a submission is refused before anything is sent.
+      await page.getByLabel('Submitted on').fill('')
       await page.getByLabel('Accepted on').fill(today())
       await expect(page.getByTestId(`submission-problem-${key}`)).toContainText('cannot be accepted before it was submitted')
       await page.getByLabel('Accepted on').fill('')
@@ -109,7 +113,7 @@ test.describe('milestone work, submission and acceptance are three facts (Phase 
       await page.getByRole('button', { name: /^Save record for/ }).click()
       await expect(page.getByTestId(`submitted-${key}`)).not.toContainText('Not recorded', { timeout: 10_000 })
       await expect(page.getByTestId(`accepted-${key}`)).toContainText('Not recorded')
-      expect(await page.getByTestId(`work-${key}`).innerText(), 'submitting does not change the work figure').toBe(workBefore)
+      expect(await page.getByTestId(`linked-${key}`).innerText(), 'submitting does not change the work figure').toBe(workBefore)
       expect(runSql(`select submitted_on is not null and accepted_on is null from milestones where key = '${key}'`).trim()).toBe('t')
     } finally {
       restore()

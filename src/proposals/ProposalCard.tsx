@@ -77,7 +77,7 @@ export function ProposalCard({
       </div>
       {proposal.context && <p className="mt-0.5 text-sm text-slate-600">{proposal.context}</p>}
       <p className="mt-0.5 text-xs text-slate-500">
-        Suggested{suggester ? ` by ${suggester}` : ''} on {proposal.raised_on}
+        Raised{suggester ? ` by ${suggester}` : ''} on {proposal.raised_on}
       </p>
       <p className="mt-0.5 text-xs text-slate-600" data-testid={`proposal-facts-${proposal.id}`}>
         {departmentName ?? 'No department'}

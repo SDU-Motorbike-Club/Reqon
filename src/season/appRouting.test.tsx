@@ -51,6 +51,8 @@ vi.mock('../ui/AppHeader.tsx', () => ({ AppHeader: () => null }))
 // App.tsx subscribes to department/Head changes at the shell level, above
 // every route; this test is only about route-to-SeasonGate wiring.
 vi.mock('../data/useRealtimeSubteams.ts', () => ({ useRealtimeSubteams: () => 'off' }))
+// The inbox's live channel sits in the same shell-level spot.
+vi.mock('../data/useNotifications.ts', () => ({ useRealtimeNotifications: () => 'off' }))
 
 // Every page stubbed to one marker each — what renders (the page, or
 // SeasonGate's fallback in front of it) is exactly what this test checks.
@@ -66,6 +68,7 @@ vi.mock('../pages/Meetings.tsx', () => ({ default: () => 'MEETINGS PAGE' }))
 vi.mock('../pages/SpecSheet.tsx', () => ({ default: () => 'SPECS PAGE' }))
 vi.mock('../pages/Finances.tsx', () => ({ default: () => 'FINANCES PAGE' }))
 vi.mock('../pages/Settings.tsx', () => ({ default: () => 'SETTINGS PAGE' }))
+vi.mock('../pages/Inbox.tsx', () => ({ default: () => 'INBOX PAGE' }))
 
 const { default: App } = await import('../App.tsx')
 
@@ -121,6 +124,13 @@ describe('no current season: every season-scoped route shows the gate, never its
   it('/settings renders regardless — it is not season-scoped', async () => {
     renderAt('/settings')
     await waitFor(() => expect(screen.getByText('SETTINGS PAGE')).toBeInTheDocument())
+    expect(screen.queryByText('No current season')).not.toBeInTheDocument()
+  })
+
+  // What needs you does not depend on a season being set up.
+  it('/inbox renders regardless — it is not season-scoped', async () => {
+    renderAt('/inbox')
+    await waitFor(() => expect(screen.getByText('INBOX PAGE')).toBeInTheDocument())
     expect(screen.queryByText('No current season')).not.toBeInTheDocument()
   })
 })

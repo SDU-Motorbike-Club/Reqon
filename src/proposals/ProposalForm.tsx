@@ -24,6 +24,8 @@ const LABEL = 'block text-xs font-medium text-slate-700'
 // path; this form only says WHAT is missing, next to the field and in a summary,
 // before a round trip. It never picks a deadline for anyone, keeps what was
 // typed when a submit fails, and cannot be submitted twice while one is pending.
+// Department and milestone start from a suggestion (the department in view or the
+// viewer's own, the next milestone due) that the person can change.
 export function ProposalForm({
   departments,
   milestones,
@@ -34,6 +36,8 @@ export function ProposalForm({
   canConfigure,
   loading = false,
   loadError = null,
+  defaultDepartment = '',
+  defaultMilestone = '',
 }: {
   departments: Option[]
   milestones: Option[]
@@ -41,6 +45,10 @@ export function ProposalForm({
   requirements: RequirementOption[]
   onRaise: (proposal: NewProposal) => Promise<void>
   pending: boolean
+  // Suggested starting values; only used while the person has not chosen one.
+  // Ignored when not among the options offered.
+  defaultDepartment?: string
+  defaultMilestone?: string
   // Whether the viewer may open Settings to set up what is missing (President,
   // Vice President or Developer). Never a reason to show the form to anyone.
   canConfigure: boolean
@@ -58,11 +66,14 @@ export function ProposalForm({
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [departmentKey, setDepartmentKey] = useState('')
+  // null = not chosen yet, so the suggestion shows (and follows it while it changes).
+  const [pickedDepartment, setDepartmentKey] = useState<string | null>(null)
   const [ownerId, setOwnerId] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [priority, setPriority] = useState<TaskPriority>('normal')
-  const [milestoneKey, setMilestoneKey] = useState('')
+  const [pickedMilestone, setMilestoneKey] = useState<string | null>(null)
+  const departmentKey = pickedDepartment ?? (departments.some((d) => d.value === defaultDepartment) ? defaultDepartment : '')
+  const milestoneKey = pickedMilestone ?? (milestones.some((m) => m.value === defaultMilestone) ? defaultMilestone : '')
   const [requirementKeys, setRequirementKeys] = useState<string[]>([])
   const [attempted, setAttempted] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
@@ -159,11 +170,11 @@ export function ProposalForm({
     }
     setTitle('')
     setDescription('')
-    setDepartmentKey('')
+    setDepartmentKey(null)
     setOwnerId('')
     setDueDate('')
     setPriority('normal')
-    setMilestoneKey('')
+    setMilestoneKey(null)
     setRequirementKeys([])
     setAttempted(false)
     setJustRaised(true)
@@ -305,13 +316,10 @@ export function ProposalForm({
               value={dueDate}
               aria-required="true"
               aria-invalid={shown('dueDate') || undefined}
-              aria-describedby={describe('dueDate', fid('due-hint'))}
+              aria-describedby={describe('dueDate')}
               onChange={(e) => setDueDate(e.target.value)}
               className={FIELD}
             />
-            <p id={fid('due-hint')} className="mt-1 text-xs text-slate-500">
-              No date is chosen for you.
-            </p>
             {fieldError('dueDate')}
           </div>
 

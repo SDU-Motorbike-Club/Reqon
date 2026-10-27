@@ -85,7 +85,7 @@ test.describe('Phase 14 UI against the real database', () => {
     const panel = page.getByTestId(`assign-tasks-${m.clauseKey}`)
     await panel.getByLabel(/Find a task/).fill(PREFIX)
     await panel.getByTestId(`assign-row-${taskId}`).getByRole('button', { name: /^Link/ }).click()
-    await expect(panel.getByText(/is now linked to/)).toBeVisible()
+    await expect(panel.getByText(/^Linked “.+” to /)).toBeVisible()
     expect(runSql(`select count(*) from task_requirements where task_id = '${taskId}' and clause_key = '${m.clauseKey}'`).trim()).toBe('1')
 
     await page.reload()
@@ -94,7 +94,7 @@ test.describe('Phase 14 UI against the real database', () => {
     await again.getByLabel(/Find a task/).fill(PREFIX)
     await expect(again.getByTestId(`assign-row-${taskId}`)).toContainText('linked')
     await again.getByTestId(`assign-row-${taskId}`).getByRole('button', { name: /^Unlink/ }).click()
-    await expect(again.getByText(/is no longer linked to/)).toBeVisible()
+    await expect(again.getByText(/^Unlinked “.+” from /)).toBeVisible()
     expect(runSql(`select count(*) from task_requirements where task_id = '${taskId}'`).trim()).toBe('0')
   })
 

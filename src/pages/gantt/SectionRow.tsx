@@ -55,7 +55,7 @@ export function SectionRow({
   const shown = under.filter(env.lens.matches)
   const progress = sectionProgress(section, progressTasks, subsectionIds)
   const span = sectionSpan(tasks, section.id, fallbackSpan, subsectionIds)
-  const words = progressLabel(progress, 'section', 'done')
+  const words = progressLabel(progress, 'section', 'drafted')
   const target = { seasonId: env.seasonId, milestoneKey, sectionId: section.id }
   const { direct, relink } = linkCandidates(tasks, target, (t) => env.permsFor(t).canEdit)
   const byId = new Map(tasks.map((t) => [t.id, t]))
@@ -86,19 +86,20 @@ export function SectionRow({
             </span>
             {section.name}
           </button>
-          {/* The same tick as Milestones, writing to the same row (is_drafted).
-              On the Gantt a ticked section reads as done. Plain members see it
-              but cannot change it. */}
+          {/* The same tick as Milestones, writing to the same row (is_drafted),
+              and called the same: drafted. A drafted section is not done work —
+              progress comes only from its tasks. Plain members see it but cannot
+              change it. */}
           <label className="ml-auto flex min-h-11 shrink-0 items-center gap-1 text-[11px] text-slate-600 sm:min-h-0">
             <input
               type="checkbox"
               checked={section.is_drafted}
               disabled={!env.canManage}
-              aria-label={`${section.name} done`}
+              aria-label={`${section.name} drafted`}
               onChange={(e) => onDraftedChange(e.target.checked)}
               className="h-4 w-4 accent-slate-900 disabled:opacity-60"
             />
-            {progress.basis === 'tasks' ? `${progress.done}/${progress.total}` : 'done'}
+            {progress.basis === 'tasks' ? `${progress.done}/${progress.total}` : 'drafted'}
           </label>
         </div>
 

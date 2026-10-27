@@ -16,11 +16,18 @@
 // A new person never gets a privileged role here; that stays with
 // apply_role_plan() / can_grant_role() in the role dialog.
 //
-// Request:  POST { email, password, fullName, jobTitle? }
-// Response: 200 { id } | 4xx/5xx { error }
-// Passwords are never logged or echoed back.
+// The first password is generated HERE, not typed by the admin, and comes back
+// exactly once so the admin can hand it over. The roster row carries
+// must_change_password (migration 20260138000000_temporary_passwords.sql), so
+// the app asks the new person to choose their own before anything else — after
+// that, nobody but them knows it.
+//
+// Request:  POST { email, fullName, jobTitle? }
+// Response: 200 { id, password } | 4xx/5xx { error }
+// The password is never logged, and is returned only in that one 200 answer.
 
 import { createClient } from 'npm:@supabase/supabase-js@2.117.2'
+import { generatePassword } from '../_shared/passwords.ts'
 
 const corsHeaders = {
   // A bearer token, not a cookie, carries the caller's identity, so a wildcard
@@ -40,30 +47,23 @@ function reply(status: number, body: Record<string, unknown>): Response {
 // Same limits the SQL script (supabase/scripts/new_member.sql) uses, plus
 // upper bounds so nothing unbounded reaches Auth or the roster.
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const MIN_PASSWORD = 8
-const MAX_PASSWORD = 72 // bcrypt ignores everything after 72 bytes
 const MAX_NAME = 120
 const MAX_TITLE = 80
 
-type Input = { email: string; password: string; fullName: string; jobTitle: string }
+type Input = { email: string; fullName: string; jobTitle: string }
 
 function parse(raw: unknown): Input | string {
   if (typeof raw !== 'object' || raw === null) return 'Send a JSON body.'
   const body = raw as Record<string, unknown>
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
-  const password = typeof body.password === 'string' ? body.password : ''
   const fullName = typeof body.fullName === 'string' ? body.fullName.trim() : ''
   const jobTitle = typeof body.jobTitle === 'string' && body.jobTitle.trim() ? body.jobTitle.trim() : 'Member'
 
   if (!EMAIL.test(email) || email.length > 254) return 'Give a real email address.'
-  if (password.length < MIN_PASSWORD) return `The password must be at least ${MIN_PASSWORD} characters.`
-  if (new TextEncoder().encode(password).length > MAX_PASSWORD) {
-    return `The password must be at most ${MAX_PASSWORD} characters.`
-  }
   if (!fullName) return 'Give the person a full name — it is what every screen shows.'
   if (fullName.length > MAX_NAME) return `The full name must be at most ${MAX_NAME} characters.`
   if (jobTitle.length > MAX_TITLE) return `The job title must be at most ${MAX_TITLE} characters.`
-  return { email, password, fullName, jobTitle }
+  return { email, fullName, jobTitle }
 }
 
 Deno.serve(async (req) => {
@@ -111,17 +111,21 @@ Deno.serve(async (req) => {
   })
 
   // email_confirm: they can sign in straight away with the password they are
-  // given, and change it in Settings -> Your account.
+  // given; the app then makes them choose their own.
+  const password = generatePassword()
   const { data: created, error: createError } = await admin.auth.admin.createUser({
     email: input.email,
-    password: input.password,
+    password,
     email_confirm: true,
   })
   if (createError || !created.user) {
     // weak_password is also a 422, so it is checked before the email_exists
-    // fallback on status, which would otherwise call it "already exists".
+    // fallback on status, which would otherwise call it "already exists". A
+    // generated password fails it only if the project's password rules ask for
+    // something it lacks.
     if (createError?.code === 'weak_password') {
-      return reply(400, { error: 'That password is too weak. Choose a longer one.' })
+      console.error('create-member: the generated password does not meet the project password rules')
+      return reply(500, { error: 'Could not create the login: the generated password does not meet this project’s password rules. Nothing was changed.' })
     }
     if (createError?.code === 'email_exists' || (!createError?.code && createError?.status === 422)) {
       return reply(409, {
@@ -135,7 +139,7 @@ Deno.serve(async (req) => {
   const newId = created.user.id
   const { error: rosterError } = await asCaller
     .from('members')
-    .insert({ id: newId, full_name: input.fullName, role: input.jobTitle })
+    .insert({ id: newId, full_name: input.fullName, role: input.jobTitle, must_change_password: true })
 
   if (rosterError) {
     // Undo the login so no account without a roster row is left behind.
@@ -156,5 +160,5 @@ Deno.serve(async (req) => {
 
   // Audit line in the function logs: who added whom. No email, no password.
   console.log('create-member: added', newId, 'by', who.user.id)
-  return reply(200, { id: newId })
+  return reply(200, { id: newId, password })
 })

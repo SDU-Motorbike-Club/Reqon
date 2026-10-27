@@ -5,7 +5,7 @@ import type { Proposal, ProposalState } from './types.ts'
 // had to change when the concept was renamed
 // (20260108000000_proposals_and_meetings.sql documents the mapping).
 export const PROPOSAL_STATES: { value: ProposalState; label: string }[] = [
-  { value: 'open', label: 'Suggested' },
+  { value: 'open', label: 'Raised' },
   { value: 'agenda', label: 'Under review' },
   { value: 'changes_requested', label: 'Changes requested' },
   { value: 'approved', label: 'Approved' },

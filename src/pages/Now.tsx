@@ -170,7 +170,7 @@ function bookCountsText(unit: BookUnit): string {
   switch (unit.status) {
     case 'measured':
       return unit.counts.applicable > 0
-        ? `${unit.counts.complied}/${unit.counts.applicable} complied`
+        ? `${unit.counts.complied}/${unit.counts.applicable} compliant`
         : 'all not applicable'
     case 'no-requirements':
       return `no team requirements (${unit.counts.importedRules} rule${unit.counts.importedRules === 1 ? '' : 's'})`
@@ -229,7 +229,7 @@ function BookUnitRow({
         )}
         {unit.registerFilter ? (
           <Link
-            to={`/register?chapter=${encodeURIComponent(unit.registerFilter)}&group=book`}
+            to={`/register?chapter=${encodeURIComponent(unit.registerFilter)}&group=book&unresolved=1`}
             className="min-w-0 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900"
             data-testid={`${testId}-link`}
           >
@@ -368,7 +368,7 @@ export default function Now() {
         <Tile testId="tile-proposals" to="/proposals" label="Open proposals" source={proposals}
           value={valueOf(proposals, () => String(openProposals))} sub={isReviewer ? `${reviewQueue.length} wait for your review` : 'Not yet decided or made into a task'} />
         <Tile testId="tile-deadline" to="/milestones" label="Next submission" source={milestones}
-          value={valueOf(milestones, () => (deadline.kind === 'tbc' ? 'TBC' : `${deadline.days} days`))}
+          value={valueOf(milestones, () => (deadline.kind === 'tbc' ? 'TBC' : `${deadline.days} day${deadline.days === 1 ? '' : 's'}`))}
           sub={deadline.kind === 'tbc' ? 'No published deadline' : `${deadline.label} · ${deadline.name} · ${formatDay(deadline.dueOn)}`}
           tone={deadline.kind === 'due' && deadline.days <= 14 ? 'warn' : 'plain'} />
       </section>
@@ -379,16 +379,14 @@ export default function Now() {
             Requirements progress
           </h2>
           <p className="mb-2 text-xs text-slate-600">
-            The rules that place a duty on the team, in the Requirements Book&apos;s own chapters. Complied means marked
-            compliant or verified in the Register, out of the rules that apply: not applicable ones are left out and counted apart. Finishing tasks never marks a rule compliant, and a
-            rule&apos;s department does not change where it is counted.
+            Rules that place a duty on the team, by chapter. Compliant = marked Compliant or Verified in the Register.
           </p>
           <p className="mb-2 text-xs text-slate-700" data-testid="now-requirements-total">
             Across the book:{' '}
             <strong className="font-semibold tabular-nums">
               {valueOf(bookProgress, () => `${bookTotal.complied} / ${bookTotal.applicable}`)}
             </strong>{' '}
-            requirements complied
+            requirements compliant
             {bookProgress.data && bookTotal.applicable > 0 ? ` (${percent(bookTotal.complied, bookTotal.applicable)}%)` : ''}
             {bookProgress.data && bookTotal.verified > 0 ? ` · ${bookTotal.verified} verified` : ''}
             {bookProgress.data && bookTotal.notApplicable > 0 ? ` · ${bookTotal.notApplicable} not applicable` : ''}.
@@ -474,7 +472,7 @@ export default function Now() {
               empty="Nothing waits for your decision." more={{ to: '/proposals', label: 'Review on Proposals' }}>
               {reviewQueue.slice(0, 4).map((p) => (
                 <Row key={p.id} to={`/proposals?dept=${encodeURIComponent(p.subteam_key ?? '')}`} title={p.title}
-                  meta={`${dept(p.subteam_key)} · ${proposalStatusLabel(p)} · suggested by ${who(p.raised_by)}`} />
+                  meta={`${dept(p.subteam_key)} · ${proposalStatusLabel(p)} · raised by ${who(p.raised_by)}`} />
               ))}
             </ActionList>
           ) : (

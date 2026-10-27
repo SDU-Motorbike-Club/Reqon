@@ -172,7 +172,9 @@ describe('Now dashboard', () => {
     expect(screen.queryByRole('heading', { name: 'Departments' })).not.toBeInTheDocument()
     expect(document.querySelector('[data-testid^="department-"]')).toBeNull()
     expect(screen.queryByText('Work')).not.toBeInTheDocument()
-    expect(screen.getByTestId('book-chapter-B-counts')).toHaveTextContent('1/15 complied')
+    expect(screen.getByTestId('book-chapter-B-counts')).toHaveTextContent('1/15 compliant')
+    // A chapter opens its open rules only in the Register.
+    expect(screen.getByTestId('book-chapter-B-link')).toHaveAttribute('href', expect.stringContaining('unresolved=1'))
     expect(screen.getByTestId('book-chapter-B-na')).toHaveTextContent('2 not applicable (left out of the count)')
     expect(screen.getByTestId('now-requirements-total')).toHaveTextContent('1 / 15')
   })

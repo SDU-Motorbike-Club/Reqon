@@ -7,6 +7,7 @@ import {
   canArchiveTask,
   canEditTask,
   canGrantRole,
+  canResetPassword,
   canRestoreTask,
   hasDepartmentAuthority,
   reviewsAnyProposal,
@@ -134,6 +135,24 @@ describe('the permission matrix', () => {
 
 // Mirrors supabase/tests/task_authorization_test.sql's role matrix (ADR-0003):
 // active owner, active Head of the task's department, or Developer.
+describe('password resets (20260138000000 can_reset_password)', () => {
+  it('follows can_grant_role for every role the person holds', () => {
+    expect(canResetPassword(['president'], [], false)).toBe(true)
+    expect(canResetPassword(['president'], ['vicepresident', 'treasurer'], false)).toBe(true)
+    expect(canResetPassword(['president'], ['developer'], false)).toBe(false)
+    expect(canResetPassword(['vicepresident'], ['treasurer'], false)).toBe(true)
+    expect(canResetPassword(['vicepresident'], ['president'], false)).toBe(false)
+    expect(canResetPassword(['developer'], ['developer', 'president'], false)).toBe(true)
+  })
+
+  it('is never for yourself, and never for a role without roster powers', () => {
+    expect(canResetPassword(['developer'], [], true)).toBe(false)
+    expect(canResetPassword(['treasurer'], [], false)).toBe(false)
+    expect(canResetPassword(['documentation'], [], false)).toBe(false)
+    expect(canResetPassword([], [], false)).toBe(false)
+  })
+})
+
 describe('task-level authorization (ADR-0003)', () => {
   const owner: TaskActor = { id: 'owner', status: 'active', isDeveloper: false, headOf: [] }
   const head: TaskActor = { id: 'head', status: 'active', isDeveloper: false, headOf: ['GEOM'] }

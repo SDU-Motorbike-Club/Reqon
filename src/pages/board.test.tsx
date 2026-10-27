@@ -13,6 +13,7 @@ const state = {
   tasks: [] as Record<string, unknown>[],
   writes: [] as Record<string, unknown>[],
   archives: [] as Record<string, unknown>[],
+  restores: [] as Record<string, unknown>[],
   updateError: null as Error | null,
   loading: false,
   loadError: null as Error | null,
@@ -69,6 +70,11 @@ vi.mock('../data/useTasks.ts', () => ({
     error: state.updateError,
   }),
   useArchiveTask: () => ({ mutateAsync: async (v: Record<string, unknown>) => state.archives.push(v), isPending: false }),
+  useRestoreTask: () => ({
+    mutate: (v: Record<string, unknown>, o?: { onSuccess?: () => void }) => { state.restores.push(v); o?.onSuccess?.() },
+    isPending: false,
+    error: null,
+  }),
   useSetTaskDepartment: () => ({
     mutate: (v: Record<string, unknown>, o?: { onSuccess?: () => void }) => { state.moves.push(v); o?.onSuccess?.() },
     isPending: false,
@@ -113,6 +119,7 @@ beforeEach(() => {
   ]
   state.writes = []
   state.archives = []
+  state.restores = []
   state.updateError = null
   state.loading = false
   state.loadError = null
@@ -216,10 +223,12 @@ describe('lanes, priority and card facts', () => {
     expect(within(within(lane).getByTestId('task-calm')).queryByText('Urgent')).not.toBeInTheDocument()
   })
 
-  it('exposes department, owner, deadline, milestone, requirement count and state on the card', () => {
+  it('exposes department, owner, deadline, milestone and requirement count on the card; the lane gives its state', () => {
     renderBoard()
     const facts = screen.getByTestId('task-facts-aero-mine')
-    expect(facts).toHaveTextContent('To do')
+    // The state is the lane's heading, not repeated on every card.
+    expect(facts).not.toHaveTextContent('To do')
+    expect(within(screen.getByTestId('lane-todo')).getByTestId('task-aero-mine')).toBeInTheDocument()
     expect(facts).toHaveTextContent('Aerodynamics')
     expect(facts).toHaveTextContent('Ada Rider')
     expect(facts).toHaveTextContent('Due 1 Dec 2026')
@@ -334,22 +343,27 @@ describe('the details editor', () => {
     return { user, panel: within(await screen.findByTestId(`task-details-${id}`)) }
   }
 
-  it('opens a native, focusable disclosure that holds the long description, links and editor', async () => {
+  it('opens the details and editor in a dialog, from a real button on the card', async () => {
     const user = userEvent.setup()
     state.tasks = [task('long', { owner_id: 'me', detail: 'A long description of the work.', source_proposal: 'prop-archived' })]
     renderBoard()
-    // A native <summary> is in the tab order and opens on Enter/Space in a
-    // browser (jsdom does not model that; it is checked in a real browser).
-    const summary = within(screen.getByTestId('task-more-long')).getByText(/^Details/)
-    expect(summary.tagName).toBe('SUMMARY')
-    await user.click(summary)
-    const panel = within(await screen.findByTestId('task-details-long'))
+    const button = screen.getByTestId('task-more-long')
+    expect(button.tagName).toBe('BUTTON')
+    expect(button).toHaveAttribute('aria-expanded', 'false')
+    await user.click(button)
+    expect(button).toHaveAttribute('aria-expanded', 'true')
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('heading', { level: 2 })).toHaveTextContent(String(state.tasks[0].title))
+    const panel = within(await within(dialog).findByTestId('task-details-long'))
     expect(panel.getByLabelText('Description')).toHaveValue('A long description of the work.')
     expect(panel.getByTestId('task-source-long')).toHaveTextContent('Created from the proposal “Old proposal”')
   })
 
   it('lets a Head reassign the owner and saves ONLY the changed fields', async () => {
     const { user, panel } = await (async () => { renderBoard('/board?dept=AERO'); return open('aero-theirs') })()
+    // The signed-in member comes first, named as such, so taking a task is one pick.
+    const ownerOptions = within(panel.getByLabelText('Owner')).getAllByRole('option').map((o) => o.textContent)
+    expect(ownerOptions[1]).toMatch(/^Me \(/)
     await user.selectOptions(panel.getByLabelText('Owner'), 'me')
     await user.click(panel.getByTestId('task-save-aero-theirs'))
     expect(state.writes).toEqual([{ id: 'aero-theirs', ownerId: 'me' }])
@@ -589,6 +603,13 @@ describe('archiving from the Board', () => {
     expect(state.archives).toEqual([])
     await user.click(within(confirm).getByTestId('task-archive-confirm-aero-theirs'))
     expect(state.archives).toEqual([{ id: 'aero-theirs' }])
+    // The card's dialog closes and the Board says what happened, with Undo for someone who may restore.
+    const note = await screen.findByTestId('board-archived')
+    expect(note).toHaveTextContent('Archived')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await user.click(within(note).getByTestId('board-archived-undo'))
+    expect(state.restores).toEqual([{ id: 'aero-theirs' }])
+    expect(screen.getByTestId('board-archived')).toHaveTextContent('Restored')
   })
 
   it('is not offered to a plain owner or to anyone else', async () => {
@@ -626,11 +647,19 @@ describe('arriving from a link that names a task (the Register\'s linked-task li
   it('opens that card\'s details, brings it into focus, and leaves the others closed', () => {
     renderBoard('/board?task=aero-theirs')
     const card = screen.getByTestId('task-aero-theirs')
-    expect(screen.getByTestId('task-more-aero-theirs')).toHaveAttribute('open')
+    expect(screen.getByTestId('task-more-aero-theirs')).toHaveAttribute('aria-expanded', 'true')
     expect(card).toHaveFocus()
-    expect(screen.getByTestId('task-more-aero-mine')).not.toHaveAttribute('open')
+    expect(screen.getByTestId('task-more-aero-mine')).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByTestId('board-task-missing')).not.toBeInTheDocument()
     expect(screen.queryByTestId('board-task-hidden')).not.toBeInTheDocument()
+  })
+
+  it('can move the task from its details dialog, without closing it first', async () => {
+    const user = userEvent.setup()
+    renderBoard('/board?task=aero-theirs')
+    const dialog = within(screen.getByRole('dialog'))
+    await user.selectOptions(dialog.getByLabelText('Lane'), 'wip')
+    expect(state.writes).toEqual([{ id: 'aero-theirs', state: 'wip' }])
   })
 
   it('says so, with a way to the Archive, when the task is not on the Board', () => {
@@ -641,7 +670,7 @@ describe('arriving from a link that names a task (the Register\'s linked-task li
       '/archive?tab=tasks&id=long-gone',
     )
     // Nothing else is opened in its place.
-    expect(document.querySelectorAll('details[open]')).toHaveLength(0)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('does not report a missing task while tasks are still loading', () => {
@@ -658,13 +687,13 @@ describe('arriving from a link that names a task (the Register\'s linked-task li
     expect(screen.queryByTestId('task-body-theirs')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /show all tasks/i }))
     expect(screen.getByTestId('task-body-theirs')).toBeInTheDocument()
-    expect(screen.getByTestId('task-more-body-theirs')).toHaveAttribute('open')
+    expect(screen.getByTestId('task-more-body-theirs')).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('ignores a malformed task id rather than searching for it', () => {
     renderBoard('/board?task=%3Cscript%3E')
     expect(screen.queryByTestId('board-task-missing')).not.toBeInTheDocument()
-    expect(document.querySelectorAll('details[open]')).toHaveLength(0)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })
 
@@ -704,7 +733,7 @@ describe('F14-04 and F14-05: saving what was changed, and filters that keep the 
   it('keeps ?task= when the department is changed from the department row', async () => {
     const user = userEvent.setup()
     renderBoard('/board?task=aero-theirs')
-    expect(screen.getByTestId('task-more-aero-theirs')).toHaveAttribute('open')
+    expect(screen.getByTestId('task-more-aero-theirs')).toHaveAttribute('aria-expanded', 'true')
     const nav = within(screen.getByRole('navigation', { name: 'Department navigation' }))
     await user.click(nav.getByRole('link', { name: /Bodywork/ }))
     // The link is still there: the Board says the named task is hidden by the new filter.

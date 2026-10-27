@@ -32,6 +32,7 @@ async function fillAll(user: ReturnType<typeof userEvent.setup>) {
   await user.selectOptions(screen.getByLabelText(/^Department/), 'AERO')
   fireEvent.change(screen.getByLabelText(/^Deadline/), { target: { value: '2026-12-01' } })
   await user.selectOptions(screen.getByLabelText(/^Related milestone/), 'MS1')
+  await user.type(screen.getByLabelText('Find a requirement'), 'A.1')
   await user.click(screen.getByRole('checkbox', { name: /A\.1/ }))
 }
 
@@ -70,6 +71,25 @@ describe('the proposal form fields', () => {
       priority: 'normal',
       ownerId: null,
     })
+  })
+})
+
+describe('suggested starting values', () => {
+  it('starts from the suggested department and milestone, which the person can change', async () => {
+    const user = userEvent.setup()
+    renderForm({ defaultDepartment: 'AERO', defaultMilestone: 'MS1' })
+    expect(screen.getByLabelText(/^Department/)).toHaveValue('AERO')
+    expect(screen.getByLabelText(/^Related milestone/)).toHaveValue('MS1')
+    await user.selectOptions(screen.getByLabelText(/^Department/), '')
+    expect(screen.getByLabelText(/^Department/)).toHaveValue('')
+    // The deadline is still never chosen for anyone.
+    expect(screen.getByLabelText(/^Deadline/)).toHaveValue('')
+  })
+
+  it('ignores a suggestion that is not among the choices offered', () => {
+    renderForm({ defaultDepartment: 'RETIRED', defaultMilestone: 'MS9' })
+    expect(screen.getByLabelText(/^Department/)).toHaveValue('')
+    expect(screen.getByLabelText(/^Related milestone/)).toHaveValue('')
   })
 })
 

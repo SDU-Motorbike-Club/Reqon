@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import ChoosePassword from './ChoosePassword.tsx'
 import Login from './Login.tsx'
 import { useAuth } from './context.ts'
 
@@ -78,6 +79,12 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
         </button>
       </Centered>
     )
+  }
+
+  // Their password was issued by the app (a new login, or a reset), so they
+  // choose their own before anything else. Members who set theirs never see it.
+  if (auth.member.must_change_password) {
+    return <ChoosePassword />
   }
 
   return <>{children}</>

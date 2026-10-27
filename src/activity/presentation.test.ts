@@ -17,6 +17,12 @@ describe('activity presentation', () => {
       .toMatch(/Deadline: 1 Oct 2026 → 8 Oct 2026/)
   })
 
+  it('says a password was reset without showing anything secret', () => {
+    expect(presentActivity(row('password_reset', {}), names)).toMatchObject({
+      icon: '⚿', summary: 'Temporary password issued; they choose a new one when they next sign in',
+    })
+  })
+
   it('resolves people, link provenance and missing former actors', () => {
     expect(presentActivity(row('owner_changed', { from: 'm1', to: 'm2' }), names).summary)
       .toBe('Owner: Ada Rider → Lin Driver')
