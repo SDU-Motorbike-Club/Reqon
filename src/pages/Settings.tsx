@@ -17,6 +17,7 @@ import { StorageUsage } from '../attachments/StorageUsage.tsx'
 import { backupsEnabled } from '../backups/flag.ts'
 import { BackupsGuide } from '../backups/BackupsGuide.tsx'
 import { BackupsPanel } from '../backups/BackupsPanel.tsx'
+import { BugReportsPanel } from '../bugs/BugReportsPanel.tsx'
 import { ClubAccountsPanel } from '../credentials/ClubAccounts.tsx'
 import { useRecordSettingsOpen, useSettingsUsage } from '../data/useSettingsUsage.ts'
 import { orderSections, type SectionGroup, type SectionMeta } from './settings/sectionOrder.ts'
@@ -103,7 +104,7 @@ const GROUP_LABEL: Record<SectionGroup, string> = { personal: 'Personal', admin:
 type Entry = SectionMeta & { title: string; tutorialId?: string; node: ReactNode }
 
 export default function Settings() {
-  const { canAdminister, canManageRoles, canManageDepartments, canManageSeasons, canViewClubCredentials, roles: myRoles } = usePermissions()
+  const { canAdminister, canManageRoles, canManageDepartments, canManageSeasons, canViewClubCredentials, canReadBugReports, roles: myRoles } = usePermissions()
   const restriction = canManageRoles && canManageSeasons
     ? null
     : canManageRoles
@@ -150,6 +151,7 @@ export default function Settings() {
         ]
       : []),
     ...(canViewClubCredentials ? [{ id: 'club-accounts', group: 'admin' as const, rank: 9, title: 'Club accounts', node: <ClubAccountsPanel /> }] : []),
+    ...(canReadBugReports ? [{ id: 'bugs', group: 'admin' as const, rank: 9.5, title: 'Bug reports', node: <BugReportsPanel /> }] : []),
     { id: 'handover', group: 'personal', rank: 10, title: 'Handover notes', tutorialId: 'settings-handover', node: <HandoverSettings /> },
     { id: 'seasons', group: 'personal', rank: 11, title: 'Seasons', tutorialId: 'settings-seasons', node: <SeasonSettings canManageSeasons={canManageSeasons} /> },
     { id: 'export', group: 'personal', rank: 12, title: 'Export', tutorialId: 'settings-export', node: <SeasonExport /> },

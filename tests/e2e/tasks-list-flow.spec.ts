@@ -21,12 +21,16 @@ test('the Tasks page sorts, searches and pages over every row', async ({ page })
   // Default: soonest deadline first = highest number first (deadline = today + 40 - i).
   const titles = () => page.locator('[data-testid^="task-row-"] a').allInnerTexts()
   expect((await titles())[0]).toContain('30 even')
+  // The column headers (and so the sort buttons) are for tables; a phone shows each task as a card without them.
+  const hasHeaders = (page.viewportSize()?.width ?? 1280) >= 640
   // Sort by task name ascending, then flip.
-  await page.getByTestId('sort-title').click()
-  await expect(page).toHaveURL(/sort=title&dir=asc/)
-  await expect.poll(async () => (await titles())[0]).toContain('01 odd')
-  await page.getByTestId('sort-title').click()
-  await expect.poll(async () => (await titles())[0]).toContain('30 even')
+  if (hasHeaders) {
+    await page.getByTestId('sort-title').click()
+    await expect(page).toHaveURL(/sort=title&dir=asc/)
+    await expect.poll(async () => (await titles())[0]).toContain('01 odd')
+    await page.getByTestId('sort-title').click()
+    await expect.poll(async () => (await titles())[0]).toContain('30 even')
+  }
   // Page 2 continues the order of page 1.
   await page.getByRole('button', { name: /Next/ }).click()
   await expect(page).toHaveURL(/page=2/)
@@ -35,9 +39,9 @@ test('the Tasks page sorts, searches and pages over every row', async ({ page })
   // Search words from the title narrow the whole list, the sort stays.
   await page.getByLabel('Search tasks').fill('[E2E tasklist] odd')
   await expect(page.getByTestId('tasks-summary')).toContainText('of 15 tasks')
-  await expect(page).toHaveURL(/sort=title&dir=desc/)
+  if (hasHeaders) await expect(page).toHaveURL(/sort=title&dir=desc/)
   // Sorting by department / owner / milestone names works server-side too.
-  for (const column of ['department', 'owner', 'milestone', 'state', 'priority', 'due']) {
+  for (const column of hasHeaders ? ['department', 'owner', 'milestone', 'state', 'priority', 'due'] : []) {
     await page.getByTestId(`sort-${column}`).click()
     await expect(page.getByTestId('tasks-summary')).toContainText('of 15 tasks')
   }

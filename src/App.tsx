@@ -5,6 +5,7 @@ import NotFound from './pages/NotFound.tsx'
 import { SeasonGate } from './season/SeasonGate.tsx'
 import { SeasonProvider } from './season/SeasonProvider.tsx'
 import { TutorialProvider } from './tutorial/TutorialProvider.tsx'
+import { BugReportProvider } from './bugs/BugReportProvider.tsx'
 import { AppHeader } from './ui/AppHeader.tsx'
 import { ErrorBoundary } from './ui/ErrorBoundary.tsx'
 import { pageMain } from './ui/layout.ts'
@@ -20,7 +21,6 @@ import { useRealtimeSubteams } from './data/useRealtimeSubteams.ts'
 // visited. NotFound stays eager: it is a few lines, and the 404 case should
 // never show a loading flicker.
 const Now = lazy(() => import('./pages/Now.tsx'))
-const Priorities = lazy(() => import('./pages/Priorities.tsx'))
 const Tasks = lazy(() => import('./pages/Tasks.tsx'))
 const Register = lazy(() => import('./pages/Register.tsx'))
 const Book = lazy(() => import('./pages/Book.tsx'))
@@ -97,6 +97,7 @@ export default function App() {
     <RequireAuth>
       <SeasonProvider>
         <TutorialProvider>
+         <BugReportProvider>
           <GlobalRealtime />
           {/* WCAG 2.4.1. The Register puts ~2,000 controls after the navigation;
               without this a keyboard user tabs through all of them to reach the
@@ -120,7 +121,7 @@ export default function App() {
                 <Route element={<SeasonScopedLayout />}>
                   <Route path="/" element={<Now />} />
                   {/* Not in the menu any more: the Tasks page took its place. Now's tiles still drill down here. */}
-                  <Route path="/priorities" element={<Priorities />} />
+                  <Route path="/priorities" element={<Navigate to="/tasks" replace />} />
                   <Route path="/tasks" element={<Tasks />} />
                   <Route path="/register" element={<Register />} />
                   <Route path="/book" element={<Book />} />
@@ -154,6 +155,7 @@ export default function App() {
               </Routes>
             </Suspense>
           </ErrorBoundary>
+        </BugReportProvider>
         </TutorialProvider>
       </SeasonProvider>
     </RequireAuth>

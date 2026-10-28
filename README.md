@@ -28,7 +28,7 @@ anywhere.
 |---|---|
 | People and roles | a roster of members; roles President, Vice President, Developer, Treasurer, Documentation; every permission is enforced by the database |
 | Departments | departments with a Head each; Head authority is scoped to their own department |
-| Work | proposals reviewed and promoted into board tasks; Board, Gantt, priorities, milestones, meetings with agendas and minutes |
+| Work | proposals reviewed and promoted into board tasks; Board, Gantt, milestones, meetings with agendas and minutes |
 | Seasons | each season keeps its own tasks and milestones; start a new one in one step; export a season |
 | Regulations module | the rulebook, per-clause status, task-to-clause links, a spec sheet with measurements and automatic pass/fail |
 | Activity | an audit trail of changes, realtime updates, automatic archival of old done tasks |
@@ -161,8 +161,11 @@ network access to a real project are involved. The first run pulls the
 `postgres:17` image.
 
 CI (`.github/workflows/ci.yml`) runs the same two halves as separate jobs,
-`frontend` and `database`, so a red job tells you which boundary broke.
-`docs/ARCHITECTURE.md` explains what each gate proves.
+`frontend` and `database`, plus a real-browser `e2e` job, so a red job tells you
+which boundary broke. One `gate` job is green only when all three are, and it is
+the only thing the website deploy (`deploy.yml`) and the branch rule on `main`
+wait for. `docs/CI-CD.md` explains how a change reaches production and how to
+switch the protection on; `docs/ARCHITECTURE.md` explains what each gate proves.
 
 ### 2b. Against a local Supabase stack (development)
 
@@ -897,8 +900,9 @@ whole list, click again to reverse; the sort, the search, the department,
 "whose" and state filters and the page are in the address
 (`?sort=&dir=&q=&dept=&scope=&state=&page=`). The database sorts and filters
 all rows, so page 2 continues page 1. Headings are buttons on a wide screen;
-on a phone the list is cards. `/priorities` is no longer in the menu (the Tasks
-page took its place) but Now's tiles still drill down into it.
+on a phone the list is cards. The old Priorities page is gone: `/priorities` now
+redirects here, and Now's Overdue and Blocked tiles open this list (sorted by
+deadline, or filtered to Blocked).
 
 **The Requirements Book** (`/book`) reads as one scrollable column: pages are
 drawn as they come near the screen and freed when far away, and the page in the

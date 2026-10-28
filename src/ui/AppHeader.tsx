@@ -5,6 +5,7 @@ import { useAuth } from '../auth/context.ts'
 import { ROLE_LABELS, sortRoles } from '../auth/permissions.ts'
 import { usePermissions } from '../auth/usePermissions.ts'
 import { useMyAvatar } from '../data/useAvatars.ts'
+import { useBugReport } from '../bugs/bugReportContext.ts'
 import { useCurrentSeason } from '../data/useCurrentSeason.ts'
 import { useUnreadCount } from '../data/useNotifications.ts'
 import { useTutorial } from '../tutorial/context.ts'
@@ -35,6 +36,7 @@ export function AppHeader() {
   const tutorial = useTutorial()
   const season = useCurrentSeason()
   const unread = useUnreadCount().data ?? 0
+  const reportBug = useBugReport()
   const location = useLocation()
   // Remember which page the phone menu was opened on. Any navigation changes
   // the path, which closes it — no effect needed to keep the two in sync.
@@ -105,11 +107,22 @@ export function AppHeader() {
 
         {/* Visible on every width, outside the phone menu: the count is the
             point, so it must not hide behind a button. */}
+        {reportBug && (
+          <button
+            type="button"
+            onClick={() => reportBug()}
+            className="ml-auto inline-flex min-h-11 items-center rounded px-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0 sm:py-1.5"
+            data-testid="report-bug"
+            data-tutorial="report-bug"
+          >
+            Report a bug
+          </button>
+        )}
         <NavLink
           to="/inbox"
           aria-label={unread > 0 ? `Inbox, ${unread} new` : 'Inbox'}
           className={({ isActive }) =>
-            `ml-auto inline-flex min-h-11 items-center gap-1.5 rounded px-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0 sm:py-1.5 ${
+            `${reportBug ? '' : 'ml-auto '}inline-flex min-h-11 items-center gap-1.5 rounded px-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0 sm:py-1.5 ${
               isActive ? 'bg-slate-100 text-slate-950' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
             }`
           }

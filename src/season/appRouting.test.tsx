@@ -4,7 +4,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Proves the WIRING in App.tsx itself: every season-scoped route (Board, Now,
-// Priorities, Register, Milestones, Gantt, Meetings, Specs,
+// Register, Milestones, Gantt, Meetings, Specs,
 // Finances) is actually behind SeasonGate, and /settings is deliberately not
 // — it is how a club with no current season gets one. SeasonGate's own
 // rendering logic (loading/failed/no-current-season/ready) is proven once,
@@ -59,7 +59,6 @@ vi.mock('../data/useNotifications.ts', () => ({ useRealtimeNotifications: () => 
 // vi.mock() calls are hoisted and must be static top-level calls (no loop).
 vi.mock('../pages/Now.tsx', () => ({ default: () => 'NOW PAGE' }))
 vi.mock('../pages/Tasks.tsx', () => ({ default: () => 'TASKS PAGE' }))
-vi.mock('../pages/Priorities.tsx', () => ({ default: () => 'PRIORITIES PAGE' }))
 vi.mock('../pages/Register.tsx', () => ({ default: () => 'REGISTER PAGE' }))
 vi.mock('../pages/Milestones.tsx', () => ({ default: () => 'MILESTONES PAGE' }))
 vi.mock('../pages/Gantt.tsx', () => ({ default: () => 'GANTT PAGE' }))
@@ -76,7 +75,6 @@ const { default: App } = await import('../App.tsx')
 
 const SEASON_SCOPED_ROUTES: [string, string][] = [
   ['/', 'NOW PAGE'],
-  ['/priorities', 'PRIORITIES PAGE'],
   ['/tasks', 'TASKS PAGE'],
   ['/register', 'REGISTER PAGE'],
   ['/milestones', 'MILESTONES PAGE'],
@@ -144,6 +142,20 @@ describe('/proposals redirects to the Board overlay', () => {
     expect(where.searchParams.get('pscope')).toBe('mine')
     expect(where.searchParams.get('view')).toBe('history')
     expect(where.searchParams.has('scope')).toBe(false)
+  })
+})
+
+describe('the removed Priorities page', () => {
+  it('sends an old /priorities link to the Tasks list instead of a dead page', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/priorities?reason=overdue']}>
+          <App />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    await waitFor(() => expect(screen.getByText('TASKS PAGE')).toBeInTheDocument())
   })
 })
 

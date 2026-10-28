@@ -78,6 +78,7 @@ export const queryKeys = {
     ['season', seasonId ?? 'unknown', 'activity', entity, entityId ?? 'unknown'] as const,
   // The Team page: not season data, so no season prefix.
   tools: ['tools'] as const,
+  bugReports: ['bug-reports'] as const,
   // One member's finished tasks over every season, so not under a season prefix.
   contributions: (memberId: string | undefined) => ['contributions', memberId ?? 'none'] as const,
   meetings: (seasonId: string | undefined) => ['season', seasonId ?? 'unknown', 'meetings'] as const,

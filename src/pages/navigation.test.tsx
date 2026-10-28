@@ -136,8 +136,8 @@ describe('Now dashboard', () => {
   it('opens each metric on the list that explains it, already filtered', () => {
     renderApp()
     const href = (id: string) => screen.getByTestId(id).closest('a')?.getAttribute('href')
-    expect(href('tile-overdue')).toBe('/priorities?reason=overdue')
-    expect(href('tile-blocked')).toBe('/priorities?reason=blocked')
+    expect(href('tile-overdue')).toBe('/tasks?sort=due&dir=asc')
+    expect(href('tile-blocked')).toBe('/tasks?state=blocked')
     expect(href('tile-mine')).toBe('/board?scope=mine')
     // Open proposals opens Proposals — never Meetings, a different thing (F14-06).
     expect(href('tile-proposals')).toBe('/proposals')

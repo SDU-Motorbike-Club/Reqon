@@ -258,6 +258,63 @@ export type Database = {
           },
         ]
       }
+      bug_reports: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          message: string
+          page: string | null
+          reported_by: string
+          resolved_at: string | null
+          resolved_by: string | null
+          source: string
+          status: string
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          message?: string
+          page?: string | null
+          reported_by?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source: string
+          status?: string
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          message?: string
+          page?: string | null
+          reported_by?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source?: string
+          status?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bug_reports_reported_by_fkey"
+            columns: ["reported_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bug_reports_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clause_status: {
         Row: {
           clause_key: string

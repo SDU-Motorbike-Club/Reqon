@@ -17,11 +17,13 @@ export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false, // fixtures are shared, real database rows — no isolated parallel workers
   workers: 1,
-  retries: 0,
+  // One retry on CI only: a second failure is a real failure, a pass on the retry shows as "flaky" in the log.
+  retries: process.env.CI ? 1 : 0,
+  forbidOnly: !!process.env.CI,
   timeout: 30_000,
   globalSetup: './tests/e2e/setup/global-setup.ts',
   globalTeardown: './tests/e2e/setup/global-teardown.ts',
-  reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
+  reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }], ...(process.env.CI ? [['github'] as ['github']] : [])],
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
     trace: 'retain-on-failure',

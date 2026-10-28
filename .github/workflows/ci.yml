@@ -1,21 +1,34 @@
-# Three independent boundaries, three jobs. A red "frontend" means the
-# React/TS toolchain or the client tests failed; a red "database" means the
-# schema, a migration, RLS, or an RPC failed; a red "e2e" means a real
-# browser, driving the real app against a real (local) database, hit a
-# behavior the unit/DB layers alone cannot see. No job waits on another.
+# Three independent boundaries, three jobs, and ONE gate.
+#
+#   frontend  the React/TS toolchain or the client tests failed
+#   database  the schema, a migration, RLS, or an RPC failed
+#   e2e       a real browser, driving the real app against a real (local) database, hit a behavior the unit/DB
+#             layers alone cannot see
+#   gate      green only when all three are green. This is the ONE check that branch protection requires and the
+#             ONE thing deploy.yml waits for, so a new job added above is covered by adding it to `needs` below.
+#
+# No job waits on another, so one run shows every problem at once.
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+  merge_group:
+  workflow_dispatch:
+  # Nightly on main: catches drift nobody pushed (an expired token, a changed base image, a new advisory) and
+  # tells a flaky runner from a real regression, because nothing in the repo changed between two red runs.
+  schedule:
+    - cron: '17 3 * * *'
 
 permissions:
   contents: read
 
+# A newer push to a PULL REQUEST replaces its older run. A run on main is never cancelled: a cancelled run is
+# neither green nor red, and "no verdict" on a commit that is already deployed is the worst answer.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   frontend:
@@ -59,6 +72,15 @@ jobs:
       - name: Production build + bundle budget
         run: npm run build
 
+      - name: Upload coverage on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
+          if-no-files-found: ignore
+
   database:
     name: database (migrations, RLS, RPCs, integrity)
     runs-on: ubuntu-latest
@@ -77,7 +99,7 @@ jobs:
   e2e:
     name: e2e (real browser, local Supabase, Phase 13 smoke suite)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -103,8 +125,20 @@ jobs:
       # Applies every migration in supabase/migrations, in order, to a local
       # stack (Docker, preinstalled on ubuntu-latest) — the same one
       # tests/e2e/setup/*.ts talk to directly for fixtures and cleanup.
+      #
+      # Only what the suite uses is started (database, auth, REST, realtime, storage, the gateway and the
+      # Edge Functions runtime). Studio, the image proxy, the log stack, mail catcher and pooler are about half
+      # of the image pulls, and the pulls are what the registry's "Data limit exceeded" rate limit counts.
+      # A pull that is refused is retried after a pause instead of failing a run that has nothing wrong with it.
       - name: Start the local Supabase stack
-        run: npx supabase start
+        run: |
+          for attempt in 1 2 3; do
+            if npx supabase start -x studio,imgproxy,logflare,vector,mailpit,supavisor,postgres-meta; then exit 0; fi
+            echo "supabase start failed (attempt $attempt of 3)"
+            npx supabase stop --no-backup || true
+            sleep $((attempt * 45))
+          done
+          exit 1
 
       # The Requirements Book: imports static/book/MS2627_MotoStudent.pdf into
       # the local private bucket and records the verified clause pages
@@ -135,6 +169,8 @@ jobs:
       # bottom onboarding banner intercepting clicks on short screens), not
       # exploratory-only. Fixtures are created and torn down by
       # tests/e2e/setup/global-{setup,teardown}.ts around the whole run.
+      # playwright.config.ts retries a failed test once on CI: a test that fails twice is a real failure, one
+      # that passes the second time is reported as "flaky" in the log so it is seen and fixed, not hidden.
       - name: Real-browser E2E smoke suite
         run: npm run test:e2e
         env:
@@ -148,10 +184,41 @@ jobs:
           sudo apt-get install -y -qq age rclone
           npm run backup:test:local
 
+      - name: Show the Edge Function log and containers on failure
+        if: failure()
+        run: |
+          cat functions-serve.log 2>/dev/null || true
+          docker ps -a --format '{{.Names}} {{.Status}}' || true
+
       - name: Upload the Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: playwright-report/
+          path: |
+            playwright-report/
+            test-results/
           retention-days: 7
+          if-no-files-found: ignore
+
+  # The single required check. `if: always()` makes it run even when a job above failed or was skipped, and
+  # the script makes it red unless every one of them succeeded: a skipped or cancelled job must NOT read as
+  # green, which is the default for a job that merely `needs` another.
+  gate:
+    name: gate (all checks green)
+    needs: [frontend, database, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Every job succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "job results: $RESULTS"
+          for r in $RESULTS; do
+            if [ "$r" != "success" ]; then
+              echo "::error::A required job finished as '$r', not 'success'."
+              exit 1
+            fi
+          done

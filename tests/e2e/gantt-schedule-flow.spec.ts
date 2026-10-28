@@ -37,7 +37,7 @@ test.afterEach(() => {
 const datesOf = (id: string) => runSql(`select starts_on, due_date, section_id from tasks where id = '${id}'`).trim().split('|')
 
 test.describe('Gantt schedule and move (UI-06)', () => {
-  test('dragging the bar moves both dates once, on release; the date fields do the same by keyboard', async ({ page }) => {
+  test('dragging the deadline dot moves the deadline once, on release; the date fields do the same by keyboard', async ({ page }) => {
     const m = readManifest()
     const [start0, due0] = datesOf(taskId)
     await login(page, m.users.headA.email, m.password)
@@ -55,7 +55,8 @@ test.describe('Gantt schedule and move (UI-06)', () => {
     let start1 = start0
     let due1 = due0
     if ((page.viewportSize()?.width ?? 1280) >= 768) {
-      const body = row.locator('[data-schedule-part="move"]')
+      // A task is one dot on its deadline: dragging the dot moves the deadline and leaves the start alone.
+      const body = row.locator('[data-schedule-part="end"]')
       await body.scrollIntoViewIfNeeded()
       const box = (await body.boundingBox())!
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
@@ -64,11 +65,10 @@ test.describe('Gantt schedule and move (UI-06)', () => {
       // Nothing is written while dragging.
       expect(datesOf(taskId).slice(0, 2)).toEqual([start0, due0])
       await page.mouse.up()
-      await expect.poll(() => datesOf(taskId)[0], { timeout: 10_000 }).not.toBe(start0)
+      await expect.poll(() => datesOf(taskId)[1], { timeout: 10_000 }).not.toBe(due0)
       ;[start1, due1] = datesOf(taskId)
-      // Both moved by the same number of days: the length of the work is kept.
-      expect(days(start0, start1)).toBeGreaterThan(0)
-      expect(days(start0, start1)).toBe(days(due0, due1))
+      expect(start1).toBe(start0)
+      expect(days(due0, due1)).toBeGreaterThan(0)
     }
 
     // ---- The keyboard alternative: the task's own fields ----
@@ -92,6 +92,8 @@ test.describe('Gantt schedule and move (UI-06)', () => {
   })
 
   test('dragging the row onto a section of the same submission moves it there, as "Move to" does', async ({ page }) => {
+    // A phone shows the list, which moves a row with "Move to"; dragging a row onto a section is for wide screens.
+    test.skip((page.viewportSize()?.width ?? 1280) < 768, 'phones use the list and its Move to control')
     const m = readManifest()
     const [sectionId, sectionName] = runSql(`select id, name from milestone_sections where milestone_key = '${m.milestoneKey}' order by ordinal limit 1`).trim().split('|')
     await login(page, m.users.headA.email, m.password)

@@ -133,8 +133,9 @@ test.describe('task attachments', () => {
     await expect(files.getByRole('button', { name: 'Open PDF: quote.pdf' })).toBeVisible({ timeout: 30_000 })
     expect(rowOf('quote.pdf').split('|')[0]).toBe('ready')
 
-    // Head B leads another department: may see the file, may neither add files here nor delete it.
-    await login(page, m.users.headB.email, m.password)
+    // The Treasurer is not the owner, has no authority here and is not a task leader (any Head is one since
+    // is_task_leader(), 20260142000000): may see the file, may neither add files here nor delete it.
+    await login(page, m.users.treasurer.email, m.password)
     files = await openFiles(page)
     await expect(files.getByRole('button', { name: /Add photos/ })).toHaveCount(0)
     await files.getByRole('button', { name: 'Open PDF: quote.pdf' }).click()

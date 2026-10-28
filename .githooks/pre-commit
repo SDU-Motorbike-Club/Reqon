@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Fast checks before a commit exists: the types and the lint rules (including the import-boundary check).
+# These are the two that fail CI for the dullest reasons, and they take seconds here and minutes there.
+# Skip once with  SKIP_HOOKS=1 git commit ...  — CI still runs everything.
+[ -n "$SKIP_HOOKS" ] && exit 0
+[ -d node_modules ] || { echo "pre-commit: run 'npm ci' first (no node_modules), skipping."; exit 0; }
+echo "pre-commit: typecheck + lint"
+npm run --silent typecheck && npm run --silent lint

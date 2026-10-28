@@ -387,9 +387,9 @@ export default function Now() {
       <PageHeader title="Now" description="What needs attention today — overdue and blocked work, the next deadlines, your own tasks, and how the requirements stand, chapter by chapter." />
 
       <section aria-label="Instruments" data-tutorial="now-instruments" className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
-        <Tile testId="tile-overdue" to="/priorities?reason=overdue" label="Overdue" source={taskSource}
+        <Tile testId="tile-overdue" to="/tasks?sort=due&dir=asc" label="Overdue" source={taskSource}
           value={valueOf(taskSource, () => String(overdue.length))} sub="Tasks past their deadline" tone={overdue.length > 0 ? 'bad' : 'plain'} />
-        <Tile testId="tile-blocked" to="/priorities?reason=blocked" label="Blocked" source={attention}
+        <Tile testId="tile-blocked" to="/tasks?state=blocked" label="Blocked" source={attention}
           value={valueOf(attention, () => String(blocked.length))} sub="Rules and tasks marked blocked" tone={blocked.length > 0 ? 'bad' : 'plain'} />
         <Tile testId="tile-mine" to="/board?scope=mine" label="My open tasks" source={tasks}
           value={valueOf(tasks, () => String(mine.length))} sub={myId ? 'Assigned to you, not done' : 'Not on the roster'} />
@@ -405,14 +405,14 @@ export default function Now() {
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <div className="space-y-3" data-tutorial="now-actions">
           <ActionList title="Overdue" testId="now-overdue" source={taskSource} count={overdue.length} empty="Nothing is past its deadline."
-            more={{ to: '/priorities?reason=overdue', label: 'All overdue' }}>
+            more={{ to: '/tasks?sort=due&dir=asc', label: 'All overdue' }}>
             {overdue.slice(0, 5).map((a) => (
               <Row key={a.ref} to={`/board?task=${encodeURIComponent(a.ref ?? '')}`} title={a.title ?? 'Untitled task'} meta={taskWhoWhere(a.ref)} flag={overdueFlag(a.ref)} tone="bad" />
             ))}
           </ActionList>
 
           <ActionList title="Blocked" testId="now-blocked" source={attention} count={blocked.length} empty="Nothing is marked blocked."
-            more={{ to: '/priorities?reason=blocked', label: 'All blocked' }}>
+            more={{ to: '/tasks?state=blocked', label: 'All blocked' }}>
             {blocked.slice(0, 5).map((a) =>
               a.kind === 'clause' ? (
                 <Row key={`c-${a.clause_key}`} to={`/register?search=${encodeURIComponent(a.clause_key ?? a.ref ?? '')}`} title={`Rule ${a.ref}`} meta={`${who(a.owner_id)} · requirement`} tone="warn" />

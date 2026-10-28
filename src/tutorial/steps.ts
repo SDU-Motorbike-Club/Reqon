@@ -18,7 +18,6 @@ export const CHAPTERS = [
   { id: 'now', label: 'Now' },
   { id: 'board', label: 'Board' },
   { id: 'tasks', label: 'Tasks' },
-  { id: 'priorities', label: 'Priorities' },
   { id: 'proposals', label: 'Task proposals' },
   { id: 'meetings', label: 'Meetings' },
   { id: 'team', label: 'Tools' },
@@ -144,6 +143,15 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     body: 'Your name and, if you hold one, your role: President, Vice President, Treasurer or Documentation. Everyone else is a member. The tour adds the parts your role uses.',
   },
 
+  {
+    id: 'report-bug',
+    chapter: 'start',
+    route: '/',
+    target: 'report-bug',
+    title: 'Something broke?',
+    body: 'Choose “Report a bug”, next to Inbox, and say what went wrong. An error message has “Report this problem”, which attaches the error. The page you are on goes with it, and the maintainers see it.',
+  },
+
   // ----------------------------------------------------------------------- Now
   {
     id: 'now',
@@ -178,24 +186,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     target: 'tasks-overview',
     title: 'Tasks — every task, sortable',
     body: 'All active tasks in one list. Click a column heading to sort the whole list by it; click again to reverse. Search and the filters keep the sort. Open a task to edit it on the Board.',
-  },
-
-  // ---------------------------------------------------------------- Priorities
-  {
-    id: 'priorities',
-    chapter: 'priorities',
-    route: '/priorities',
-    target: 'priorities-list',
-    title: 'Priorities — what bites first',
-    body: 'Blocked rules, score-killers, overdue tasks, penalty risks and anything starred, most urgent first. The database builds this list, so everyone sees the same one.',
-  },
-  {
-    id: 'priority-row',
-    chapter: 'priorities',
-    route: '/priorities',
-    target: 'priority-row',
-    title: 'One item',
-    body: 'The coloured label says why it is here. Click the rule’s reference to open it in the Register, or “Open on Board” for a task, and give it an owner with the dropdown.',
   },
 
   // ------------------------------------------------------------------ Register

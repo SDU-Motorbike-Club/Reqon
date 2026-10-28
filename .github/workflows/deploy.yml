@@ -1,0 +1,122 @@
+# Production deploy of the website, ONLY after CI is green for that exact commit.
+#
+# WHY THIS EXISTS. Vercel's Git integration deploys every push to main the moment it arrives, without
+# waiting for CI: commit dac3370 went live at 12:05 and its CI went red at 12:14. This workflow replaces
+# that: it runs when the CI workflow finishes on main, does nothing unless the result is "success", and
+# then builds and publishes that same commit.
+#
+# SWITCHING IT ON (one time, see docs/CI-CD.md):
+#   1. Add the repository secrets VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID.
+#   2. Add  "git": { "deploymentEnabled": { "main": false } }  to vercel.json so Vercel stops deploying main
+#      by itself. Pull requests still get Vercel preview URLs.
+# Until step 1 is done this workflow only prints a notice, so it can be merged first without breaking anything.
+#
+# The database is NOT deployed here. A migration is applied by hand with `npx supabase db push` BEFORE the
+# website that needs it (the order every migration header states), so a person decides when the schema changes.
+name: Deploy website
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit to deploy. CI must already be green for it (checked below).
+        required: true
+
+permissions:
+  contents: read
+  checks: read
+
+# One production deploy at a time, and a deploy is never cancelled half-way.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy (production, after CI is green)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Only a push to main that CI passed. A nightly CI run (event "schedule") re-checks main but deploys nothing.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    environment:
+      name: production
+      url: ${{ steps.publish.outputs.url }}
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha || inputs.sha }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check the secrets are set
+        id: configured
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "::notice::VERCEL_TOKEN, VERCEL_ORG_ID or VERCEL_PROJECT_ID is not set, so nothing was deployed. See docs/CI-CD.md."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # A manual run names any commit, so check its CI instead of trusting the person who typed it.
+      - name: CI is green for this exact commit
+        if: steps.configured.outputs.ready == 'true'
+        run: |
+          state=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs?per_page=100" \
+            --jq '[.check_runs[] | select(.name == "gate (all checks green)")] | sort_by(.started_at) | last | .conclusion')
+          echo "gate for $SHA: ${state:-none}"
+          if [ "$state" != "success" ]; then
+            echo "::error::CI is not green for $SHA, so it is not deployed."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.configured.outputs.ready == 'true'
+        with:
+          ref: ${{ env.SHA }}
+
+      - uses: actions/setup-node@v4
+        if: steps.configured.outputs.ready == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        if: steps.configured.outputs.ready == 'true'
+        run: npm ci
+
+      - name: Pull the production settings
+        if: steps.configured.outputs.ready == 'true'
+        run: npx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build exactly what CI built
+        if: steps.configured.outputs.ready == 'true'
+        run: npx vercel@latest build --prod --token="$VERCEL_TOKEN"
+
+      - name: Publish
+        id: publish
+        if: steps.configured.outputs.ready == 'true'
+        run: |
+          url=$(npx vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Published $SHA at $url"
+
+      # A page that does not answer, or whose JavaScript bundle is missing, fails here instead of being found
+      # by a member. Retries cover the few seconds a new deployment takes to start answering.
+      - name: Smoke check the live site
+        if: steps.configured.outputs.ready == 'true'
+        run: |
+          url="${{ steps.publish.outputs.url }}"
+          for _ in 1 2 3 4 5 6; do
+            code=$(curl -s -o /tmp/index.html -w '%{http_code}' "$url/" || true)
+            if [ "$code" = "200" ] && grep -q '/assets/' /tmp/index.html; then echo "live: $url"; exit 0; fi
+            sleep 10
+          done
+          echo "::error::$url did not serve the app (last status $code)."
+          exit 1

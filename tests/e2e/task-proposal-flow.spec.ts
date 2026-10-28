@@ -106,18 +106,19 @@ test.describe('full task/proposal flow (R9-R16, R37-R38, R42-R43)', () => {
     }
     await page.keyboard.press('Escape')
 
-    // ---- 7. Head B (a DIFFERENT department, does not own this task) is refused --------
-    await login(page, m.users.headB.email, m.password)
+    // ---- 7. The Treasurer (not the owner, no authority here, not a task leader) is refused --------
+    // Any Head may edit any task since is_task_leader() (20260142000000), so a Head is no longer the outsider.
+    await login(page, m.users.treasurer.email, m.password)
     await page.goto('/board')
     await page.getByRole('button', { name: /^All tasks/ }).click()
-    const cardForHeadB = page.getByTestId(`task-${taskId}`)
-    await expect(cardForHeadB).toBeVisible()
+    const cardForOutsider = page.getByTestId(`task-${taskId}`)
+    await expect(cardForOutsider).toBeVisible()
     // No move/edit control: the "Details and edit" disclosure never renders for
     // someone who cannot edit this task — only the read-only "Details" one does.
-    await expect(cardForHeadB.getByText('Details and edit', { exact: true })).toHaveCount(0)
-    await expect(cardForHeadB.getByText('Details', { exact: true })).toBeVisible()
+    await expect(cardForOutsider.getByText('Details and edit', { exact: true })).toHaveCount(0)
+    await expect(cardForOutsider.getByText('Details', { exact: true })).toBeVisible()
 
-    // Direct authenticated API attempt (not the UI): sign in as Head B with a fresh
+    // Direct authenticated API attempt (not the UI): sign in as the Treasurer with a fresh
     // supabase-js client and try to update the task directly. RLS must refuse it —
     // zero rows matched, not merely a client-side restriction.
     const { createClient } = await import('@supabase/supabase-js')
@@ -125,7 +126,7 @@ test.describe('full task/proposal flow (R9-R16, R37-R38, R42-R43)', () => {
       process.env.PLAYWRIGHT_SUPABASE_URL ?? 'http://127.0.0.1:54321',
       process.env.PLAYWRIGHT_SUPABASE_ANON_KEY ?? 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH',
     )
-    const { error: signInError } = await anonClient.auth.signInWithPassword({ email: m.users.headB.email, password: m.password })
+    const { error: signInError } = await anonClient.auth.signInWithPassword({ email: m.users.treasurer.email, password: m.password })
     expect(signInError).toBeNull()
     const { data: forgedUpdate, error: updateError } = await anonClient.from('tasks').update({ priority: 'normal' }).eq('id', taskId).select()
     expect(updateError).toBeNull() // RLS refusal is a zero-row match, not a thrown error

@@ -107,6 +107,8 @@ export type Permissions = {
   // can_view_finances(): see financial records — an explicit allowlist
   // (President, Vice President, Treasurer, Developer), not "any role"
   canViewFinances: boolean
+  // bug_reports (20260150000000): read, resolve and delete the bug reports members send. Developers only.
+  canReadBugReports: boolean
   // can_manage_finances(): create, edit and delete financial records
   canManageFinances: boolean
   // can_manage_departments(): create/rename/describe/appoint Head/reorder/
@@ -151,6 +153,7 @@ export function permissionsFor(roles: readonly PrivilegedRole[]): Permissions {
     canViewClubCredentials: hasRole('president') || hasRole('developer'),
     canManageMilestoneStructure: editsMeetings,
     canViewFinances: hasRole('president') || hasRole('vicepresident') || hasRole('treasurer') || hasRole('developer'),
+    canReadBugReports: hasRole('developer'),
     canManageFinances: hasRole('treasurer') || hasRole('developer'),
     // can_manage_departments() (20260115000000_department_lifecycle.sql).
     canManageDepartments: hasRole('president') || hasRole('vicepresident') || hasRole('developer'),

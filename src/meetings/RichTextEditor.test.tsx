@@ -149,4 +149,20 @@ describe('text coming in from outside', () => {
     await act(async () => {})
     expect(onChange).not.toHaveBeenCalled()
   })
+
+  // ProseMirror cancels Escape's default, so without this the dialog around the editor could not be closed from
+  // the keyboard while the cursor was in the text (found by the real-browser Meetings test).
+  it('passes Escape to the dialog around it', async () => {
+    const user = userEvent.setup()
+    const onCancel = vi.fn()
+    const { container } = render(
+      <dialog open onCancel={onCancel}>
+        <Parent initial="text" onChange={() => {}} />
+      </dialog>,
+    )
+    const box = await within(container).findByRole('textbox')
+    await user.click(box)
+    await user.keyboard('{Escape}')
+    expect(onCancel).toHaveBeenCalledTimes(1)
+  })
 })

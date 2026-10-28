@@ -44,6 +44,13 @@ export default function RichTextEditor({
     editable: !disabled,
     editorProps: {
       attributes: { role: 'textbox', 'aria-multiline': 'true', 'aria-labelledby': labelId, class: 'pc-doc' },
+      // ProseMirror cancels Escape's default on purpose, so the browser would never close the dialog this sits
+      // in. Hand Escape to that dialog's own cancel handling, as every other field in it does.
+      handleKeyDown: (view, event) => {
+        if (event.key !== 'Escape') return false
+        view.dom.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))
+        return true
+      },
     },
     onUpdate: ({ editor: e }) => {
       const next = cleanEditorMarkdown(e.getMarkdown())

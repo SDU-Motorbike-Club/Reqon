@@ -1,3 +1,4 @@
+import { useBugReport } from '../bugs/bugReportContext.ts'
 import type { ReactNode } from 'react'
 import { isPermissionError } from '../core/errors.ts'
 
@@ -43,9 +44,30 @@ export function ErrorState({
       >
         Try again
       </button>
+      <ReportProblem error={error} className="mt-3 ml-2" />
     </div>
   )
 }
+
+// "Report this problem" on an error message: opens the bug-report dialog with the error's text attached. Not shown
+// where there is nothing to report to (outside the signed-in app) or when the error is only a refusal because of who
+// the person is, which is not a bug.
+function ReportProblem({ error, className = '' }: { error: Error; className?: string }) {
+  const report = useBugReport()
+  if (!report || isPermissionError(error)) return null
+  return (
+    <button
+      type="button"
+      onClick={() => report(errorText(error))}
+      className={`min-h-11 rounded px-1 text-sm text-red-900 underline underline-offset-2 hover:text-red-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-900 sm:min-h-0 ${className}`}
+      data-testid="report-problem"
+    >
+      Report this problem
+    </button>
+  )
+}
+
+const errorText = (error: Error) => `${error.name}: ${error.message}`
 
 // Empty is not the same as broken. Say what would put something here.
 export function EmptyState({ title, children }: { title: string; children: ReactNode }) {
@@ -72,6 +94,7 @@ export function ActionError({ error, className = '' }: { error: Error | null | u
     >
       {refused && <span className="font-semibold">Not permitted: </span>}
       {error.message}
+      <ReportProblem error={error} className="ml-2" />
     </p>
   )
 }

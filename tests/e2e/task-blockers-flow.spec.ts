@@ -61,7 +61,9 @@ test.describe('blockers and prerequisites (Phase 3)', () => {
     await page.goto(`/board?task=${t1}`)
     const panel = page.getByTestId(`task-details-${t1}`)
     await expect(panel).toBeVisible()
-    await panel.getByLabel(/Add a prerequisite/).selectOption({ label: `${T2} — ${m.departments.headB.name}` })
+    // The picker is a search box: type part of the title, then choose the match.
+    await panel.getByRole('combobox', { name: /Add a prerequisite/ }).fill(T2)
+    await panel.getByRole('option', { name: `${T2} — ${m.departments.headB.name}` }).click()
     await panel.getByRole('button', { name: 'Add prerequisite' }).click()
     await expect(panel.getByTestId(`task-prereq-${t1}-${t2}`)).toBeVisible()
     expect(runSql(`select count(*) from task_dependencies where task_id = '${t1}' and depends_on_task_id = '${t2}'`).trim()).toBe('1')
@@ -79,8 +81,8 @@ test.describe('blockers and prerequisites (Phase 3)', () => {
     await page.goto(`/board?task=${t2}`)
     const panelB = page.getByTestId(`task-details-${t2}`)
     await expect(panelB).toBeVisible()
-    const offered = await panelB.getByLabel(/Add a prerequisite/).locator('option').allTextContents()
-    expect(offered.some((o) => o.startsWith(T1))).toBe(false)
+    await panelB.getByRole('combobox', { name: /Add a prerequisite/ }).fill(T1)
+    await expect(panelB.getByRole('option', { name: T1 })).toHaveCount(0)
     expect(runSql(`select count(*) from task_dependencies where task_id = '${t2}'`).trim()).toBe('0')
   })
 

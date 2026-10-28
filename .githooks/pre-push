@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Before anything leaves this machine: the unit tests for what this branch changed (and everything that
+# imports it), compared with origin/main. The whole suite, coverage, the database tests and the real-browser
+# suite run in CI; this is the fast filter so a push is rarely red for something a minute here would show.
+# Skip once with  SKIP_HOOKS=1 git push ...
+[ -n "$SKIP_HOOKS" ] && exit 0
+[ -d node_modules ] || { echo "pre-push: run 'npm ci' first (no node_modules), skipping."; exit 0; }
+base=origin/main
+git rev-parse --verify --quiet "$base" >/dev/null || { echo "pre-push: no $base to compare with, skipping."; exit 0; }
+echo "pre-push: tests for changed files (vs $base)"
+VITE_ATTACHMENTS_ENABLED=false npx vitest run --changed "$base" --passWithNoTests
