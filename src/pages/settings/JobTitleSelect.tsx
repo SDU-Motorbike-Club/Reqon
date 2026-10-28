@@ -9,7 +9,7 @@ import { DEFAULT_JOB_TITLE } from './rosterModel.ts'
 const NEW_TITLE = '__new__'
 
 const control =
-  'min-h-11 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 disabled:opacity-60 sm:min-h-0'
+  'min-h-11 rounded border border-slate-300 bg-surface px-2 py-1 text-xs text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring disabled:opacity-60 sm:min-h-0'
 
 export function JobTitleSelect({
   id,
@@ -75,7 +75,7 @@ export function JobTitleSelect({
           type="button"
           disabled={disabled}
           onClick={save}
-          className="min-h-11 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 hover:border-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+          className="min-h-11 rounded border border-slate-300 bg-surface px-2 py-1 text-xs text-slate-800 hover:border-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
         >
           Use it
         </button>
@@ -86,7 +86,7 @@ export function JobTitleSelect({
             setTyping(false)
             setDraft('')
           }}
-          className="min-h-11 rounded px-2 py-1 text-xs text-slate-600 underline underline-offset-2 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+          className="min-h-11 rounded px-2 py-1 text-xs text-slate-600 underline underline-offset-2 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
         >
           Cancel
         </button>

@@ -1,17 +1,21 @@
-import { useId, useState, type FormEvent } from 'react'
+import { useId, useMemo, useState, type FormEvent } from 'react'
 import { flushSync } from 'react-dom'
 import {
   useCreateMeeting,
+  useMeetingAttendance,
+  useSetMeetingAttendees,
   useUpdateMeeting,
   type Meeting,
   type MeetingDraft,
 } from '../data/useMeetings.ts'
+import { useMembers } from '../data/useMembers.ts'
 import { useSubteams } from '../data/useSubteams.ts'
 import { isActive } from '../departments/types.ts'
 import { Dialog } from '../ui/Dialog.tsx'
 import { buttonPrimary, buttonSecondary } from '../ui/buttons.ts'
 import { ActionError } from '../ui/states.tsx'
-import { MarkdownField } from './MarkdownField.tsx'
+import { AttendanceChecklist } from './AttendanceChecklist.tsx'
+import { RichTextField } from './RichTextField.tsx'
 import { isPastDay } from './meetingText.ts'
 
 // Calling a meeting, or editing one that has happened.
@@ -44,17 +48,19 @@ export function MeetingDialog({
   const titleId = useId()
   const create = useCreateMeeting()
   const update = useUpdateMeeting()
-  const pending = create.isPending || update.isPending
-  const error = create.error ?? update.error
+  const setAttendees = useSetMeetingAttendees()
+  const pending = create.isPending || update.isPending || setAttendees.isPending
+  const error = create.error ?? update.error ?? setAttendees.error
 
   const close = () => {
     create.reset()
     update.reset()
+    setAttendees.reset()
     onClose()
   }
 
   return (
-    <Dialog open={open} onClose={close} labelledBy={titleId} dismissible={!pending}>
+    <Dialog open={open} onClose={close} labelledBy={titleId} dismissible={!pending} size="wide">
       <Form
         // Remounted per meeting, so reopening never shows the previous one's
         // half-typed values.
@@ -65,13 +71,23 @@ export function MeetingDialog({
         pending={pending}
         error={error}
         onCancel={close}
-        onSubmit={async (draft) => {
+        // `present` is null when nobody touched the ticks: the saved list is then left exactly as it is.
+        onSubmit={async (draft, present) => {
           try {
             if (meeting) {
+              if (present) await setAttendees.mutateAsync({ meetingId: meeting.id, memberIds: present })
               await update.mutateAsync({ id: meeting.id, expectedUpdatedAt: meeting.updated_at, ...draft })
               onSaved('Meeting updated.')
             } else {
-              await create.mutateAsync(draft)
+              const created = await create.mutateAsync(draft)
+              if (present && present.length > 0) {
+                try {
+                  await setAttendees.mutateAsync({ meetingId: created.id, memberIds: present })
+                } catch {
+                  onSaved('Meeting added, but who came could not be saved. Open the meeting to tick them again.')
+                  return
+                }
+              }
               onSaved('Meeting added.')
             }
           } catch {
@@ -98,7 +114,7 @@ function Form({
   pending: boolean
   error: Error | null
   onCancel: () => void
-  onSubmit: (draft: MeetingDraft) => void
+  onSubmit: (draft: MeetingDraft, present: string[] | null) => void
 }) {
   const [title, setTitle] = useState(meeting?.title ?? '')
   const [heldOn, setHeldOn] = useState(meeting?.held_on ?? '')
@@ -116,7 +132,18 @@ function Form({
   const pastDate = heldOn !== (meeting?.held_on ?? '') && isPastDay(heldOn)
   const [agenda, setAgenda] = useState(meeting ? (meeting.agenda ?? '') : template)
   const [notes, setNotes] = useState(meeting?.notes ?? '')
-  const [attendees, setAttendees] = useState(meeting?.attendees ?? '')
+  // Who came is a tick list. What was ticked before is only replaced when the person ticks something here, so
+  // saving before the list has loaded can never wipe it. The old free-text line is kept as it was.
+  const members = useMembers().data ?? []
+  const attendance = useMeetingAttendance()
+  const saved = useMemo(() => new Set(meeting ? (attendance.data?.get(meeting.id) ?? []) : []), [attendance.data, meeting])
+  const [ticked, setTicked] = useState<Set<string> | null>(null)
+  const present = ticked ?? saved
+  const people = members
+    .filter((m) => m.status !== 'alumni' || saved.has(m.id))
+    .map((m) => ({ id: m.id, name: m.status === 'alumni' ? `${m.full_name} (retired)` : m.full_name }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+  const attendanceLoading = meeting !== null && attendance.isPending
   const [errors, setErrors] = useState<Errors>({})
   const fieldId = (name: string) => `${titleId}-${name}`
 
@@ -142,21 +169,24 @@ function Form({
     }
 
     setErrors({})
-    onSubmit({
-      title: title.trim(),
-      heldOn,
-      startsAt: startsAt || null,
-      endsAt: endsAt || null,
-      location: location.trim() || null,
-      subteamKey: subteamKey || null,
-      agenda: agenda.trim() || null,
-      notes: notes.trim() || null,
-      attendees: attendees.trim() || null,
-    })
+    onSubmit(
+      {
+        title: title.trim(),
+        heldOn,
+        startsAt: startsAt || null,
+        endsAt: endsAt || null,
+        location: location.trim() || null,
+        subteamKey: subteamKey || null,
+        agenda: agenda.trim() || null,
+        notes: notes.trim() || null,
+        attendees: meeting?.attendees ?? null,
+      },
+      ticked ? [...ticked] : null,
+    )
   }
 
   const field =
-    'mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0'
+    'mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0'
   const label = 'block text-xs font-medium text-slate-600'
 
   return (
@@ -285,41 +315,42 @@ function Form({
             ))}
           </select>
           <p id={fieldId('subteam-note')} className="mt-1 text-xs text-slate-600">
-            A department is told in its inbox, together with its Head. Leave it on the whole club to tell nobody.
+            A department is told in its inbox, together with its Head. On the whole club, every member is told.
           </p>
         </div>
 
-        <MarkdownField
+        <RichTextField
           id={fieldId('agenda')}
           label="Agenda"
           value={agenda}
           onChange={setAgenda}
-          rows={8}
+          size="large"
+          disabled={pending}
           note={meeting ? undefined : 'Started from the club’s default agenda; changes here are for this meeting only.'}
         />
 
-        <MarkdownField
+        <RichTextField
           id={fieldId('notes')}
           label="Minutes (optional)"
           value={notes}
           onChange={setNotes}
-          rows={5}
+          size="medium"
+          disabled={pending}
           placeholder="What was decided, and who took what away."
         />
 
-        <div>
-          <label className={label} htmlFor={fieldId('attendees')}>
-            Who came (optional)
-          </label>
-          <input
-            id={fieldId('attendees')}
-            name="attendees"
-            value={attendees}
-            onChange={(e) => setAttendees(e.target.value)}
-            placeholder="Names, as free text"
-            className={field}
-          />
-        </div>
+        {attendanceLoading ? (
+          <p role="status" className="text-xs text-slate-600">
+            Loading who came…
+          </p>
+        ) : (
+          <AttendanceChecklist people={people} present={present} onChange={setTicked} />
+        )}
+        {meeting?.attendees && (
+          <p className="text-xs text-slate-600" data-testid="legacy-attendees">
+            Written before the tick list: {meeting.attendees}
+          </p>
+        )}
       </fieldset>
 
       <ActionError error={error} className="mt-3" />

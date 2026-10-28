@@ -40,7 +40,7 @@ export function UploadList({
           const pct = Math.round(it.progress * 100)
           const showBar = it.stage === 'preparing' || it.stage === 'uploading'
           return (
-            <li key={it.id} className="rounded border border-slate-200 bg-white p-2 text-sm" data-testid={`upload-${it.stage}`}>
+            <li key={it.id} className="rounded border border-slate-200 bg-surface p-2 text-sm" data-testid={`upload-${it.stage}`}>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="min-w-0 flex-1 truncate text-slate-800" title={it.fileName}>
                   {it.fileName}

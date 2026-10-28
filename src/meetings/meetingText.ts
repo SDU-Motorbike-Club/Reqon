@@ -1,5 +1,6 @@
 import { formatDay, todayIso } from '../lib/dates.ts'
 import type { Meeting } from '../data/useMeetings.ts'
+import { stripMarkdownEscapes } from './editorMarkdown.ts'
 
 // Ready-made announcements for a meeting, to paste into WhatsApp or an email.
 // The club announces meetings in chat first; typing the date, place and agenda
@@ -29,7 +30,9 @@ export function isPastDay(heldOn: string, today: string = todayIso()): boolean {
 // headings; an email has neither. Lists are plain "- " lines and read the same.
 function agendaFor(markdown: string | null, chat: boolean): string {
   if (!markdown) return ''
-  return markdown
+  // The editor keeps a backslash before a literal * or # so it is not read as emphasis or a heading; a chat or an
+  // email has no Markdown to read, so the backslash would just show.
+  return stripMarkdownEscapes(markdown
     .replace(/\r\n/g, '\n')
     .split('\n')
     .map((line) => {
@@ -40,7 +43,7 @@ function agendaFor(markdown: string | null, chat: boolean): string {
     })
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
-    .trim()
+    .trim())
 }
 
 function details(meeting: ShareableMeeting, department: string | null): string[] {

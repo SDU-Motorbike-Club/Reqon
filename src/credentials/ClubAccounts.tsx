@@ -15,7 +15,7 @@ import { copyToClipboard } from './clipboard.ts'
 
 // 16px on a phone, so iOS does not zoom the page when a field is tapped.
 const input =
-  'mt-1 block min-h-11 w-full rounded border border-slate-300 bg-white px-2.5 text-base text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-9 sm:text-sm'
+  'mt-1 block min-h-11 w-full rounded border border-slate-300 bg-surface px-2.5 text-base text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-9 sm:text-sm'
 
 // The same twelve dots for every account, whatever the password is: the length of a password is a hint too.
 const MASK = '••••••••••••'
@@ -230,7 +230,7 @@ function AccountRow({ account, copiedBy }: { account: ClubCredential; copiedBy: 
   }
 
   return (
-    <li className="rounded border border-slate-200 bg-white p-3" data-testid={`account-${account.service.toLowerCase()}`}>
+    <li className="rounded border border-slate-200 bg-surface p-3" data-testid={`account-${account.service.toLowerCase()}`}>
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-medium text-slate-900">{account.service}</h3>
         {!hasPassword && (

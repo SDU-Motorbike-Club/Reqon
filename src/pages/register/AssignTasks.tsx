@@ -84,7 +84,7 @@ export function AssignTasks({
   }
 
   return (
-    <div className="mt-2 rounded border border-slate-300 bg-white p-2" data-testid={`assign-tasks-${clauseKey}`}>
+    <div className="mt-2 rounded border border-slate-300 bg-surface p-2" data-testid={`assign-tasks-${clauseKey}`}>
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div className="min-w-0 flex-1">
           <label htmlFor={`${id}-q`} className="block text-xs font-medium text-slate-700">
@@ -96,7 +96,7 @@ export function AssignTasks({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Title, owner or department"
-            className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+            className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
           />
         </div>
         <button type="button" onClick={onClose} className="min-h-11 rounded px-2 text-xs underline underline-offset-2 sm:min-h-0">
@@ -134,7 +134,7 @@ export function AssignTasks({
                   disabled={pending !== null}
                   onClick={() => void toggle(task)}
                   className={`min-h-11 rounded border px-2 py-0.5 text-xs font-medium sm:min-h-0 ${
-                    isLinked ? 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100' : 'border-slate-900 bg-slate-900 text-white hover:bg-slate-800'
+                    isLinked ? 'border-slate-300 bg-surface text-slate-800 hover:bg-slate-100' : 'border-slate-900 bg-accent text-white hover:bg-accent-hover'
                   }`}
                 >
                   {pending === task.id ? 'Saving…' : isLinked ? 'Unlink' : 'Link'}

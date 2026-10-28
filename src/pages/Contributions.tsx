@@ -12,7 +12,7 @@ import { PageHeader } from '../ui/PageHeader.tsx'
 import { EmptyState, ErrorState, LoadingState } from '../ui/states.tsx'
 
 const FIELD =
-  'mt-1 min-h-11 w-full max-w-sm rounded border border-slate-300 bg-white px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0'
+  'mt-1 min-h-11 w-full max-w-sm rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0'
 
 // What a member has finished, across every season: the tasks they own that are
 // done. Read-only and built from the tasks themselves, so it never disagrees
@@ -98,7 +98,7 @@ export default function Contributions() {
                   <p className="mt-0.5 text-xs text-slate-600">
                     {group.byDepartment.map((d) => `${deptName(d.key)} ${d.count}`).join(' · ')}
                   </p>
-                  <ul className="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+                  <ul className="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-surface">
                     {group.tasks.map((task) => (
                       <li key={task.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-3 py-2 text-sm">
                         <span className="min-w-0 text-slate-900">

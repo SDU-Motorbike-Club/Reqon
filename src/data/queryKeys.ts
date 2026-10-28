@@ -36,6 +36,9 @@ export const queryKeys = {
   notifications: (memberId: string | null) => ['notifications', memberId ?? 'none'] as const,
   // The club's default meeting agenda. One row, not season-scoped.
   meetingTemplate: ['meeting_template'] as const,
+  meetingAttendance: ['meeting_attendees'] as const,
+  meetingSchedule: ['meeting_schedule'] as const,
+  meetingOccurrences: ['meeting_occurrences'] as const,
   // The contacts directory, categories and contacts together. Not season-scoped.
   contacts: ['contacts'] as const,
 

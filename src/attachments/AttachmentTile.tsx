@@ -22,14 +22,14 @@ export function AttachmentTile({
       type="button"
       onClick={onOpen}
       aria-label={`Open ${kindLabel}: ${file.original_name}`}
-      className="group relative block aspect-square w-full overflow-hidden rounded border border-slate-200 bg-slate-100 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:outline-none"
+      className="group relative block aspect-square w-full overflow-hidden rounded border border-slate-200 bg-slate-100 focus-visible:ring-2 focus-visible:ring-accent-ring focus-visible:outline-none"
       data-testid={`attachment-tile-${file.id}`}
     >
       {thumbUrl ? (
         <img src={thumbUrl} alt="" loading="lazy" decoding="async" onError={onThumbError} className="h-full w-full object-cover" />
       ) : file.kind === 'document' ? (
         <span className="flex h-full w-full flex-col items-center justify-center gap-1 p-2 text-center">
-          <span aria-hidden="true" className="rounded bg-red-700 px-1.5 py-0.5 text-[11px] font-bold text-white">
+          <span aria-hidden="true" className="rounded bg-danger px-1.5 py-0.5 text-[11px] font-bold text-white">
             PDF
           </span>
           <span className="line-clamp-3 text-[11px] break-all text-slate-700">{file.original_name}</span>
@@ -40,7 +40,7 @@ export function AttachmentTile({
         </span>
       )}
       {file.kind === 'document' && thumbUrl && (
-        <span aria-hidden="true" className="absolute top-1 left-1 rounded bg-red-700 px-1.5 py-0.5 text-[11px] font-bold text-white">
+        <span aria-hidden="true" className="absolute top-1 left-1 rounded bg-danger px-1.5 py-0.5 text-[11px] font-bold text-white">
           PDF
         </span>
       )}

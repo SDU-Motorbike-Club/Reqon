@@ -382,7 +382,6 @@ vi.mock('../data/useRealtimeClauseStatus.ts', () => ({ useRealtimeClauseStatus: 
 
 const { default: Now } = await import('./Now.tsx')
 const { default: Board } = await import('./Board.tsx')
-const { default: Proposals } = await import('./Proposals.tsx')
 const { TutorialProvider } = await import('../tutorial/TutorialProvider.tsx')
 const { AppHeader } = await import('../ui/AppHeader.tsx')
 const { SeasonProvider } = await import('../season/SeasonProvider.tsx')
@@ -399,9 +398,6 @@ function renderApp(initial = '/') {
           <Routes>
             <Route path="/" element={<Now />} />
             <Route path="/board" element={<Board />} />
-            {/* Proposals are raised and decided here; the Now screen only links
-                to this screen (it no longer embeds the form — UI-02). */}
-            <Route path="/proposals" element={<Proposals />} />
           </Routes>
           </TutorialProvider>
         </MemoryRouter>
@@ -419,30 +415,44 @@ async function openProposalForm(user: ReturnType<typeof userEvent.setup>) {
   if (toggle.getAttribute('aria-expanded') === 'false') await user.click(toggle)
 }
 
-// The form asks for everything submit_proposal() requires.
+// The Board has a Department filter too, so the form's field is the one inside the proposal form.
+const formDepartment = () => within(screen.getByLabelText(/^Title/).closest('form') as HTMLElement).getByLabelText(/^Department/)
+
+// Fills every field, including the optional ones (only the title and the deadline are required).
 async function fillProposalForm(user: ReturnType<typeof userEvent.setup>, title: string, description?: string) {
   await user.type(await screen.findByLabelText(/^Title/), title)
   if (description) await user.type(screen.getByLabelText('Description (optional)'), description)
-  await user.selectOptions(screen.getByLabelText(/^Department \*/), 'AERO')
+  await user.selectOptions(formDepartment(), 'AERO')
   fireEvent.change(screen.getByLabelText(/^Deadline/), { target: { value: '2026-12-01' } })
   await user.selectOptions(screen.getByLabelText(/^Related milestone/), 'MS1-1')
   await user.type(screen.getByLabelText('Find a requirement'), 'B.1')
   await user.click(screen.getByRole('checkbox', { name: /B\.1\.1\.1/ }))
 }
 
+// The proposals overlay is itself a dialog, and the review dialog opens on top of it: the topmost is the last.
+async function topDialog() {
+  await screen.findAllByRole('dialog')
+  const dialogs = screen.getAllByRole('dialog')
+  return dialogs[dialogs.length - 1]
+}
+
 // Opens the review dialog of one proposal card.
 async function openReview(user: ReturnType<typeof userEvent.setup>, id: string) {
   await user.click(await screen.findByTestId(`review-open-${id}`))
-  return within(await screen.findByRole('dialog'))
+  return within(await waitFor(async () => {
+    const dialogs = screen.getAllByRole('dialog')
+    if (dialogs.length < 2) throw new Error('the review dialog is not open yet')
+    return dialogs[dialogs.length - 1]
+  }))
 }
 
 describe('ACCEPTANCE: Proposals -> raise -> review -> approve -> task -> Board', () => {
   // Longer timeout: this test alone drives a full multi-screen workflow.
   it('completes the whole workflow: Proposals -> review -> approve -> task on the Board', async () => {
     const user = userEvent.setup()
-    renderApp('/proposals')
+    renderApp('/board?proposals=1')
 
-    // --- 1. Raise a proposal, from the Proposals screen ----------------------
+    // --- 1. Raise a proposal, from the proposals overlay on the Board ----------------------
     await openProposalForm(user)
     await fillProposalForm(user, 'Fairing width tolerance', 'B.2.1.2 is blocked')
     await user.click(screen.getByRole('button', { name: 'Raise proposal' }))
@@ -507,7 +517,7 @@ describe('a proposal is never a dead end', () => {
       proposalRow({ id: 'c', title: 'Parked one', state: 'parked' }),
       proposalRow({ id: 'd', title: 'Rejected one', state: 'decided', outcome: 'rejected', archived_at: '2026-09-01', decision: 'no budget' }),
     ]
-    renderApp('/proposals')
+    renderApp('/board?proposals=1')
     await screen.findByTestId('proposal-a')
     expect(screen.getByTestId('proposal-c')).toBeInTheDocument()
     expect(screen.getByTestId('proposal-parked-c')).toHaveTextContent('Parked')
@@ -523,7 +533,7 @@ describe('a proposal is never a dead end', () => {
   it('rejects with a confirmation, finds it in History, and reopens it', async () => {
     const user = userEvent.setup()
     db.task_proposals = [proposalRow({ id: 'a', title: 'Open one', state: 'open' })]
-    renderApp('/proposals')
+    renderApp('/board?proposals=1')
     let dialog = await openReview(user, 'a')
     await user.click(dialog.getByTestId('review-reject'))
     // Nothing happens until the second, explicit click.
@@ -541,7 +551,7 @@ describe('a proposal is never a dead end', () => {
   it('parks from the dialog and keeps the parked proposal reachable and recoverable', async () => {
     const user = userEvent.setup()
     db.task_proposals = [proposalRow({ id: 'a', title: 'Open one', state: 'agenda' })]
-    renderApp('/proposals')
+    renderApp('/board?proposals=1')
     let dialog = await openReview(user, 'a')
     await user.click(dialog.getByTestId('review-park'))
     await waitFor(() => expect(db.task_proposals[0].state).toBe('parked'))
@@ -554,11 +564,11 @@ describe('a proposal is never a dead end', () => {
   it('explains what blocks an older proposal, lets its Head complete it, then approves it', async () => {
     const user = userEvent.setup()
     db.task_proposals = [proposalRow({ id: 'l', title: 'Old one', legacy_incomplete: true, due_date: null, milestone_key: null })]
-    renderApp('/proposals')
-    expect(await screen.findByTestId('proposal-legacy-l')).toHaveTextContent(/needs a deadline, a milestone and at least one requirement/)
+    renderApp('/board?proposals=1')
+    expect(await screen.findByTestId('proposal-legacy-l')).toHaveTextContent(/needs a deadline before it can become a task/)
 
     const dialog = await openReview(user, 'l')
-    expect(dialog.getByTestId('review-legacy')).toHaveTextContent(/still needs a deadline, a milestone and at least one requirement/)
+    expect(dialog.getByTestId('review-legacy')).toHaveTextContent(/still needs a deadline/)
     expect(dialog.getByTestId('review-approve')).toBeDisabled()
 
     fireEvent.change(dialog.getByLabelText('Deadline'), { target: { value: '2026-11-15' } })
@@ -586,7 +596,7 @@ describe('a proposal is never a dead end', () => {
   // a department they do not head. (Who decides, for someone without that authority, is ProposalsPanel.test.)
   it('the President reviews a proposal in a department they do not head', async () => {
     db.task_proposals = [proposalRow({ id: 'o', title: 'Bodywork idea', subteam_key: 'BODY' })]
-    renderApp('/proposals')
+    renderApp('/board?proposals=1')
     await screen.findByTestId('proposal-o')
     expect(screen.getByTestId('review-open-o')).toHaveTextContent('Review')
     expect(screen.queryByTestId('proposal-hint-o')).not.toBeInTheDocument()
@@ -596,7 +606,7 @@ describe('a proposal is never a dead end', () => {
     const user = userEvent.setup()
     db.task_proposals = [proposalRow({ id: 'a', title: 'Refused one', state: 'open' })]
     db.proposal_requirements = [{ proposal_id: 'a', clause_key: 'B.1.1.1' }]
-    renderApp('/proposals')
+    renderApp('/board?proposals=1')
     let dialog = await openReview(user, 'a')
     await user.type(dialog.getByLabelText('Review note'), 'my note')
     await user.click(dialog.getByTestId('review-approve'))
@@ -608,31 +618,29 @@ describe('a proposal is never a dead end', () => {
     expect(await screen.findByText(/Only the Head of this proposal's department, or a Developer, may promote it/)).toBeInTheDocument()
     expect(db.tasks).toHaveLength(0)
     // A rejected write does not close the dialog or roll back the valid approval.
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(await topDialog()).toBeInTheDocument()
     expect(dialog.getByTestId('review-approved')).toHaveTextContent('Revision 1 was approved')
     expect(db.task_proposals[0]).toMatchObject({ state: 'approved', approved_revision: 1 })
   })
 })
 
 describe('the proposal form', () => {
-  it('refuses an incomplete proposal beside each field and in a summary, and creates nothing', async () => {
+  it('refuses a proposal with no deadline beside the field and in a summary, and creates nothing', async () => {
     const user = userEvent.setup()
-    renderApp('/proposals')
+    renderApp('/board?proposals=1')
     await openProposalForm(user)
     await user.type(await screen.findByLabelText(/^Title/), 'Just a title')
-    // Department and milestone start from a suggestion; this person clears both.
-    await user.selectOptions(screen.getByLabelText(/^Department \*/), '')
-    await user.selectOptions(screen.getByLabelText(/^Related milestone/), '')
     await user.click(screen.getByRole('button', { name: 'Raise proposal' }))
 
+    // Only the deadline is missing: the department, milestone and requirement are optional.
     const summary = await screen.findByTestId('proposal-summary')
-    expect(summary).toHaveTextContent(/4 things need fixing/)
+    expect(summary).toHaveTextContent(/One thing needs fixing/)
     expect(summary).toHaveFocus()
-    for (const field of ['department', 'dueDate', 'milestone', 'requirement']) {
-      expect(screen.getByTestId(`error-${field}`)).toBeInTheDocument()
-    }
-    // Each message is tied to its input for assistive technology.
-    expect(screen.getByLabelText(/^Department \*/)).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByTestId('error-dueDate')).toBeInTheDocument()
+    expect(screen.queryByTestId('error-department')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('error-milestone')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('error-requirement')).not.toBeInTheDocument()
+    // The message is tied to its input for assistive technology.
     expect(screen.getByLabelText(/^Deadline/)).toHaveAttribute('aria-describedby', expect.stringContaining('error'))
     expect(db.task_proposals).toHaveLength(0)
     expect(db.proposal_requirements).toHaveLength(0)
@@ -642,7 +650,7 @@ describe('the proposal form', () => {
 
   it('keeps everything typed when the server call fails, and recovers on retry', async () => {
     const user = userEvent.setup()
-    renderApp('/proposals')
+    renderApp('/board?proposals=1')
     await openProposalForm(user)
     await fillProposalForm(user, 'Flaky network', 'still here')
     failNextSubmit = true
@@ -652,7 +660,7 @@ describe('the proposal form', () => {
     expect(db.task_proposals).toHaveLength(0)
     expect(screen.getByLabelText(/^Title/)).toHaveValue('Flaky network')
     expect(screen.getByLabelText('Description (optional)')).toHaveValue('still here')
-    expect(screen.getByLabelText(/^Department \*/)).toHaveValue('AERO')
+    expect(formDepartment()).toHaveValue('AERO')
     expect(screen.getByLabelText(/^Deadline/)).toHaveValue('2026-12-01')
     expect(within(screen.getByTestId('chosen-requirements')).getByText('B.1.1.1')).toBeInTheDocument()
 
@@ -665,7 +673,7 @@ describe('the proposal form', () => {
 
   it('does not raise two proposals from a double submit', async () => {
     const user = userEvent.setup()
-    renderApp('/proposals')
+    renderApp('/board?proposals=1')
     await openProposalForm(user)
     await fillProposalForm(user, 'Only once')
     await user.tripleClick(screen.getByRole('button', { name: 'Raise proposal' }))
@@ -676,7 +684,7 @@ describe('the proposal form', () => {
 
   it('stores an optional owner and an urgent priority when they are chosen', async () => {
     const user = userEvent.setup()
-    renderApp('/proposals')
+    renderApp('/board?proposals=1')
     await openProposalForm(user)
     await fillProposalForm(user, 'With owner')
     await user.selectOptions(screen.getByLabelText(/^Proposed owner/), 'm2')
@@ -696,7 +704,7 @@ describe('duplicate protection', () => {
       approved_digest: 'fixture-revision-1',
     })]
     db.proposal_requirements = [{ proposal_id: 't1', clause_key: 'B.1.1.1' }]
-    renderApp('/proposals')
+    renderApp('/board?proposals=1')
     const dialog = await openReview(user, 't1')
     await user.click(dialog.getByTestId('review-promote'))
     await waitFor(() => expect(db.tasks).toHaveLength(1))

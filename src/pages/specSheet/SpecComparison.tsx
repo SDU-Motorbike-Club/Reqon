@@ -49,7 +49,7 @@ export function SpecThresholds({ spec }: { spec: PresentableSpec }) {
       </p>
       <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-md border border-slate-200 bg-slate-200 sm:grid-cols-2" data-testid={`thresholds-${spec.id}`}>
         {thresholdItems(spec).map((item) => (
-          <div key={item.key} className="min-w-0 bg-white px-2.5 py-2">
+          <div key={item.key} className="min-w-0 bg-surface px-2.5 py-2">
             <dt className="text-[0.68rem] font-medium tracking-wide text-slate-500 uppercase">{item.label}</dt>
             <dd
               className={`mt-0.5 break-words font-mono text-sm ${item.missing ? 'text-slate-500' : 'font-semibold text-slate-900'}`}

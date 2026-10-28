@@ -1,5 +1,4 @@
 import { useId, useRef, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
 import { TASK_PRIORITIES, TASK_PRIORITY_LABEL } from '../tasks/priority.ts'
 import type { TaskPriority } from '../tasks/types.ts'
 import { RequirementPicker } from './RequirementPicker.tsx'
@@ -15,12 +14,12 @@ import {
 export type Option = { value: string; label: string }
 
 const FIELD =
-  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 aria-[invalid=true]:border-red-600 sm:min-h-0'
+  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring aria-[invalid=true]:border-red-600 sm:min-h-0'
 const LABEL = 'block text-xs font-medium text-slate-700'
 
 // The proposal form (ADR-0005): Title*, Description, Department*, Proposed owner,
-// Deadline*, Priority, Related requirements*, Related milestone*. Everything
-// marked is mandatory and the database refuses an incomplete proposal on every
+// Deadline*, Priority, Related requirements, Related milestone. Only what is
+// marked * is mandatory and the database refuses an incomplete proposal on every
 // path; this form only says WHAT is missing, next to the field and in a summary,
 // before a round trip. It never picks a deadline for anyone, keeps what was
 // typed when a submit fails, and cannot be submitted twice while one is pending.
@@ -33,7 +32,6 @@ export function ProposalForm({
   requirements,
   onRaise,
   pending,
-  canConfigure,
   loading = false,
   loadError = null,
   defaultDepartment = '',
@@ -79,7 +77,6 @@ export function ProposalForm({
   const [serverError, setServerError] = useState<string | null>(null)
   const [justRaised, setJustRaised] = useState(false)
 
-  const missing: string[] = []
   if (loadError) {
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 p-3" role="alert" data-testid="proposal-load-error">
@@ -90,47 +87,17 @@ export function ProposalForm({
   }
   if (loading) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-3" role="status" data-testid="proposal-loading">
+      <div className="rounded-lg border border-slate-200 bg-surface p-3" role="status" data-testid="proposal-loading">
         <h3 className="text-sm font-semibold text-slate-900">Raise a proposal</h3>
         <p className="mt-1 text-sm text-slate-600">Loading departments, milestones and requirements…</p>
       </div>
     )
   }
-  if (departments.length === 0) missing.push('active department')
-  if (milestones.length === 0) missing.push('milestone for this season')
-  if (requirements.length === 0) missing.push('requirements book')
-
-  if (missing.length > 0) {
-    return (
-      <div className="rounded-lg border border-slate-200 bg-white p-3" data-testid="proposal-empty">
-        <h3 className="text-sm font-semibold text-slate-900">Raise a proposal</h3>
-        <p className="mt-1 text-sm text-pretty text-slate-700">
-          A proposal needs a department, a milestone and at least one requirement, and there is no{' '}
-          {missing.join(' and no ')} yet, so none can be raised.
-        </p>
-        {canConfigure ? (
-          <p className="mt-2 text-sm">
-            <Link to="/settings" className="font-medium text-slate-900 underline underline-offset-2">
-              Open Settings to set them up
-            </Link>
-          </p>
-        ) : (
-          <p className="mt-2 text-sm text-slate-600">
-            The President or Vice President can set these up in Settings.
-          </p>
-        )}
-      </div>
-    )
-  }
-
   const draft: Partial<NewProposal> = { title, departmentKey, dueDate, milestoneKey, requirementKeys }
   const problems = submissionProblems(draft)
   const fieldId: Record<SubmissionProblem, string> = {
     title: fid('title'),
-    department: fid('department'),
     dueDate: fid('due'),
-    milestone: fid('milestone'),
-    requirement: fid('requirement-search'),
   }
   const shown = (p: SubmissionProblem) => attempted && problems.includes(p)
   const errorId = (p: SubmissionProblem) => `${fid(p)}-error`
@@ -192,7 +159,7 @@ export function ProposalForm({
       noValidate
       onSubmit={submit}
       aria-labelledby={fid('heading')}
-      className="rounded-lg border border-slate-200 bg-white p-3"
+      className="rounded-lg border border-slate-200 bg-surface p-3"
      
     >
       <h3 id={fid('heading')} className="text-sm font-semibold text-slate-900">
@@ -271,25 +238,21 @@ export function ProposalForm({
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label htmlFor={fid('department')} className={LABEL}>
-              Department <span aria-hidden="true">*</span>
+              Department
             </label>
             <select
               id={fid('department')}
               value={departmentKey}
-              aria-required="true"
-              aria-invalid={shown('department') || undefined}
-              aria-describedby={describe('department')}
               onChange={(e) => setDepartmentKey(e.target.value)}
               className={FIELD}
             >
-              <option value="">Choose a department</option>
+              <option value="">No department yet</option>
               {departments.map((d) => (
                 <option key={d.value} value={d.value}>
                   {d.label}
                 </option>
               ))}
             </select>
-            {fieldError('department')}
           </div>
 
           <div>
@@ -343,42 +306,35 @@ export function ProposalForm({
 
           <div className="sm:col-span-2">
             <label htmlFor={fid('milestone')} className={LABEL}>
-              Related milestone <span aria-hidden="true">*</span>
+              Related milestone
             </label>
             <select
               id={fid('milestone')}
               value={milestoneKey}
-              aria-required="true"
-              aria-invalid={shown('milestone') || undefined}
-              aria-describedby={describe('milestone')}
               onChange={(e) => setMilestoneKey(e.target.value)}
               className={FIELD}
             >
-              <option value="">Choose a milestone</option>
+              <option value="">No milestone yet</option>
               {milestones.map((m) => (
                 <option key={m.value} value={m.value}>
                   {m.label}
                 </option>
               ))}
             </select>
-            {fieldError('milestone')}
           </div>
         </div>
 
         <div role="group" aria-labelledby={fid('requirements-label')}>
           <p id={fid('requirements-label')} className={LABEL}>
-            Related requirements <span aria-hidden="true">*</span>
+            Related requirements
           </p>
           <RequirementPicker
             id={fid('requirement')}
             options={requirements}
             selected={requirementKeys}
             onChange={setRequirementKeys}
-            invalid={shown('requirement')}
-            describedBy={describe('requirement')}
             disabled={pending}
           />
-          {fieldError('requirement')}
         </div>
       </fieldset>
 
@@ -386,7 +342,7 @@ export function ProposalForm({
         <button
           type="submit"
           aria-disabled={pending}
-          className="min-h-11 rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 aria-disabled:opacity-60 sm:min-h-0"
+          className="min-h-11 rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring aria-disabled:opacity-60 sm:min-h-0"
         >
           {pending ? 'Raising…' : 'Raise proposal'}
         </button>

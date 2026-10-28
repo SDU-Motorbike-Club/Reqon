@@ -334,7 +334,17 @@ exist:
   server-side fallback (service-role credential, 30s timeout) for a target
   without `pg_cron`.
 
-Neither has been run against any real environment. Whether the hosted
+A second `pg_cron` job makes the weekly meeting:
+`supabase/scheduler/install_meeting_schedule_job.sql` /
+`uninstall_meeting_schedule_job.sql` (daily, runs `create_scheduled_meetings()`,
+idempotent). `supabase db push` alone does not schedule it: after a push, a
+rebuild or a restore of the project, run the install file again
+(`npx supabase db query --linked -f supabase/scheduler/install_meeting_schedule_job.sql`)
+or no meeting is ever created. The notification-purge and attachment-sweep jobs
+(`install_notification_purge_job.sql`, `install_attachment_sweep_job.sql`) follow
+the same rule.
+
+Neither archive path has been run against any real environment. Whether the hosted
 project offers `pg_cron` is unverified (X4, `docs/redesign/STATUS.md`); this
 environment's own disposable verification container is plain PostgreSQL and
 deliberately has no `pg_cron` either, so the install script itself is

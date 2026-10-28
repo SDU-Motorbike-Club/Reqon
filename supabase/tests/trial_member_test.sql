@@ -2,7 +2,7 @@
 --  Trial member checks (20260143000000 / 20260143000100, docs/trial-members.md).
 --
 --  A trial member reads, edits and moves the tasks they own, suggests proposals and
---  uses the tool list. Everything else needs a full member, and a trial member never
+--  reads the tool list (they can list a tool of their own, but not change any). Everything else needs a full member, and a trial member never
 --  holds a role or heads a department.
 --
 --  SAFE TO RUN AGAINST THE REAL PROJECT. Everything happens inside one block that
@@ -210,8 +210,8 @@ begin
   update tools set location = 'home', held_by = nb where id = tool;
   perform pg_temp.as_owner();
   select * into lines, failures from pg_temp.note(lines, failures,
-    'and says where it is and that they have it',
-    exists (select 1 from tools where id = tool and location = 'home' and held_by = nb));
+    'but cannot change any tool afterwards, not even that one (a trial member reads the list)',
+    exists (select 1 from tools where id = tool and location = 'workshop' and held_by is null));
 
   insert into tools (item, owner_id) values ('Handed jack', m1) returning id into tool;
   perform pg_temp.as_user(m1);
@@ -225,7 +225,7 @@ begin
   update tools set held_by = nb where id = tool;
   perform pg_temp.as_owner();
   select * into lines, failures from pg_temp.note(lines, failures,
-    'a trial member takes a tool nobody has', exists (select 1 from tools where id = tool and held_by = nb));
+    'a trial member cannot take a tool nobody has', exists (select 1 from tools where id = tool and held_by is null));
 
   -- ------------------------------------------- what stays closed (is_active_member)
   perform pg_temp.as_user(nb);

@@ -8,11 +8,11 @@ const meeting = (over: Partial<ShareableMeeting> = {}): ShareableMeeting => ({
 
 describe('meetingWhen', () => {
   it('says the weekday, the day and the time range', () => {
-    expect(meetingWhen(meeting())).toBe('Thu, 10 Sept 2026, 18:00–19:30')
+    expect(meetingWhen(meeting())).toBe('Thu, 10/09/26, 18:00–19:30')
   })
   it('leaves the time out when none is fixed, and the end when only a start is', () => {
-    expect(meetingWhen(meeting({ starts_at: null, ends_at: null }))).toBe('Thu, 10 Sept 2026')
-    expect(meetingWhen(meeting({ ends_at: null }))).toBe('Thu, 10 Sept 2026, 18:00')
+    expect(meetingWhen(meeting({ starts_at: null, ends_at: null }))).toBe('Thu, 10/09/26')
+    expect(meetingWhen(meeting({ ends_at: null }))).toBe('Thu, 10/09/26, 18:00')
   })
   it('never invents a day from a bad date', () => {
     expect(meetingWhen(meeting({ held_on: 'soon' }))).toBe('soon')
@@ -36,7 +36,7 @@ describe('whatsappText', () => {
     expect(whatsappText(meeting(), 'Chassis')).toBe(
       [
         '*Chassis sync*',
-        'When: Thu, 10 Sept 2026, 18:00–19:30',
+        'When: Thu, 10/09/26, 18:00–19:30',
         'Where: Workshop',
         'For: Chassis',
         '',
@@ -51,7 +51,7 @@ describe('whatsappText', () => {
   })
   it('skips the lines it has nothing for', () => {
     expect(whatsappText(meeting({ location: null, agenda: null }), null)).toBe(
-      '*Chassis sync*\nWhen: Thu, 10 Sept 2026, 18:00–19:30',
+      '*Chassis sync*\nWhen: Thu, 10/09/26, 18:00–19:30',
     )
   })
 })
@@ -59,8 +59,8 @@ describe('whatsappText', () => {
 describe('emailText', () => {
   it('gives a subject with the date and a plain body', () => {
     const { subject, body } = emailText(meeting(), null)
-    expect(subject).toBe('Chassis sync, Thu, 10 Sept 2026, 18:00–19:30')
-    expect(body).toContain('When: Thu, 10 Sept 2026, 18:00–19:30')
+    expect(subject).toBe('Chassis sync, Thu, 10/09/26, 18:00–19:30')
+    expect(body).toContain('When: Thu, 10/09/26, 18:00–19:30')
     expect(body).toContain('Agenda:\nAgenda\n')
     expect(body).toContain('- Budget check')
     expect(body).not.toMatch(/[*#]/)

@@ -4,22 +4,26 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/context.ts'
 import { ROLE_LABELS, sortRoles } from '../auth/permissions.ts'
 import { usePermissions } from '../auth/usePermissions.ts'
+import { useMyAvatar } from '../data/useAvatars.ts'
 import { useCurrentSeason } from '../data/useCurrentSeason.ts'
 import { useUnreadCount } from '../data/useNotifications.ts'
 import { useTutorial } from '../tutorial/context.ts'
+import { Avatar } from './Avatar.tsx'
 import { buttonSecondary } from './buttons.ts'
 import { SHELL } from './layout.ts'
 import { NAV_ITEMS } from './navItems.ts'
 
-// Active screen: filled pill AND aria-current="page" — never colour alone.
+// Active screen: a bright label with an accent rule under it, AND aria-current="page" — never colour alone. The
+// red fill is kept for the one thing you came to do on a screen (its primary button), so the menu does not
+// compete with it. The rule sits on the header's own bottom border, which is why the link is pulled down 1px.
 const desktopLink = ({ isActive }: { isActive: boolean }) =>
-  `inline-flex items-center rounded px-2.5 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 ${
-    isActive ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+  `relative -mb-px inline-flex items-center border-b-2 px-2 py-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-ring ${
+    isActive ? 'border-accent text-slate-950' : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900'
   }`
 
 const phoneLink = ({ isActive }: { isActive: boolean }) =>
-  `flex min-h-11 items-center rounded px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 ${
-    isActive ? 'bg-slate-900 text-white' : 'text-slate-800 hover:bg-slate-100'
+  `flex min-h-11 items-center border-l-2 px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-ring ${
+    isActive ? 'border-accent bg-slate-100 text-slate-950' : 'border-transparent text-slate-700 hover:bg-slate-50 hover:text-slate-900'
   }`
 
 // The one navigation for the whole app. Before this, each screen hand-rolled
@@ -60,6 +64,8 @@ export function AppHeader() {
   }, [menuOpen])
 
   const name = auth.status === 'member' ? auth.member.full_name : ''
+  // Only your own picture, one row: the header is on every screen, so it must never load everyone's.
+  const myPicture = useMyAvatar().data ?? null
   // Your roles beside your name, in words, so it is always clear what the
   // screens will let you do.
   const roleText = sortRoles(can.roles).map((role) => ROLE_LABELS[role]).join(', ')
@@ -78,11 +84,11 @@ export function AppHeader() {
   }
 
   return (
-    <header className="border-b border-slate-200 bg-white">
+    <header className="border-b border-slate-200 bg-surface">
       <div className={`${SHELL} flex items-center gap-2 py-2`}>
         <Link
           to="/"
-          className="rounded text-base font-semibold tracking-tight text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+          className="rounded text-base font-semibold tracking-tight text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
         >
           Reqon
         </Link>
@@ -103,15 +109,15 @@ export function AppHeader() {
           to="/inbox"
           aria-label={unread > 0 ? `Inbox, ${unread} new` : 'Inbox'}
           className={({ isActive }) =>
-            `ml-auto inline-flex min-h-11 items-center gap-1.5 rounded px-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0 sm:py-1.5 ${
-              isActive ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+            `ml-auto inline-flex min-h-11 items-center gap-1.5 rounded px-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0 sm:py-1.5 ${
+              isActive ? 'bg-slate-100 text-slate-950' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
             }`
           }
           data-testid="inbox-link"
         >
           Inbox
           {unread > 0 && (
-            <span aria-hidden="true" className="rounded-full bg-sky-600 px-1.5 text-xs font-semibold text-white tabular-nums">
+            <span aria-hidden="true" className="rounded-full bg-info px-1.5 text-xs font-semibold text-white tabular-nums">
               {unread > 99 ? '99+' : unread}
             </span>
           )}
@@ -119,7 +125,8 @@ export function AppHeader() {
 
         <div className="hidden items-center gap-2 sm:flex">
           {name && (
-            <span className="text-xs text-slate-600" data-tutorial="account-roles">
+            <span className="inline-flex items-center gap-2 text-xs text-slate-600" data-tutorial="account-roles">
+              <Avatar name={name} image={myPicture} size="sm" />
               {name}
               {roleText && <span className="text-slate-500"> · {roleText}</span>}
             </span>
@@ -147,7 +154,7 @@ export function AppHeader() {
         </button>
       </div>
 
-      <nav aria-label="Main" className={`${SHELL} hidden pb-2 sm:block`} data-tutorial="main-nav">
+      <nav aria-label="Main" className={`${SHELL} hidden sm:block`} data-tutorial="main-nav">
         <ul className="flex flex-wrap gap-1">
           {items.map((item, i) => (
             <li key={item.to} className={i > 0 && items[i - 1].group !== item.group ? 'ml-1.5 border-l border-slate-200 pl-1.5' : undefined}>
@@ -181,7 +188,8 @@ export function AppHeader() {
           </nav>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2">
             {name && (
-              <span className="text-xs text-slate-600">
+              <span className="inline-flex items-center gap-2 text-xs text-slate-600">
+                <Avatar name={name} image={myPicture} size="sm" />
                 Signed in as {name}
                 {roleText && ` · ${roleText}`}
               </span>

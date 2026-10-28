@@ -10,7 +10,7 @@ export function TutorialOffer() {
   return (
     <aside
       aria-labelledby="tutorial-offer-title"
-      className="pc-slide-up fixed inset-x-2 bottom-2 z-40 rounded-lg border border-slate-200 bg-white p-3 shadow-lg sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-96"
+      className="pc-slide-up fixed inset-x-2 bottom-2 z-40 rounded-lg border border-slate-200 bg-surface p-3 shadow-lg sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-96"
       data-testid="tutorial-offer"
     >
       <h2 id="tutorial-offer-title" className="text-sm font-semibold text-slate-900">
@@ -32,7 +32,8 @@ export function TutorialOffer() {
           Not now
         </button>
       </div>
-      <p className="mt-2 text-xs text-slate-600">
+      {/* The header's Tutorial button says the same; on a phone the card is already a third of the screen. */}
+      <p className="mt-2 hidden text-xs text-slate-600 sm:block">
         You can start it any time from <strong className="font-semibold">Tutorial</strong> in the top bar.
       </p>
     </aside>

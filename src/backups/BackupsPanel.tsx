@@ -63,7 +63,7 @@ export function BackupsPanel({ now = new Date() }: { now?: Date }) {
         ))}
       </ul>
 
-      <div className="rounded border border-slate-200 bg-white p-3" data-tutorial="backups-download">
+      <div className="rounded border border-slate-200 bg-surface p-3" data-tutorial="backups-download">
         <h3 className="text-sm font-medium text-slate-900">Download the newest backup</h3>
         <p className="mt-1 text-xs text-slate-600">
           The file is encrypted. Only the key holders (President, Vice President, Developers) can open it, with the private
@@ -89,7 +89,7 @@ export function BackupsPanel({ now = new Date() }: { now?: Date }) {
 function DestinationCard({ health: h }: { health: Health }) {
   const run = h.lastOk
   return (
-    <li className="rounded border border-slate-200 bg-white p-3" data-testid={`backup-${h.destination}`}>
+    <li className="rounded border border-slate-200 bg-surface p-3" data-testid={`backup-${h.destination}`}>
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-medium text-slate-900">{h.label}</h3>
         <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${STATE_CHIP[h.state]}`}>{STATE_LABEL[h.state]}</span>

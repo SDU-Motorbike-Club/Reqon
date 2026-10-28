@@ -22,6 +22,7 @@ const state = {
   linkError: null as Error | null,
   moves: [] as Record<string, unknown>[],
   created: [] as Record<string, unknown>[],
+  proposals: [] as Record<string, unknown>[],
 }
 type Dept = { key: string; name: string; lead_id: string | null; archived_at: string | null }
 let departments: Dept[]
@@ -43,6 +44,14 @@ vi.mock('../data/useSubteams.ts', () => ({ useSubteams: () => ({ data: departmen
 vi.mock('../data/useMilestones.ts', () => ({ useMilestones: () => ({ data: [{ key: 'MS1', name: 'Plan' }], isLoading: false, error: null }) }))
 vi.mock('../data/useClauses.ts', () => ({
   useClauses: () => ({ data: [{ clause_key: 'A.1', printed_ref: 'A.1', body: 'Rule', section: 'A', article: 1, article_title: null }], isLoading: false, error: null }),
+}))
+vi.mock('../data/useProposals.ts', () => ({ useProposals: () => ({ data: state.proposals, isLoading: false, error: null, refetch: () => {} }) }))
+vi.mock('../data/useRealtimeProposals.ts', () => ({ useRealtimeProposals: () => 'live' }))
+vi.mock('../data/useRealtimeProposalRequirements.ts', () => ({ useRealtimeProposalRequirements: () => 'live' }))
+vi.mock('../data/useRealtimeProposalComments.ts', () => ({ useRealtimeProposalComments: () => 'live' }))
+// The panel has its own thorough test; here only the Board's side of the overlay is under test.
+vi.mock('../proposals/ProposalsPanel.tsx', () => ({
+  ProposalsPanel: ({ embedded }: { embedded?: boolean }) => <div data-testid="proposals-panel" data-embedded={String(Boolean(embedded))} />,
 }))
 vi.mock('../data/useRealtimeTasks.ts', () => ({ useRealtimeTasks: () => 'live' }))
 vi.mock('../data/useRealtimeTaskRequirements.ts', () => ({ useRealtimeTaskRequirements: () => 'live' }))
@@ -136,6 +145,7 @@ beforeEach(() => {
   state.linkError = null
   state.moves = []
   state.created = []
+  state.proposals = []
   state.tasks = [
     task('aero-mine', { owner_id: 'me', title: 'Aero mine' }),
     task('aero-theirs', { owner_id: 'm2', title: 'Aero theirs' }),
@@ -240,7 +250,7 @@ describe('lanes, priority and card facts', () => {
     expect(within(screen.getByTestId('lane-todo')).getByTestId('task-aero-mine')).toBeInTheDocument()
     expect(facts).toHaveTextContent('Aerodynamics')
     expect(facts).toHaveTextContent('Ada Rider')
-    expect(facts).toHaveTextContent('Due 1 Dec 2026')
+    expect(facts).toHaveTextContent('Due 01/12/26')
     expect(facts).toHaveTextContent('MS1 — Plan')
     expect(screen.getByTestId('task-reqs-aero-mine')).toHaveTextContent('2 requirements')
   })
@@ -383,8 +393,8 @@ describe('the details editor', () => {
       panel.getByLabelText('Why is it blocked?'),
       panel.getByLabelText('Owner'),
       panel.getByLabelText('Priority'),
-      panel.getByLabelText('Deadline'),
       panel.getByLabelText('Start date'),
+      panel.getByLabelText('Deadline'),
       screen.getByTestId('task-deps-ordered'),
       screen.getByTestId('task-links-ordered'),
       screen.getByTestId('task-department-ordered'),
@@ -927,6 +937,57 @@ describe('a long lane: a short list first, with Show more', () => {
   })
 })
 
+// Proposals are an overlay on the Board, for the department in view; there is no Proposals page.
+describe('proposals as an overlay on the Board', () => {
+  const proposal = (id: string, over: Record<string, unknown> = {}) => ({ id, title: id, subteam_key: 'AERO', state: 'open', outcome: null, archived_at: null, ...over })
+
+  it('offers Propose to a plain member, who cannot create a task, and both to a Head', () => {
+    departments = departments.map((d) => ({ ...d, lead_id: 'm2' }))
+    renderBoard()
+    expect(screen.queryByTestId('board-new-task')).not.toBeInTheDocument()
+    expect(screen.getByTestId('board-propose-task')).toBeInTheDocument()
+    cleanup()
+    departments = departments.map((d) => ({ ...d, lead_id: 'me' }))
+    renderBoard()
+    expect(screen.getByTestId('board-new-task')).toBeInTheDocument()
+    expect(screen.getByTestId('board-propose-task')).toBeInTheDocument()
+  })
+
+  it('offers no way to propose to someone who left the club', () => {
+    session.status = 'alumni'
+    renderBoard()
+    expect(screen.queryByTestId('board-propose-task')).not.toBeInTheDocument()
+    // Reading what is proposed is still allowed.
+    expect(screen.getByTestId('board-proposals')).toBeInTheDocument()
+  })
+
+  it('counts the proposals still open in the department in view, not the decided ones', () => {
+    state.proposals = [proposal('a'), proposal('b', { state: 'changes_requested' }), proposal('c', { subteam_key: 'BODY' }), proposal('d', { state: 'decided', outcome: 'approved' })]
+    renderBoard()
+    expect(screen.getByTestId('board-proposals')).toHaveTextContent('Proposals (3)')
+    cleanup()
+    renderBoard('/board?dept=AERO')
+    expect(screen.getByTestId('board-proposals')).toHaveTextContent('Proposals (2)')
+  })
+
+  it('opens the overlay from the button, with the panel inside it, and closes it', async () => {
+    const user = userEvent.setup()
+    renderBoard()
+    expect(screen.queryByTestId('proposals-panel')).not.toBeInTheDocument()
+    await user.click(screen.getByTestId('board-proposals'))
+    expect(screen.getByTestId('proposals-panel')).toHaveAttribute('data-embedded', 'true')
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(screen.queryByTestId('proposals-panel')).not.toBeInTheDocument())
+  })
+
+  it('opens straight away from a link that names it (the inbox, the old /proposals address)', () => {
+    renderBoard('/board?proposals=1&pscope=mine')
+    expect(screen.getByTestId('proposals-panel')).toBeInTheDocument()
+    // The panel's "mine" is its own choice: the Board behind it still shows everyone's tasks.
+    expect(shown()).toEqual(['aero-mine', 'aero-theirs', 'body-mine', 'body-theirs'])
+  })
+})
+
 describe('creating a task straight on the Board (task leaders only)', () => {
   it('offers New task to a Head, and not to a plain member', () => {
     renderBoard()
@@ -937,7 +998,7 @@ describe('creating a task straight on the Board (task leaders only)', () => {
     expect(screen.queryByTestId('board-new-task')).not.toBeInTheDocument()
   })
 
-  it('asks only for a title, a department and a deadline, then creates it with exactly what was typed', async () => {
+  it('asks only for a title and a deadline, then creates it with exactly what was typed', async () => {
     const user = userEvent.setup()
     renderBoard()
     await user.click(screen.getByTestId('board-new-task'))
@@ -946,23 +1007,53 @@ describe('creating a task straight on the Board (task leaders only)', () => {
     await user.click(form.getByTestId('new-task-submit'))
     expect(form.getByText('Give the task a name.')).toBeInTheDocument()
     expect(form.getByText('Give the task a deadline.')).toBeInTheDocument()
-    expect(form.getByText('Choose a department.')).toBeInTheDocument()
-    // The milestone and the requirements are optional: nothing is said about them.
+    // Nothing else is required: no department, no start date, no milestone, no requirement.
+    expect(form.queryByText('Choose a department.')).not.toBeInTheDocument()
+    expect(form.queryByText('Give the task a start date.')).not.toBeInTheDocument()
     expect(form.queryByText('Choose a milestone.')).not.toBeInTheDocument()
     expect(form.queryByText('Link at least one requirement.')).not.toBeInTheDocument()
     expect(state.created).toEqual([])
 
     await user.type(form.getByLabelText('Title'), '  Brake duct  ')
     await user.type(form.getByLabelText('Deadline'), '2026-12-01')
+    await user.click(form.getByTestId('new-task-submit'))
+    await waitFor(() => expect(state.created).toHaveLength(1))
+    expect(state.created[0]).toEqual({
+      title: 'Brake duct', detail: null, departmentKey: null, ownerId: null, startsOn: null, dueDate: '2026-12-01',
+      milestoneKey: null, clauseKeys: [], priority: 'normal',
+    })
+    expect(await screen.findByTestId('board-task-created')).toHaveTextContent('Created “Brake duct”.')
+  })
+
+  it('sends a department, an owner and a start date when they are given', async () => {
+    const user = userEvent.setup()
+    renderBoard()
+    await user.click(screen.getByTestId('board-new-task'))
+    const form = within(screen.getByTestId('new-task-form'))
+    await user.type(form.getByLabelText('Title'), 'Brake duct')
+    await user.type(form.getByLabelText('Start date'), '2026-11-20')
+    await user.type(form.getByLabelText('Deadline'), '2026-12-01')
     await user.selectOptions(form.getByLabelText('Department'), 'BODY')
     await user.selectOptions(form.getByLabelText('Owner'), 'me')
     await user.click(form.getByTestId('new-task-submit'))
     await waitFor(() => expect(state.created).toHaveLength(1))
-    expect(state.created[0]).toEqual({
-      title: 'Brake duct', detail: null, departmentKey: 'BODY', ownerId: 'me', dueDate: '2026-12-01',
-      milestoneKey: null, clauseKeys: [], priority: 'normal',
-    })
-    expect(await screen.findByTestId('board-task-created')).toHaveTextContent('Created “Brake duct”.')
+    expect(state.created[0]).toMatchObject({ departmentKey: 'BODY', ownerId: 'me', startsOn: '2026-11-20', dueDate: '2026-12-01' })
+  })
+
+  it('puts the start date on the left and the deadline on the right, and refuses a deadline before the start', async () => {
+    const user = userEvent.setup()
+    renderBoard()
+    await user.click(screen.getByTestId('board-new-task'))
+    const form = within(screen.getByTestId('new-task-form'))
+    const start = form.getByLabelText('Start date')
+    const due = form.getByLabelText('Deadline')
+    expect(start.compareDocumentPosition(due) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    await user.type(form.getByLabelText('Title'), 'Backwards')
+    await user.type(start, '2026-12-05')
+    await user.type(due, '2026-12-01')
+    await user.click(form.getByTestId('new-task-submit'))
+    expect(form.getByText('The deadline cannot be before the start date.')).toBeInTheDocument()
+    expect(state.created).toEqual([])
   })
 
   it('sends a milestone and requirements when they are given', async () => {
@@ -972,7 +1063,6 @@ describe('creating a task straight on the Board (task leaders only)', () => {
     const form = within(screen.getByTestId('new-task-form'))
     await user.type(form.getByLabelText('Title'), 'Linked')
     await user.type(form.getByLabelText('Deadline'), '2026-12-01')
-    await user.selectOptions(form.getByLabelText('Department'), 'BODY')
     await user.selectOptions(form.getByLabelText('Milestone'), 'MS1')
     await user.type(form.getByLabelText('Find a requirement'), 'A.1')
     await user.click(await form.findByRole('checkbox'))

@@ -525,7 +525,7 @@ describe('signed out', () => {
     const submit = hook(() => useSubmitProposal())
     await expect(
       submit.current.mutateAsync({ title: 'No details', departmentKey: '', dueDate: '', milestoneKey: '', requirementKeys: [] }),
-    ).rejects.toThrow(/needs a department, a deadline, a milestone, at least one requirement/)
+    ).rejects.toThrow(/it needs a deadline/)
     expect(db.task_proposals).toHaveLength(1)
   })
 })

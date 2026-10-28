@@ -244,7 +244,7 @@ begin
   perform pg_temp.expect('an older incomplete proposal cannot be approved', pg_temp.attempt(ha, format('select approve_proposal(%L, 1, ''ok'')', p_leg)), 'ERROR 22023%older%');
   p_leg := pg_temp.mk(pa, au);
   delete from proposal_requirements where proposal_id = p_leg;
-  perform pg_temp.expect('a proposal with no requirement cannot be approved', pg_temp.attempt(ha, format('select approve_proposal(%L, 1, ''ok'')', p_leg)), 'ERROR 22023%');
+  perform pg_temp.expect('a proposal with no requirement CAN be approved (requirements are optional)', pg_temp.attempt(ha, format('select approve_proposal(%L, 1, ''ok'')', p_leg)), 'ALLOWED');
   p_leg := pg_temp.mk('PD_ARCH', au);
   perform pg_temp.expect('a proposal in an archived department cannot be approved', pg_temp.attempt(dev, format('select approve_proposal(%L, 1, ''ok'')', p_leg)), 'ERROR 22023%');
 

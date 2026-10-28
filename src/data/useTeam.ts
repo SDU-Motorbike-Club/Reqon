@@ -38,10 +38,15 @@ function useToolWrite<T>(what: string, write: (input: T) => PromiseLike<{ data: 
 }
 
 // `ownerId` is only for an admin listing a tool for someone else; left out, the database makes it yours.
-// `heldBy` is who has it (a member id), or null for nobody.
+// `heldBy` is who has it (a member id), or null for nobody. `shared` is chosen once, here: true = a club tool.
 export function useAddTool() {
-  return useToolWrite<{ item: string; location: ToolLocation; heldBy: string | null; ownerId?: string }>('add that tool', ({ item, location, heldBy, ownerId }) =>
-    supabase.from('tools').insert({ item, location, held_by: heldBy, ...(ownerId ? { owner_id: ownerId } : {}) }).select('id'),
+  return useToolWrite<{ item: string; location: ToolLocation; heldBy: string | null; shared?: boolean; ownerId?: string }>(
+    'add that tool',
+    ({ item, location, heldBy, shared, ownerId }) =>
+      supabase
+        .from('tools')
+        .insert({ item, location, held_by: heldBy, ...(shared ? { shared: true } : {}), ...(ownerId ? { owner_id: ownerId } : {}) })
+        .select('id'),
   )
 }
 

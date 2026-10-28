@@ -2,7 +2,7 @@ import { useId } from 'react'
 import { ALL_DEPARTMENTS, type DepartmentChoice } from './filter.ts'
 
 const SELECT =
-  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0'
+  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0'
 
 // The one Scope x Department control. Scope is a pressed-state button group
 // (a filter, not a navigation); Department is a native select, which is the
@@ -33,8 +33,8 @@ export function ScopeDepartmentFilter<S extends string>({
 }) {
   const deptId = useId()
   const button = (active: boolean) =>
-    `min-h-11 rounded px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0 ${
-      active ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
+    `min-h-11 rounded px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0 ${
+      active ? 'bg-slate-200 text-slate-950' : 'text-slate-700 hover:bg-slate-100'
     }`
 
   return (

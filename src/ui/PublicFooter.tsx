@@ -4,7 +4,7 @@ import { NavLink } from 'react-router-dom'
 // privacy policy. Kept to what someone needs before they have an account.
 export function PublicFooter() {
   return (
-    <footer className="border-t border-slate-200 bg-white">
+    <footer className="border-t border-slate-200 bg-surface">
       <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3 text-xs text-slate-600 sm:px-6">
         <p>Reqon · SDU Motorbike Club</p>
         <nav aria-label="Legal">

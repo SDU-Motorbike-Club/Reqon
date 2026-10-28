@@ -56,7 +56,7 @@ export function ExplainedLabel({
             setTransient(false)
           }
         }}
-        className={`min-h-11 rounded px-1.5 py-0.5 text-[11px] font-bold tracking-wide focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0 ${className}`}
+        className={`min-h-11 rounded px-1.5 py-0.5 text-[11px] font-bold tracking-wide focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0 ${className}`}
       >
         {info.label}
       </button>
@@ -69,7 +69,7 @@ export function ExplainedLabel({
           ref={popover}
           aria-hidden="true"
           data-testid={testId ? `${testId}-explanation` : undefined}
-          className="absolute left-0 top-full z-20 mt-1 block w-64 max-w-[min(16rem,80vw)] rounded border border-slate-300 bg-white p-2 text-xs font-normal normal-case tracking-normal text-slate-800 shadow-md"
+          className="absolute left-0 top-full z-20 mt-1 block w-64 max-w-[min(16rem,80vw)] rounded border border-slate-300 bg-surface p-2 text-xs font-normal normal-case tracking-normal text-slate-800 shadow-md"
         >
           {info.summary}
         </span>

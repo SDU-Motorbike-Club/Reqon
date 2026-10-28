@@ -56,7 +56,7 @@ export function ClauseLinkedWork({ clauseKey, printedRef, state, work, availabil
         </span>
         {progress.total > 0 && (
           <span aria-hidden="true" className="h-1.5 w-20 overflow-hidden rounded bg-slate-200">
-            <span className="block h-full bg-emerald-600" style={{ width: `${progress.percent ?? 0}%` }} />
+            <span className="block h-full bg-ok" style={{ width: `${progress.percent ?? 0}%` }} />
           </span>
         )}
         {detail && (
@@ -70,7 +70,7 @@ export function ClauseLinkedWork({ clauseKey, printedRef, state, work, availabil
             aria-expanded={open}
             aria-controls={listId}
             onClick={() => setOpen((value) => !value)}
-            className="min-h-11 rounded border border-slate-300 bg-white px-2 py-0.5 text-xs text-slate-800 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+            className="min-h-11 rounded border border-slate-300 bg-surface px-2 py-0.5 text-xs text-slate-800 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
           >
             {open ? 'Hide tasks' : `Show tasks (${work.tasks.length})`}
             <span className="sr-only"> for {printedRef}</span>
@@ -81,7 +81,7 @@ export function ClauseLinkedWork({ clauseKey, printedRef, state, work, availabil
             type="button"
             aria-expanded={assigning}
             onClick={() => setAssigning((value) => !value)}
-            className="min-h-11 rounded border border-slate-300 bg-white px-2 py-0.5 text-xs text-slate-800 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+            className="min-h-11 rounded border border-slate-300 bg-surface px-2 py-0.5 text-xs text-slate-800 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
             data-testid={`assign-open-${clauseKey}`}
           >
             Link tasks
@@ -92,7 +92,7 @@ export function ClauseLinkedWork({ clauseKey, printedRef, state, work, availabil
           <button
             type="button"
             onClick={() => onMarkCompliant(clauseKey)}
-            className="min-h-11 rounded border border-emerald-700 bg-white px-2 py-0.5 text-xs font-medium text-emerald-900 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+            className="min-h-11 rounded border border-emerald-700 bg-surface px-2 py-0.5 text-xs font-medium text-emerald-900 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
           >
             Mark compliant
             <span className="sr-only"> {printedRef}</span>
@@ -120,12 +120,12 @@ export function ClauseLinkedWork({ clauseKey, printedRef, state, work, availabil
       )}
 
       {open && (
-        <ul id={listId} className="mt-1.5 divide-y divide-slate-100 rounded border border-slate-200 bg-white" data-testid="linked-tasks">
+        <ul id={listId} className="mt-1.5 divide-y divide-slate-100 rounded border border-slate-200 bg-surface" data-testid="linked-tasks">
           {work.tasks.map((task) => (
             <li key={task.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-2 py-1.5" data-task-id={task.id}>
               <Link
                 to={taskHref(task)}
-                className="min-h-11 py-2 font-medium text-slate-900 underline decoration-slate-400 underline-offset-2 hover:decoration-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0 sm:py-0"
+                className="min-h-11 py-2 font-medium text-slate-900 underline decoration-slate-400 underline-offset-2 hover:decoration-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0 sm:py-0"
               >
                 {task.title}
               </Link>

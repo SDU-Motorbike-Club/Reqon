@@ -31,6 +31,10 @@ let writes: string[] = []
 let caller: Member = PRES
 
 function reset() {
+  habits.usage = new Map()
+  habits.failed = false
+  habits.attention = new Set()
+  habits.recorded = []
   db = {
     members: [PRES, CREW, VP, DEV, TREAS].map((m) => ({ ...m })),
     member_roles: [
@@ -322,6 +326,28 @@ vi.mock('../lib/supabase.ts', () => ({ get supabase() { return supabase } }))
 // channel behaviour is exercised elsewhere (data/realtimeEntities.test.tsx);
 // this suite only needs it to not crash on mount.
 vi.mock('../data/useRealtimeSubteams.ts', () => ({ useRealtimeSubteams: () => 'off' }))
+// Pictures, Settings habits and the "needs attention" check each have their own tests; here they are fixed so the
+// page's own behaviour (and the order of its sections) can be driven from the test.
+const habits = vi.hoisted(() => ({
+  usage: new Map<string, { score: number; scoredAt: string }>(),
+  failed: false,
+  attention: new Set<string>(),
+  recorded: [] as string[],
+}))
+vi.mock('../data/useAvatars.ts', () => ({
+  useMyAvatar: () => ({ data: null }),
+  useAvatars: () => ({ data: new Map<string, string>() }),
+  useSetMyAvatar: () => ({ mutateAsync: async () => {}, isPending: false, error: null }),
+  useRemoveMyAvatar: () => ({ mutate: () => {}, isPending: false, error: null }),
+}))
+vi.mock('../data/useSettingsUsage.ts', () => ({
+  useSettingsUsage: () => ({ isSuccess: !habits.failed, isError: habits.failed, data: habits.failed ? undefined : habits.usage }),
+  useRecordSettingsOpen: () => (section: string) => habits.recorded.push(section),
+}))
+vi.mock('./settings/useSettingsAttention.ts', () => ({ useSettingsAttention: () => ({ ids: habits.attention, settled: true }) }))
+// The weekly-meeting section has its own test (settings/MeetingScheduleSettings.test.tsx); here its queries
+// would only add calls to the fake database that the assertions about other sections do not expect.
+vi.mock('./settings/MeetingScheduleSettings.tsx', () => ({ MeetingScheduleSettings: () => <p>Weekly meeting section</p> }))
 // The signed-in person's roles come from member_roles, exactly as AuthProvider
 // loads them. usePermissions() reads this same mocked context.
 vi.mock('../auth/context.ts', () => ({
@@ -370,9 +396,9 @@ describe('who sees what', () => {
   it('the president sees every admin control, and a role button for each member', async () => {
     renderSettings()
     expect(await screen.findByText('Add someone to the roster')).toBeInTheDocument()
-    expect(screen.getByText('Departments')).toBeInTheDocument()
-    expect(screen.getByText('Milestone dates and points')).toBeInTheDocument()
-    expect(screen.getByText('Requirements Book')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Departments' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Milestone dates and points' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Requirements Book' })).toBeInTheDocument()
     expect(screen.getByText('Start a new season')).toBeInTheDocument()
     // The roster rows arrive with the members query, after the forms.
     expect(await screen.findByRole('button', { name: 'Change roles for Bo Wrench' })).toBeInTheDocument()
@@ -388,8 +414,8 @@ describe('who sees what', () => {
     caller = VP
     renderSettings()
     expect(await screen.findByText('Add someone to the roster')).toBeInTheDocument()
-    expect(screen.getByText('Departments')).toBeInTheDocument()
-    expect(screen.getByText('Milestone dates and points')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Departments' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Milestone dates and points' })).toBeInTheDocument()
     expect(screen.queryByText('Start a new season')).not.toBeInTheDocument()
     await screen.findByTestId('member-m2')
     expect(changeRolesButtons().length).toBeGreaterThan(0)
@@ -428,13 +454,13 @@ describe('who sees what', () => {
       expect(screen.queryByText(/Your access/)).not.toBeInTheDocument()
       await screen.findByTestId('member-m2')
       expect(screen.queryByText('Add someone to the roster')).not.toBeInTheDocument()
-      expect(screen.queryByText('Departments')).not.toBeInTheDocument()
-      expect(screen.queryByText('Requirements Book')).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Departments' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Requirements Book' })).not.toBeInTheDocument()
       expect(screen.queryByText('Start a new season')).not.toBeInTheDocument()
       expect(screen.queryByTestId('make-current-sb')).not.toBeInTheDocument()
       expect(changeRolesButtons()).toHaveLength(0)
       // Handover notes stay open to everyone.
-      expect(screen.getByText('Handover notes')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Handover notes' })).toBeInTheDocument()
     })
   }
 
@@ -442,8 +468,8 @@ describe('who sees what', () => {
     caller = DEV
     renderSettings()
     expect(await screen.findByText('Add someone to the roster')).toBeInTheDocument()
-    expect(screen.getByText('Departments')).toBeInTheDocument()
-    expect(screen.getByText('Milestone dates and points')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Departments' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Milestone dates and points' })).toBeInTheDocument()
     expect(screen.getByText('Start a new season')).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: 'Change roles for Bo Wrench' })).toBeInTheDocument()
     expect(changeRolesButtons()).toHaveLength(db.members.length)
@@ -922,9 +948,10 @@ describe('roster', () => {
   it('says which kind of role each thing on a row is', async () => {
     renderSettings()
     const row = await screen.findByTestId('member-m1')
-    // "Team lead" (a job title) and "President" (a privileged role) sit on the
-    // same line; only one of them grants anything.
-    expect(within(row).getByText('Job title:').parentElement).toHaveTextContent('Team lead')
+    // "Team lead" (a job title) and "President" (a privileged role) are told apart; only one of them grants
+    // anything. An administrator edits the title in the picker, so it is not also printed as a badge.
+    expect(within(row).getByLabelText('Job title for Ada Rider')).toHaveValue('Team lead')
+    expect(within(row).queryByText('Job title:')).not.toBeInTheDocument()
     expect(within(row).getByText('Roles:').parentElement).toHaveTextContent('President')
   })
 })
@@ -1313,5 +1340,103 @@ describe('protected updates distinguish forbidden from vanished', () => {
     await expect(update.current.mutateAsync({ key: 'GHOST-MS', maxPoints: 10 })).rejects.toThrow(
       /no longer exists/,
     )
+  })
+})
+
+// --- The order of the sections ----------------------------------------------------------------------------------
+
+const order = () => Array.from(document.querySelectorAll('[data-section]')).map((el) => el.getAttribute('data-section') as string)
+const use = (score: number, days = 0) => ({ score, scoredAt: new Date(Date.now() - days * 86_400_000).toISOString() })
+
+describe('the order of the sections follows how you use them', () => {
+  it('starts in the fixed order, Your account first and the club admin sections after the personal ones', async () => {
+    renderSettings()
+    await screen.findByText('Add someone to the roster')
+    const ids = order()
+    expect(ids.slice(0, 3)).toEqual(['account', 'roster', 'access'])
+    const personal = ['account', 'roster', 'access', 'handover', 'seasons', 'export']
+    expect(ids.slice(0, personal.length)).toEqual(personal)
+    expect(ids.slice(personal.length)).toEqual(expect.arrayContaining(['departments', 'milestones', 'meeting', 'book']))
+    expect(ids.slice(personal.length).indexOf('departments')).toBeLessThan(ids.slice(personal.length).indexOf('milestones'))
+  })
+
+  it('puts the most used first inside each group, keeps Your account on top, and never crosses the groups', async () => {
+    habits.usage = new Map([['export', use(6)], ['handover', use(3)], ['milestones', use(9)], ['account', use(0.2)]])
+    renderSettings()
+    await screen.findByText('Add someone to the roster')
+    const ids = order()
+    expect(ids.slice(0, 4)).toEqual(['account', 'export', 'handover', 'roster'])
+    expect(ids.indexOf('milestones')).toBeLessThan(ids.indexOf('departments'))
+    expect(Math.max(...['account', 'roster', 'access', 'handover', 'seasons', 'export'].map((id) => ids.indexOf(id)))).toBeLessThan(ids.indexOf('milestones'))
+  })
+
+  it('lets an old habit fade behind a recent one', async () => {
+    habits.usage = new Map([['seasons', use(20, 150)], ['handover', use(2, 1)]])
+    renderSettings()
+    await screen.findByText('Add someone to the roster')
+    const ids = order()
+    expect(ids.indexOf('handover')).toBeLessThan(ids.indexOf('seasons'))
+  })
+
+  it('keeps the fixed order, without a word about it, when the habits cannot be read', async () => {
+    habits.failed = true
+    renderSettings()
+    await screen.findByText('Add someone to the roster')
+    expect(order().slice(0, 3)).toEqual(['account', 'roster', 'access'])
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('shows a team member only the personal group', async () => {
+    caller = CREW
+    renderSettings()
+    await screen.findByRole('heading', { name: 'Roster' })
+    expect(order()).toEqual(['account', 'roster', 'access', 'handover', 'seasons', 'export'])
+    expect(screen.queryByText('Club admin')).not.toBeInTheDocument()
+    expect(screen.getByText('Personal')).toBeInTheDocument()
+  })
+
+  it('lifts a section that needs attention to the top of its group, marks it, and says so in the jump links', async () => {
+    habits.attention = new Set(['milestones'])
+    habits.usage = new Map([['departments', use(30)]])
+    renderSettings()
+    await screen.findByText('Add someone to the roster')
+    const ids = order()
+    const admin = ids.slice(ids.indexOf('milestones') - 0)
+    expect(ids.indexOf('milestones')).toBeLessThan(ids.indexOf('departments'))
+    expect(admin[0]).toBe('milestones')
+    expect(screen.getByTestId('attention-milestones')).toHaveTextContent('Needs attention')
+    expect(within(screen.getByTestId('settings-jump')).getByRole('link', { name: /Milestone dates and points.*needs attention/ })).toBeInTheDocument()
+  })
+})
+
+describe('remembering what you use', () => {
+  it('records a section the first time you click inside it, once, and not for sections you only scrolled past', async () => {
+    const user = userEvent.setup()
+    renderSettings()
+    await screen.findByText('Add someone to the roster')
+    expect(habits.recorded).toEqual([])
+    await user.click(screen.getByRole('heading', { name: 'Handover notes' }))
+    await user.click(screen.getByRole('heading', { name: 'Handover notes' }))
+    expect(habits.recorded).toEqual(['handover'])
+    await user.click(screen.getByRole('heading', { name: 'Seasons' }))
+    expect(habits.recorded).toEqual(['handover', 'seasons'])
+  })
+
+  it('counts a jump-link click as using the section', async () => {
+    const user = userEvent.setup()
+    renderSettings()
+    await screen.findByText('Add someone to the roster')
+    await user.click(within(screen.getByTestId('settings-jump')).getByRole('link', { name: 'Export' }))
+    expect(habits.recorded).toContain('export')
+  })
+
+  it('does not re-sort the page while you work in it', async () => {
+    const user = userEvent.setup()
+    renderSettings()
+    await screen.findByText('Add someone to the roster')
+    const before = order()
+    await user.click(screen.getByRole('heading', { name: 'Export' }))
+    await user.click(screen.getByRole('heading', { name: 'Seasons' }))
+    expect(order()).toEqual(before)
   })
 })

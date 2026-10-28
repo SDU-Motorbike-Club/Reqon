@@ -31,8 +31,8 @@ const REASON_ORDER: Record<string, number> = {
 }
 
 const REASON_STYLE: Record<string, string> = {
-  blocked: 'bg-red-700 text-white',
-  'score-killer': 'bg-red-700 text-white',
+  blocked: 'bg-danger text-white',
+  'score-killer': 'bg-danger text-white',
   overdue: 'bg-red-100 text-red-900',
   urgent: 'bg-red-100 text-red-900',
   penalty: 'bg-amber-500 text-amber-950',
@@ -135,8 +135,8 @@ export default function Priorities() {
               type="button"
               aria-pressed={reason === r}
               onClick={() => setParams((current) => mergeSearchParams(current, { reason: r }), { replace: true })}
-              className={`min-h-11 rounded px-3 py-1.5 text-xs font-medium capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0 ${
-                reason === r ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
+              className={`min-h-11 rounded px-3 py-1.5 text-xs font-medium capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0 ${
+                reason === r ? 'bg-slate-200 text-slate-950' : 'text-slate-700 hover:bg-slate-100'
               }`}
             >
               {r ?? 'Everything'} <span className="font-normal opacity-80">({n})</span>
@@ -177,7 +177,7 @@ export default function Priorities() {
       )}
 
       {rows.length > 0 && (
-      <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white" data-tutorial="priorities-list">
+      <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-surface" data-tutorial="priorities-list">
         {rows.map((row, index) => (
           <li
             key={`${row.kind}-${row.clause_key ?? row.ref}`}
@@ -203,7 +203,7 @@ export default function Priorities() {
               {row.kind === 'clause' ? (
                 <Link
                   to={`/register?search=${encodeURIComponent(row.clause_key ?? row.ref ?? '')}`}
-                  className="inline-flex min-h-6 items-center rounded font-mono text-sm font-bold text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+                  className="inline-flex min-h-6 items-center rounded font-mono text-sm font-bold text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
                   title="Open this rule in the Register"
                 >
                   {row.ref}
@@ -211,7 +211,7 @@ export default function Priorities() {
               ) : (
                 <Link
                   to={`/board?task=${encodeURIComponent(row.ref ?? '')}`}
-                  className="inline-flex min-h-11 items-center rounded text-xs font-medium text-slate-700 underline underline-offset-2 sm:min-h-0 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+                  className="inline-flex min-h-11 items-center rounded text-xs font-medium text-slate-700 underline underline-offset-2 sm:min-h-0 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
                 >
                   Open on Board
                 </Link>
@@ -232,7 +232,7 @@ export default function Priorities() {
                     id={`owner-${row.clause_key ?? row.ref}`}
                     value={row.owner_id ?? ''}
                     onChange={(e) => assignOwner(row, e.target.value || null)}
-                    className="min-h-11 w-full min-w-0 max-w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 sm:w-auto sm:max-w-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+                    className="min-h-11 w-full min-w-0 max-w-full rounded border border-slate-300 bg-surface px-2 py-1 text-sm text-slate-900 sm:w-auto sm:max-w-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
                   >
                     <option value="">Unassigned</option>
                     {ownerChoices(row.owner_id).map((m) => (

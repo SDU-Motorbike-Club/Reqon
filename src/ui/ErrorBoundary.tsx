@@ -26,7 +26,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
-        <div className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-6">
+        <div className="w-full max-w-lg rounded-lg border border-slate-200 bg-surface p-6">
           <h1 className="text-lg font-semibold text-slate-900">Something broke on this screen</h1>
           <p className="mt-2 text-sm text-slate-700">
             The rest of the app still works. Nothing you had saved is lost — Reqon
@@ -39,7 +39,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <button
               type="button"
               onClick={() => this.setState({ error: null })}
-              className="min-h-11 rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 sm:min-h-0"
+              className="min-h-11 rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 sm:min-h-0"
             >
               Try again
             </button>

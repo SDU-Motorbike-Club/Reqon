@@ -3,7 +3,7 @@ import { ROLE_LABELS, sortRoles, type PrivilegedRole } from '../auth/permissions
 // Each role gets its own quiet tint so they are easy to tell apart at a glance,
 // but the WORD is what carries the meaning — colour is never the only signal.
 const TINT: Record<PrivilegedRole, string> = {
-  president: 'bg-slate-900 text-white ring-slate-900',
+  president: 'bg-accent text-white ring-slate-900',
   vicepresident: 'bg-slate-100 text-slate-800 ring-slate-300',
   treasurer: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
   documentation: 'bg-amber-50 text-amber-900 ring-amber-200',

@@ -3,7 +3,9 @@ import { selectSmall } from './GanttChart.tsx'
 
 // Expand/collapse everything, and the month/week scale. Pure interaction
 // orchestration handed up to Gantt.tsx as callbacks (Phase 6 §6.3) — this
-// component holds no state of its own.
+// component holds no state of its own. It is a bare row of controls: Gantt.tsx
+// puts it in the same card as the scope filter, so the chart is not pushed down
+// by a stack of boxes.
 export function GanttToolbar({
   allOpen,
   onToggleAll,
@@ -12,6 +14,7 @@ export function GanttToolbar({
   legendOpen,
   legendId,
   onLegend,
+  onToday,
 }: {
   allOpen: boolean
   onToggleAll: () => void
@@ -20,13 +23,20 @@ export function GanttToolbar({
   legendOpen: boolean
   legendId: string
   onLegend: () => void
+  // Scrolls the chart to today; absent when today is outside the chart.
+  onToday?: () => void
 }) {
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+    <div className="flex flex-wrap items-center gap-2">
       <button type="button" className={`${buttonSecondary} text-xs`} onClick={onToggleAll}>
         {allOpen ? 'Collapse all' : 'Expand all'}
       </button>
-      <label className="flex items-center gap-1.5 text-xs text-slate-600">
+      {onToday && (
+        <button type="button" className={`${buttonSecondary} text-xs max-sm:hidden`} onClick={onToday} data-testid="gantt-to-today">
+          Jump to today
+        </button>
+      )}
+      <label className="flex items-center gap-1.5 text-xs text-slate-600 max-sm:hidden">
         Scale
         <select
           value={scale}
@@ -47,10 +57,6 @@ export function GanttToolbar({
       >
         Legend
       </button>
-      <p className="text-xs text-slate-600">
-        The dashed line is today. A submission’s bar fills from the left as its linked tasks are done. Drag a task’s
-        bar to change its dates, or its row onto another section — or open the row to do the same with the keyboard.
-      </p>
     </div>
   )
 }

@@ -33,7 +33,7 @@ export default function Login() {
     <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
+        className="w-full max-w-sm rounded-lg border border-slate-200 bg-surface p-6 shadow-sm"
       >
         <h1 className="text-xl font-semibold text-slate-900">Reqon</h1>
         <p className="mt-1 mb-6 text-sm text-slate-600">
@@ -77,7 +77,7 @@ export default function Login() {
         <button
           type="submit"
           disabled={busy}
-          className="w-full rounded-md bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-60"
+          className="w-full rounded-md bg-accent px-4 py-2 font-medium text-white hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-60"
         >
           {busy ? 'Signing in…' : 'Sign in'}
         </button>

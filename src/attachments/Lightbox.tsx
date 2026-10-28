@@ -10,7 +10,7 @@ import { formatBytes, formatDuration } from './rules.ts'
 import { VideoPlayer } from './VideoPlayer.tsx'
 
 const ICON_BUTTON =
-  'inline-flex min-h-11 min-w-11 items-center justify-center rounded text-lg text-white hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none disabled:opacity-30'
+  'inline-flex min-h-11 min-w-11 items-center justify-center rounded text-lg text-white hover:bg-surface/10 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none disabled:opacity-30'
 
 // Saves a file under its original name: the signed link carries Content-Disposition: attachment, so the
 // browser downloads instead of navigating away.
@@ -118,7 +118,7 @@ export function Lightbox({
     <dialog
       ref={dialog}
       aria-labelledby={`${uid}-title`}
-      className="m-0 h-dvh max-h-none w-full max-w-none bg-slate-950 p-0 text-white backdrop:bg-black/80 sm:m-auto sm:h-[min(56rem,95dvh)] sm:w-[min(64rem,95vw)] sm:rounded-xl"
+      className="m-0 h-dvh max-h-none w-full max-w-none bg-black p-0 text-white backdrop:bg-black/80 sm:m-auto sm:h-[min(56rem,95dvh)] sm:w-[min(64rem,95vw)] sm:rounded-xl"
       onCancel={(e) => {
         e.preventDefault()
         onClose()
@@ -160,7 +160,7 @@ export function Lightbox({
           )}
           {file.kind === 'document' && (
             <div className="space-y-2 text-center">
-              <span className="inline-block rounded bg-red-700 px-2 py-1 text-sm font-bold">PDF</span>
+              <span className="inline-block rounded bg-danger px-2 py-1 text-sm font-bold">PDF</span>
               <p className="text-sm text-slate-200">Download the document to read it.</p>
             </div>
           )}
@@ -182,7 +182,7 @@ export function Lightbox({
           )}
         </div>
 
-        <footer className="space-y-2 overflow-y-auto border-t border-white/10 bg-white p-3 text-slate-900 sm:max-h-[40%]">
+        <footer className="space-y-2 overflow-y-auto border-t border-white/10 bg-surface p-3 text-slate-900 sm:max-h-[40%]">
           {draft === null ? (
             <p className="text-sm whitespace-pre-line" data-testid="lightbox-caption">
               {file.caption ?? <span className="text-slate-500 italic">No caption.</span>}

@@ -6,7 +6,7 @@ import { buttonPrimary, buttonSecondary } from '../../ui/buttons.ts'
 import { ActionError } from '../../ui/states.tsx'
 
 const AREA =
-  'w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500'
+  'w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring'
 
 // "Checked and ready" is a person's confirmation of ONE exact current team measurement, with a note of
 // what was checked. Passing the rule or meeting a goal confirms nothing. The confirmation ends by itself

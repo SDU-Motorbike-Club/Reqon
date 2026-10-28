@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useAuth } from '../auth/context.ts'
 import { usePermissions } from '../auth/usePermissions.ts'
 import { canEditTask, canReassignTaskOwner } from '../auth/permissions.ts'
@@ -18,7 +18,7 @@ import { buttonPrimary, buttonSecondary } from '../ui/buttons.ts'
 import { Dialog } from '../ui/Dialog.tsx'
 import { ActionError, EmptyState, ErrorState } from '../ui/states.tsx'
 import { useMembers } from '../data/useMembers.ts'
-import { useMilestones, useMilestoneSections, useSetSectionDrafted } from '../data/useMilestones.ts'
+import { useMilestones, useMilestoneSections } from '../data/useMilestones.ts'
 import { useRealtimeTaskDependencies } from '../data/useRealtimeTaskDependencies.ts'
 import { useRealtimeTasks } from '../data/useRealtimeTasks.ts'
 import { useRealtimeMilestones } from '../data/useRealtimeMilestones.ts'
@@ -28,6 +28,7 @@ import { useTaskActor } from '../data/useTaskActor.ts'
 import { useTaskDependencies } from '../data/useTaskDependencies.ts'
 import { useTasksForProgress } from '../data/useTaskHistory.ts'
 import { useTasks, useUpdateTask, type Task } from '../data/useTasks.ts'
+import { gridStyle } from './gantt/ganttGrid.ts'
 import { GanttLegend } from './gantt/GanttLegend.tsx'
 import { GanttToolbar } from './gantt/GanttToolbar.tsx'
 import { MilestoneRow } from './gantt/MilestoneRow.tsx'
@@ -66,7 +67,6 @@ export default function Gantt() {
   const departments = useSubteams()
   const actor = useTaskActor()
   const permissions = usePermissions()
-  const setDrafted = useSetSectionDrafted()
   const updateTask = useUpdateTask()
   useRealtimeTasks()
   useRealtimeTaskDependencies()
@@ -79,15 +79,17 @@ export default function Gantt() {
   // open the level you care about. What is open lives in the address (?open=,
   // ?sections=, ?task=), so it survives a refresh and a link from Milestones or
   // a Board card lands on the right group already expanded.
-  const openMilestones = useMemo(() => readSetParam(params, 'open'), [params])
+  const rawOpen = params.get('open')
   const openSections = useMemo(() => readSetParam(params, 'sections'), [params])
   const expandedTask = params.get('task')
   const scale: 'month' | 'week' = params.get('scale') === 'week' ? 'week' : 'month'
   const [legendOpen, setLegendOpen] = useState(false)
   const legendId = useId()
+  const chartRegion = useRef<HTMLDivElement>(null)
   const writeParams = (patch: Record<string, string | null>) =>
     setParams((current) => mergeSearchParams(current, patch), { replace: true })
-  const setOpenMilestones = (next: ReadonlySet<string>) => writeParams({ open: writeSetParam(next) })
+  // An empty set is written as '-', not left out: no ?open= means "nobody chose yet", and then the next due submission is open.
+  const setOpenMilestones = (next: ReadonlySet<string>) => writeParams({ open: next.size > 0 ? writeSetParam(next) : '-' })
   const setOpenSections = (next: ReadonlySet<string>) => writeParams({ sections: writeSetParam(next) })
   const setScale = (next: 'month' | 'week') => writeParams({ scale: next === 'week' ? 'week' : null })
 
@@ -107,6 +109,15 @@ export default function Gantt() {
   const today = todayIso()
   const myId = auth.status === 'member' ? auth.member.id : null
   const milestoneRows = useMemo(() => milestones.data ?? [], [milestones.data])
+  // Until somebody opens or closes something, the submission due next is open: it is what most visits are for.
+  const openMilestones = useMemo<ReadonlySet<string>>(() => {
+    if (rawOpen === '-') return new Set()
+    if (rawOpen !== null) return readSetParam(params, 'open')
+    const next = milestoneRows
+      .filter((m): m is typeof m & { due_on: string } => m.due_on !== null && m.due_on >= today)
+      .sort((a, b) => a.due_on.localeCompare(b.due_on))[0]
+    return new Set(next ? [next.key] : [])
+  }, [rawOpen, params, milestoneRows, today])
   const sectionRows = useMemo(() => sections.data ?? [], [sections.data])
   const taskRows = useMemo(() => tasks.data ?? [], [tasks.data])
   // Falls back to the active list until the archived part has loaded.
@@ -159,8 +170,16 @@ export default function Gantt() {
   const range = timelineRange(planningDates(milestoneRows, linked), today)
   const ticks = scale === 'week' ? weekTicks(range) : monthTicks(range)
   // Weeks need room to be legible; the chart already scrolls sideways.
-  const chartWidth = scale === 'week' ? `${Math.max(52, ticks.length * 3.5)}rem` : '52rem'
+  const chartWidth = scale === 'week' ? `${Math.max(52, ticks.length * 4.5)}rem` : '52rem'
   const todayLeft = placeDay(today, range)
+  // Brings today into view: the weekly chart is wider than the screen and starts months before it.
+  const jumpToToday = () =>
+    chartRegion.current?.querySelector('[data-testid="gantt-today-label"] span')?.scrollIntoView?.({ inline: 'center', block: 'nearest' })
+  // On the weekly scale the chart opens already at today, so nobody has to hunt for it.
+  useEffect(() => {
+    if (scale === 'week') jumpToToday()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scale, milestoneRows.length])
 
   // Every place a task can be moved to, in timeline order: each section, then
   // the submission's unsectioned group.
@@ -290,7 +309,7 @@ export default function Gantt() {
       {(milestones.isLoading || tasks.isLoading) && (
         <p role="status" className="mb-2 text-xs text-slate-500">Loading…</p>
       )}
-      <ActionError error={updateTask.error ?? setDrafted.error} className="mb-3" />
+      <ActionError error={updateTask.error} className="mb-3" />
       {moveNotice && (
         <p role="alert" className="mb-3 rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-950" data-testid="gantt-move-notice">
           {moveNotice}
@@ -304,12 +323,33 @@ export default function Gantt() {
         </EmptyState>
       ) : (
         <>
-          <p className="mb-2 text-sm text-slate-700" data-testid="gantt-summary">
-            {milestoneRows.length} submission{milestoneRows.length === 1 ? '' : 's'}.{' '}
-            {upcoming ? `Next deadline: ${milestoneLabel(upcoming)} on ${formatDay(upcoming.due_on)}. ` : 'No upcoming deadline is published. '}
-            {linked.length} linked task{linked.length === 1 ? '' : 's'}
-            {linked.length > 0 ? ` (${undated} undated, ${late} overdue)` : ''}. Progress counts archived done work, so
-            archiving a finished task does not lower it.
+          {/* The same sentences as ever, set as three short facts and one quiet note so the numbers can be found at a glance. */}
+          <p className="mb-3 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm text-slate-600" data-testid="gantt-summary">
+            <span>
+              <strong className="font-semibold text-slate-900">{milestoneRows.length}</strong> submission{milestoneRows.length === 1 ? '' : 's'}.
+            </span>{' '}
+            <span>
+              {upcoming ? (
+                <>
+                  Next deadline: <strong className="font-semibold text-slate-900">{milestoneLabel(upcoming)}</strong> on {formatDay(upcoming.due_on)}.
+                </>
+              ) : (
+                'No upcoming deadline is published.'
+              )}
+            </span>{' '}
+            <span>
+              <strong className="font-semibold text-slate-900">{linked.length}</strong> linked task{linked.length === 1 ? '' : 's'}
+              {linked.length > 0 && (
+                <>
+                  {' '}
+                  ({undated} undated, <span className={late > 0 ? 'font-medium text-accent-ring' : undefined}>{late} overdue</span>)
+                </>
+              )}
+              .
+            </span>{' '}
+            <span className="basis-full text-xs text-slate-500">
+              Progress counts archived done work, so archiving a finished task does not lower it.
+            </span>
           </p>
           {!canManage && (
             <p role="status" className="mb-2 text-xs text-slate-600" data-testid="gantt-view-only">
@@ -320,73 +360,81 @@ export default function Gantt() {
           {/* The department lens: the same control, scope and department as the
               Board. It filters the tasks shown while the milestone → section
               structure stays; each submission's OVERALL progress does not move. */}
-          <div className="mb-3 rounded-lg border border-slate-200 bg-white p-3" data-testid="gantt-filters">
-            <ScopeDepartmentFilter
-              scopes={myId ? SCOPES : [SCOPES[0]]}
-              scope={myId ? filter.scope : 'all'}
-              onScope={(scope) => setFilter({ ...filter, scope })}
-              counts={counts}
-              scopeGroupLabel="Which tasks to show"
-              scopeTestId="gantt-scope"
-            />
+          <div className="mb-4 rounded-xl border border-slate-200 bg-surface p-3" data-testid="gantt-filters">
+            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+              <ScopeDepartmentFilter
+                scopes={myId ? SCOPES : [SCOPES[0]]}
+                scope={myId ? filter.scope : 'all'}
+                onScope={(scope) => setFilter({ ...filter, scope })}
+                counts={counts}
+                scopeGroupLabel="Which tasks to show"
+                scopeTestId="gantt-scope"
+              />
+              <GanttToolbar
+                allOpen={allOpen}
+                onToggleAll={() =>
+                  setOpenMilestones(allOpen ? new Set() : new Set(milestoneRows.map((m) => m.key)))
+                }
+                scale={scale}
+                onScale={setScale}
+                legendOpen={legendOpen}
+                legendId={legendId}
+                onLegend={() => setLegendOpen((open) => !open)}
+                onToday={todayLeft !== null ? jumpToToday : undefined}
+              />
+            </div>
             {notice && (
               <p role="status" className="mt-2 text-xs text-amber-900" data-testid="gantt-filter-notice">
                 {notice}
               </p>
             )}
-            <p className="mt-2 text-xs text-slate-600" data-testid="gantt-lens-note">
+            <p className="mt-3 border-t border-slate-200 pt-2 text-xs text-slate-600" data-testid="gantt-lens-note">
               {lensActive
                 ? `Showing ${lensName}. Each submission keeps its overall progress; the department figure beside it counts only these tasks.`
                 : 'Showing every linked task. Pick a department to see one department’s work in the same structure.'}
             </p>
+            <p className="mt-1 text-xs text-slate-500">
+              The dashed line is today, the flag is a submission’s deadline and each dot is a task’s date. Drag a dot to
+              change a deadline, or a row onto another section — or open the task to do the same with the keyboard.
+            </p>
           </div>
-
-          <GanttToolbar
-            allOpen={allOpen}
-            onToggleAll={() =>
-              setOpenMilestones(allOpen ? new Set() : new Set(milestoneRows.map((m) => m.key)))
-            }
-            scale={scale}
-            onScale={setScale}
-            legendOpen={legendOpen}
-            legendId={legendId}
-            onLegend={() => setLegendOpen((open) => !open)}
-          />
           {legendOpen && <GanttLegend id={legendId} />}
 
           {/* The chart keeps its proportions rather than squeezing; on a phone
               it scrolls sideways, which beats months three pixels wide. It is a
               focusable region so a keyboard user can scroll it. */}
           <div
+            ref={chartRegion}
             role="region"
             aria-label="Timeline, scrolls sideways"
             tabIndex={0}
-            className="overflow-x-auto rounded-lg border border-slate-200 bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+            className="overflow-x-auto rounded-xl border border-slate-200 bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
           >
             {/* The padding lives inside the scrolled content, so the sticky
-                label column has no gap for the ruler to show through. */}
-            <div className="p-3" style={{ minWidth: chartWidth }} data-tutorial="gantt-chart">
-              <div className="grid grid-cols-[minmax(15rem,22rem)_1fr] items-start gap-3 border-b border-slate-200 pb-1">
-                <span className="sticky left-0 z-10 self-stretch flex items-center bg-white pr-2 text-xs font-medium text-slate-600">
+                label column has no gap for the ruler to show through. The month
+                lines behind every row come from the ruler's own ticks. */}
+            <div className="p-4 sm:min-w-[var(--gantt-min)]" style={{ '--gantt-min': chartWidth, ...gridStyle(ticks) } as CSSProperties} data-tutorial="gantt-chart">
+              <div className="grid grid-cols-[minmax(17rem,24rem)_1fr] items-start gap-3 border-b border-slate-200 pb-1 max-sm:hidden">
+                <span className="sticky left-0 z-10 flex items-end self-stretch bg-surface pr-2 text-xs font-medium text-slate-500">
                   Submission · section · subtask
                 </span>
                 <div>
                   {/* Today gets a word as well as a line: nothing is colour-only. */}
-                  <div className="relative h-4" data-testid="gantt-today-label">
+                  <div className="relative h-6" data-testid="gantt-today-label">
                     {todayLeft !== null && (
                       <span
-                        className="absolute top-0 -translate-x-1/2 rounded bg-red-700 px-1 text-[10px] font-semibold leading-4 text-white"
+                        className="absolute top-0 -translate-x-1/2 rounded-full bg-accent px-2 text-xs font-semibold leading-5 text-white"
                         style={{ left: `${todayLeft}%` }}
                       >
                         Today
                       </span>
                     )}
                   </div>
-                  <div className="relative h-5" data-testid="gantt-months">
+                  <div className="relative h-6" data-testid="gantt-months">
                     {ticks.map((tick) => (
                       <span
                         key={tick.key}
-                        className="absolute top-0 truncate border-l border-slate-200 px-1 text-center text-[11px] text-slate-500"
+                        className="absolute top-0 h-full truncate border-l border-slate-200 px-1.5 pt-1 text-left text-xs text-slate-500"
                         style={{ left: `${tick.left}%`, width: `${tick.width}%` }}
                       >
                         {tick.label}
@@ -408,7 +456,6 @@ export default function Gantt() {
                     onToggle={() => setOpenMilestones(toggle(openMilestones, milestone.key))}
                     openSections={openSections}
                     onToggleSection={(key) => setOpenSections(toggle(openSections, key))}
-                    onDraftedChange={(id, isDrafted) => setDrafted.mutate({ id, isDrafted })}
                     env={env}
                   />
                 ))}

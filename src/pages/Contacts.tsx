@@ -25,11 +25,11 @@ import { ActionError, EmptyState, ErrorState, LoadingState } from '../ui/states.
 
 // 16px on a phone, so iOS does not zoom the page when a field is tapped.
 const input =
-  'mt-1 block min-h-11 w-full rounded border border-slate-300 bg-white px-2.5 text-base text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-9 sm:text-sm'
+  'mt-1 block min-h-11 w-full rounded border border-slate-300 bg-surface px-2.5 text-base text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-9 sm:text-sm'
 const label = 'block text-sm font-medium text-slate-900'
 const chip = (active: boolean) =>
-  `inline-flex min-h-11 items-center gap-1 rounded-full border px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-8 ${
-    active ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+  `inline-flex min-h-11 items-center gap-1 rounded-full border px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-8 ${
+    active ? 'border-slate-400 bg-slate-200 text-slate-950' : 'border-slate-300 bg-surface text-slate-700 hover:bg-slate-100'
   }`
 
 // Only http(s) links leave the page: anything else typed in is treated as a
@@ -244,7 +244,7 @@ export default function Contacts() {
 function ContactCard({ contact, canEdit, onEdit, onDelete }: { contact: Contact; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
   const link = 'inline-flex min-h-11 items-center break-all text-slate-900 underline decoration-slate-400 underline-offset-2 hover:decoration-slate-900 sm:min-h-0'
   return (
-    <li className="flex flex-col rounded-lg border border-slate-200 bg-white p-3" data-testid={`contact-${contact.id}`}>
+    <li className="flex flex-col rounded-lg border border-slate-200 bg-surface p-3" data-testid={`contact-${contact.id}`}>
       <p className="font-medium text-slate-900">
         {contact.name}
         {contact.title && <span className="font-normal text-slate-600"> · {contact.title}</span>}

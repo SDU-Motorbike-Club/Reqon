@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import type { MilestoneSection } from '../../data/useMilestones.ts'
 import type { Task } from '../../data/useTasks.ts'
-import { formatDay } from '../../lib/dates.ts'
-import { Bar, ROW, STICKY_LABEL, Track } from './GanttChart.tsx'
+import { ROW, STICKY_LABEL, Track } from './GanttChart.tsx'
 import { taskDropHandlers } from './ganttDrag.ts'
 import { GanttTaskRow } from './GanttTaskRow.tsx'
 import { LinkTaskTool } from './LinkTaskTool.tsx'
 import type { GanttEnv } from './ganttEnv.ts'
 import { currentTargetKey, linkCandidates, relinkFrom } from './ganttLinking.ts'
-import { sectionSpan, spanCaption, type Span } from './ganttModel.ts'
 import { progressLabel, sectionProgress, tasksUnderSection, type ProgressSource } from './ganttProgress.ts'
 
 // One milestone section: its drafted tick, its bar, and — when open — its Board
@@ -20,14 +18,11 @@ export function SectionRow({
   milestoneKey,
   tasks,
   progressTasks,
-  fallbackSpan,
   open,
   onToggle,
-  onDraftedChange,
   subsections = [],
   openSections,
   onToggleSection,
-  onDraftedChangeById,
   depth = 0,
   env,
 }: {
@@ -35,15 +30,12 @@ export function SectionRow({
   milestoneKey: string
   tasks: Task[]
   progressTasks: ProgressSource[]
-  fallbackSpan: Span | null
   open: boolean
   onToggle: () => void
-  onDraftedChange: (isDrafted: boolean) => void
   // Subsections are drawn under their parent, one level deep (a subsection has none).
   subsections?: MilestoneSection[]
   openSections?: ReadonlySet<string>
   onToggleSection?: (key: string) => void
-  onDraftedChangeById?: (sectionId: string, isDrafted: boolean) => void
   depth?: number
   env: GanttEnv
 }) {
@@ -54,7 +46,6 @@ export function SectionRow({
   const underAll = tasks.filter((t) => t.section_id === section.id || (t.section_id !== null && subsectionIds.includes(t.section_id)))
   const shown = under.filter(env.lens.matches)
   const progress = sectionProgress(section, progressTasks, subsectionIds)
-  const span = sectionSpan(tasks, section.id, fallbackSpan, subsectionIds)
   const words = progressLabel(progress, 'section', 'drafted')
   const target = { seasonId: env.seasonId, milestoneKey, sectionId: section.id }
   const { direct, relink } = linkCandidates(tasks, target, (t) => env.permsFor(t).canEdit)
@@ -73,54 +64,29 @@ export function SectionRow({
 
   return (
     <div data-testid={`gantt-section-${section.id}`} className={dimmed ? 'opacity-70' : undefined}>
-      <div className={`${ROW} group py-1 ${dropOver ? "rounded ring-2 ring-slate-900" : ""}`} {...drop} data-drop-target="true">
-        <div className={`${STICKY_LABEL} flex items-center gap-1.5 bg-white ${depth > 0 ? 'pl-10' : 'pl-6'} pr-2 group-hover:bg-slate-100`}>
+      <div className={`${ROW} group py-1 ${dropOver ? "rounded-lg ring-2 ring-accent-ring" : ""}`} {...drop} data-drop-target="true">
+        <div className={`${STICKY_LABEL} flex items-center gap-1.5 bg-surface ${depth > 0 ? 'pl-10' : 'pl-6'} pr-2 group-hover:bg-slate-100`}>
           <button
             type="button"
             aria-expanded={open}
             onClick={onToggle}
-            className="flex min-h-11 items-center gap-1.5 text-left text-xs text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+            className="flex min-h-11 items-center gap-1.5 text-left text-xs text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
           >
             <span aria-hidden="true" className="w-3 text-slate-500">
               {open ? '▾' : '▸'}
             </span>
             {section.name}
           </button>
-          {/* The same tick as Milestones, writing to the same row (is_drafted),
-              and called the same: drafted. A drafted section is not done work —
-              progress comes only from its tasks. Plain members see it but cannot
-              change it. */}
-          <label className="ml-auto flex min-h-11 shrink-0 items-center gap-1 text-[11px] text-slate-600 sm:min-h-0">
-            <input
-              type="checkbox"
-              checked={section.is_drafted}
-              disabled={!env.canManage}
-              aria-label={`${section.name} drafted`}
-              onChange={(e) => onDraftedChange(e.target.checked)}
-              className="h-4 w-4 accent-slate-900 disabled:opacity-60"
-            />
-            {progress.basis === 'tasks' ? `${progress.done}/${progress.total}` : 'drafted'}
-          </label>
+          {/* Progress is counted from the section's tasks; the "drafted" tick lives on Milestones, not here. */}
+          <span className="ml-auto shrink-0 text-xs text-slate-600">{progress.basis === 'tasks' ? `${progress.done}/${progress.total}` : ''}</span>
         </div>
 
         <Track
           today={env.todayLeft}
-          summary={`${section.name}: ${words}${span ? `, ${formatDay(span.from)} to ${formatDay(span.to)}` : ''}${
+          summary={`${section.name}: ${words}${
             env.lens.active ? `. ${shown.length} task${shown.length === 1 ? '' : 's'} shown for ${env.lens.name}` : ''
           }`}
         >
-          {span && (
-            <Bar
-              span={span}
-              range={env.range}
-              percent={progress.percent ?? 0}
-              tone={underAll.length > 0 ? 'bg-slate-500' : 'bg-slate-300'}
-              caption={spanCaption(span)}
-              title={`${section.name}: ${formatDay(span.from)} → ${formatDay(span.to)} · ${words}${
-                underAll.length === 0 ? ' (no dated subtasks — shows the submission window)' : ''
-              }`}
-            />
-          )}
         </Track>
       </div>
 
@@ -164,22 +130,20 @@ export function SectionRow({
               milestoneKey={milestoneKey}
               tasks={tasks}
               progressTasks={progressTasks}
-              fallbackSpan={fallbackSpan}
               open={openSections?.has(sub.id) ?? false}
               onToggle={() => onToggleSection?.(sub.id)}
-              onDraftedChange={(isDrafted) => onDraftedChangeById?.(sub.id, isDrafted)}
               depth={depth + 1}
               env={env}
             />
           ))}
 
           {underAll.length === 0 && (
-            <p className="sticky left-0 z-10 w-fit bg-white pl-12 text-[11px] text-slate-600">
+            <p className="sticky left-0 z-10 w-fit bg-surface pl-12 text-[11px] text-slate-600">
               No subtasks yet.{env.canManage ? ' Link an existing Board task below.' : ''}
             </p>
           )}
           {under.length > 0 && shown.length === 0 && (
-            <p className="sticky left-0 z-10 w-fit bg-white pl-12 text-[11px] text-slate-600" data-testid={`gantt-section-empty-${section.id}`}>
+            <p className="sticky left-0 z-10 w-fit bg-surface pl-12 text-[11px] text-slate-600" data-testid={`gantt-section-empty-${section.id}`}>
               Nothing for {env.lens.name} in this section ({under.length} task{under.length === 1 ? '' : 's'} hidden by the
               filter).
             </p>

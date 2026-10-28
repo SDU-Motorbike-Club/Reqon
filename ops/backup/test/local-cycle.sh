@@ -125,7 +125,7 @@ kill $WRITER 2>/dev/null; wait $WRITER 2>/dev/null
 check "…reported as database_busy" grep -qx database_busy "$OUT/failure-code"
 sql "drop table public.zz_backup_probe" >/dev/null
 
-section "R2 (BAK-03/04): daily, Sunday → weekly, the 1st → monthly"
+section "R2 (BAK-03/04): daily, Monday → weekly, the 1st → monthly"
 cp "$FILE" "$OUT/keep.tar.age"; cp "$META" "$OUT/keep.meta.json"
 mkdir -p "$T/pub"
 publish_as() { # publish_as <stamp> → copies the verified backup under that stamp and publishes it
@@ -135,8 +135,10 @@ publish_as() { # publish_as <stamp> → copies the verified backup under that st
 }
 publish_as 20261007T031700Z >/dev/null 2>&1 && ok "Wednesday 2026-10-07 is uploaded" || bad "Wednesday upload"
 check "…only to daily/" test "$(cat "$T/pub/20261007T031700Z/published")" = "daily/reqon-backup-20261007T031700Z.tar.age"
-publish_as 20261011T031700Z >/dev/null 2>&1; check "Sunday 2026-10-11 → daily/ and weekly/" test "$(tr '\n' ' ' < "$T/pub/20261011T031700Z/published")" = "daily/reqon-backup-20261011T031700Z.tar.age weekly/reqon-backup-20261011T031700Z.tar.age "
-publish_as 20261101T031700Z >/dev/null 2>&1; check "Sunday 1 Nov 2026 → daily/, weekly/ and monthly/" test "$(wc -l < "$T/pub/20261101T031700Z/published")" = "3"
+publish_as 20261011T031700Z >/dev/null 2>&1; check "Sunday 2026-10-11 → daily/ only (Sunday is no longer a weekly day)" test "$(cat "$T/pub/20261011T031700Z/published")" = "daily/reqon-backup-20261011T031700Z.tar.age"
+publish_as 20261012T031700Z >/dev/null 2>&1; check "Monday 2026-10-12 → daily/ and weekly/" test "$(tr '\n' ' ' < "$T/pub/20261012T031700Z/published")" = "daily/reqon-backup-20261012T031700Z.tar.age weekly/reqon-backup-20261012T031700Z.tar.age "
+publish_as 20261015T031700Z >/dev/null 2>&1; check "Thursday 2026-10-15 → daily/ only (Thursday's copy goes to Drive, not R2 weekly/)" test "$(cat "$T/pub/20261015T031700Z/published")" = "daily/reqon-backup-20261015T031700Z.tar.age"
+publish_as 20270301T031700Z >/dev/null 2>&1; check "Monday 1 Mar 2027 → daily/, weekly/ and monthly/" test "$(wc -l < "$T/pub/20270301T031700Z/published")" = "3"
 check "the bucket holds the encrypted bytes, identical to the local file" bash -c "rclone cat '$R2/daily/reqon-backup-20261007T031700Z.tar.age' | cmp - '$FILE'"
 BACKUP_FOLDERS=bogus BACKUP_OUT_DIR="$T/pub/20261007T031700Z" BACKUP_R2_REMOTE="$R2" expect_exit 2 "an unknown folder is refused" "$OPS/publish.sh"
 mkdir -p "$T/two"; cp "$FILE" "$FILE.copy" 2>/dev/null; cp "$FILE" "$T/two/reqon-backup-20261001T000000Z.tar.age"; cp "$FILE" "$T/two/reqon-backup-20261002T000000Z.tar.age"

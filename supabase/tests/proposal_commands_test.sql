@@ -136,13 +136,9 @@ begin
   select count(*) into a1 from task_proposals;
   perform pg_temp.chk('empty title refused', pg_temp.val(mem, format('select submit_proposal(%L, %L, %L, %L::date, %L, %L::text[])::text', sA, '   ', dA, '2026-12-01', 'PC-A1', array[c1])) = 'E:23514');
   perform pg_temp.chk('title over 200 characters refused', pg_temp.val(mem, format('select submit_proposal(%L, %L, %L, %L::date, %L, %L::text[])::text', sA, repeat('x', 201), dA, '2026-12-01', 'PC-A1', array[c1])) = 'E:23514');
-  perform pg_temp.chk('missing department refused', pg_temp.val(mem, format('select submit_proposal(%L, %L, null, %L::date, %L, %L::text[])::text', sA, 'T', '2026-12-01', 'PC-A1', array[c1])) = 'E:23502');
   perform pg_temp.chk('unknown department refused', pg_temp.val(mem, format('select submit_proposal(%L, %L, %L, %L::date, %L, %L::text[])::text', sA, 'T', 'NO_SUCH_DEPT', '2026-12-01', 'PC-A1', array[c1])) = 'E:23514');
   perform pg_temp.chk('missing deadline refused', pg_temp.val(mem, format('select submit_proposal(%L, %L, %L, null, %L, %L::text[])::text', sA, 'T', dA, 'PC-A1', array[c1])) = 'E:23502');
-  perform pg_temp.chk('missing milestone refused', pg_temp.val(mem, format('select submit_proposal(%L, %L, %L, %L::date, null, %L::text[])::text', sA, 'T', dA, '2026-12-01', array[c1])) = 'E:23514');
   perform pg_temp.chk('a milestone from another season refused', pg_temp.val(mem, format('select submit_proposal(%L, %L, %L, %L::date, %L, %L::text[])::text', sA, 'T', dA, '2026-12-01', 'PC-B1', array[c1])) = 'E:23514');
-  perform pg_temp.chk('null requirement list refused', pg_temp.val(mem, format('select submit_proposal(%L, %L, %L, %L::date, %L, null)::text', sA, 'T', dA, '2026-12-01', 'PC-A1')) = 'E:23514');
-  perform pg_temp.chk('empty requirement list refused', pg_temp.val(mem, format('select submit_proposal(%L, %L, %L, %L::date, %L, %L::text[])::text', sA, 'T', dA, '2026-12-01', 'PC-A1', '{}'::text[])) = 'E:23514');
   perform pg_temp.chk('an unknown requirement refused', pg_temp.val(mem, format('select submit_proposal(%L, %L, %L, %L::date, %L, %L::text[])::text', sA, 'T', dA, '2026-12-01', 'PC-A1', array['NOT-A-CLAUSE'])) = 'E:23503');
   perform pg_temp.chk('an explicit null priority refused', pg_temp.val(mem, format('select submit_proposal(%L, %L, %L, %L::date, %L, %L::text[], null, null)::text', sA, 'T', dA, '2026-12-01', 'PC-A1', array[c1])) = 'E:23502');
   perform pg_temp.chk('an invalid priority value refused', pg_temp.act(mem, format('select submit_proposal(%L, %L, %L, %L::date, %L, %L::text[], null, ''critical'')', sA, 'T', dA, '2026-12-01', 'PC-A1', array[c1])) <> 'ok');
@@ -151,6 +147,15 @@ begin
   perform pg_temp.chk('an alumnus cannot submit', pg_temp.val(alum, format('select submit_proposal(%L, %L, %L, %L::date, %L, %L::text[])::text', sA, 'T', dA, '2026-12-01', 'PC-A1', array[c1])) = 'E:42501');
   select count(*) into a2 from task_proposals;
   perform pg_temp.chk('no refused submission left a proposal behind', a1 = a2, format('%s -> %s', a1, a2));
+  -- Milestone and requirements are optional (20260149000000): a proposal without them is accepted, and a
+  -- milestone or requirement that IS given must still be real.
+  perform pg_temp.chk('a proposal with no department is accepted', pg_temp.val(mem, format('select submit_proposal(%L, %L, null, %L::date, %L, %L::text[])::text', sA, 'No department', '2026-12-01', 'PC-A1', array[c1])) not like 'E:%');
+  perform pg_temp.chk('the department-less proposal really has none', exists (select 1 from task_proposals where title = 'No department' and subteam_key is null));
+  perform pg_temp.chk('a proposal with no milestone is accepted', pg_temp.val(mem, format('select submit_proposal(%L, %L, %L, %L::date, null, %L::text[])::text', sA, 'No milestone', dA, '2026-12-01', array[c1])) not like 'E:%');
+  perform pg_temp.chk('a proposal with a null requirement list is accepted', pg_temp.val(mem, format('select submit_proposal(%L, %L, %L, %L::date, %L, null)::text', sA, 'No requirements', dA, '2026-12-01', 'PC-A1')) not like 'E:%');
+  perform pg_temp.chk('a proposal with an empty requirement list is accepted', pg_temp.val(mem, format('select submit_proposal(%L, %L, %L, %L::date, %L, %L::text[])::text', sA, 'Empty requirements', dA, '2026-12-01', 'PC-A1', '{}'::text[])) not like 'E:%');
+  perform pg_temp.chk('the milestone-less proposal really has none', exists (select 1 from task_proposals where title = 'No milestone' and milestone_key is null));
+  perform pg_temp.chk('the requirement-less proposal really has none', not exists (select 1 from proposal_requirements r join task_proposals p on p.id = r.proposal_id where p.title = 'No requirements'));
   update subteams set archived_at = now(), archive_reason = 'test' where key = dC;
   perform pg_temp.chk('an archived department refused', pg_temp.val(mem, format('select submit_proposal(%L, %L, %L, %L::date, %L, %L::text[])::text', sA, 'T', dC, '2026-12-01', 'PC-A1', array[c1])) = 'E:23514');
   update subteams set archived_at = null, archive_reason = null where key = dC;

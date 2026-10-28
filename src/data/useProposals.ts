@@ -261,10 +261,12 @@ export function useSubmitProposal() {
         await supabase.rpc('submit_proposal', {
           p_season_id: seasonId,
           p_title: proposal.title,
-          p_subteam_key: proposal.departmentKey,
+          // Optional: no department is sent as null (the generated type has no default for this argument).
+          p_subteam_key: (proposal.departmentKey || null) as string,
           p_due_date: proposal.dueDate,
-          p_milestone_key: proposal.milestoneKey,
-          p_clause_keys: proposal.requirementKeys,
+          // Optional: no milestone is sent as null (the generated type has no default for this argument).
+          p_milestone_key: (proposal.milestoneKey || null) as string,
+          p_clause_keys: proposal.requirementKeys ?? [],
           p_description: proposal.description ?? undefined,
           p_priority: proposal.priority ?? 'normal',
           ...(proposal.ownerId ? { p_owner_id: proposal.ownerId } : {}),

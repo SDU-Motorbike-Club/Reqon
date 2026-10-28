@@ -3,14 +3,14 @@ import type { BackupRun } from '../data/useBackups.ts'
 
 // How healthy each backup destination looks, from the rows the workflow recorded (Ultraplan Phase 4;
 // BAK-08/09). Pure: the panel only displays what this decides. The daily R2 copy is expected every ~24 h
-// (stale after 48 h); the GitHub and Drive copies are weekly (stale after 9 days).
+// (stale after 48 h); the GitHub (Mondays) and Drive (Thursdays) copies are each weekly, on different days so one failed run cannot cost both (stale after 9 days).
 
 export type Destination = 'r2' | 'github' | 'drive'
 
 export const DESTINATIONS: readonly { id: Destination; label: string; staleAfterHours: number; cadence: string }[] = [
   { id: 'r2', label: 'Cloudflare R2 (daily)', staleAfterHours: 48, cadence: 'every day' },
-  { id: 'github', label: 'Private GitHub repository (weekly)', staleAfterHours: 9 * 24, cadence: 'every Sunday' },
-  { id: 'drive', label: 'Google Drive (weekly)', staleAfterHours: 9 * 24, cadence: 'every Sunday' },
+  { id: 'github', label: 'Private GitHub repository (weekly)', staleAfterHours: 9 * 24, cadence: 'every Monday' },
+  { id: 'drive', label: 'Google Drive (weekly)', staleAfterHours: 9 * 24, cadence: 'every Thursday' },
 ]
 
 export type HealthState = 'ok' | 'stale' | 'failed' | 'never'

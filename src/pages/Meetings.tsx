@@ -2,14 +2,16 @@ import { useId, useState } from 'react'
 import { usePermissions } from '../auth/usePermissions.ts'
 import {
   useDeleteMeeting,
+  useMeetingAttendance,
   useMeetingTemplate,
   useMeetings,
   useSaveMeetingTemplate,
   type Meeting,
 } from '../data/useMeetings.ts'
+import { useMembers } from '../data/useMembers.ts'
 import { useSubteams } from '../data/useSubteams.ts'
-import { formatDay } from '../lib/dates.ts'
-import { MarkdownField } from '../meetings/MarkdownField.tsx'
+import { formatDay, todayIso } from '../lib/dates.ts'
+import { RichTextField } from '../meetings/RichTextField.tsx'
 import { MeetingDialog } from '../meetings/MeetingDialog.tsx'
 import { MeetingShare } from '../meetings/MeetingShare.tsx'
 import { MeetingText } from '../meetings/MeetingText.tsx'
@@ -42,6 +44,13 @@ export default function Meetings() {
   const template = useMeetingTemplate()
   const remove = useDeleteMeeting()
   const departments = useSubteams()
+  const members = useMembers()
+  const attendance = useMeetingAttendance()
+  // Who came, by name and in alphabetical order; a member who has since left the roster still reads by name.
+  const whoCame = (meetingId: string): string[] => {
+    const names = new Map((members.data ?? []).map((m) => [m.id, m.full_name]))
+    return (attendance.data?.get(meetingId) ?? []).map((id) => names.get(id) ?? 'Someone no longer on the roster').sort((a, b) => a.localeCompare(b))
+  }
   const departmentName = (key: string | null) =>
     key ? (departments.data?.find((d) => d.key === key)?.name ?? key) : null
   const [editing, setEditing] = useState<Meeting | 'new' | null>(null)
@@ -70,8 +79,23 @@ export default function Meetings() {
       <PageHeader
         title="Meetings"
         description="When the club met, what was on the agenda, and what was decided."
+        actions={
+          can.canCreateMeeting && (
+            <button
+              type="button"
+              className={buttonPrimary}
+              data-tutorial="meeting-new"
+              onClick={() => {
+                setMessage('')
+                setEditing('new')
+              }}
+            >
+              New meeting
+            </button>
+          )
+        }
       >
-        <p className="mt-2 text-sm text-slate-700" data-testid="meeting-access">
+        <p className="text-sm text-slate-700" data-testid="meeting-access">
           {can.canCreateMeeting
             ? 'You can call a meeting and write its agenda and minutes.'
             : 'Everyone can read these. The President or Vice President calls a meeting.'}
@@ -82,19 +106,6 @@ export default function Meetings() {
         <h2 className="text-sm font-semibold text-slate-900">
           {rows.length === 1 ? '1 meeting' : `${rows.length} meetings`}
         </h2>
-        {can.canCreateMeeting && (
-          <button
-            type="button"
-            className={buttonPrimary}
-            data-tutorial="meeting-new"
-            onClick={() => {
-              setMessage('')
-              setEditing('new')
-            }}
-          >
-            New meeting
-          </button>
-        )}
       </div>
       <p role="status" className="mt-1 min-h-5 text-sm text-emerald-800">
         {message}
@@ -120,17 +131,24 @@ export default function Meetings() {
             {rows.map((meeting) => (
               <li
                 key={meeting.id}
-                className="rounded-lg border border-slate-200 bg-white p-3"
+                className="pc-lift rounded-lg border border-slate-200 bg-surface p-3"
                 data-testid={`meeting-${meeting.id}`}
               >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-slate-900">{meeting.title}</h3>
-                  <p className="text-sm text-slate-700">
+                {/* Weekly meetings share a title, so the DATE is what tells them apart: it leads, in the heading
+                    weight, and a meeting still to come says so in words. */}
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <p className="flex flex-wrap items-center gap-2 text-base font-semibold text-slate-950">
                     <time dateTime={meeting.held_on}>{when(meeting)}</time>
-                    {meeting.location ? ` · ${meeting.location}` : ''}
-                    {meeting.subteam_key ? ` · For ${departmentName(meeting.subteam_key)}` : ''}
+                    {meeting.held_on >= todayIso() && (
+                      <span className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800">Upcoming</span>
+                    )}
+                  </p>
+                  <p className="text-sm text-slate-600">
+                    {meeting.location ? `${meeting.location}` : ''}
+                    {meeting.subteam_key ? `${meeting.location ? ' · ' : ''}For ${departmentName(meeting.subteam_key)}` : ''}
                   </p>
                 </div>
+                <h3 className="text-sm text-slate-700">{meeting.title}</h3>
 
                 {meeting.agenda && (
                   <div className="mt-2">
@@ -148,8 +166,12 @@ export default function Meetings() {
                     </div>
                   </div>
                 )}
-                {meeting.attendees && (
-                  <p className="mt-2 text-xs text-slate-600">Who came: {meeting.attendees}</p>
+                {whoCame(meeting.id).length > 0 ? (
+                  <p className="mt-2 text-xs text-slate-600" data-testid={`meeting-who-${meeting.id}`}>
+                    Who came ({whoCame(meeting.id).length}): {whoCame(meeting.id).join(', ')}
+                  </p>
+                ) : (
+                  meeting.attendees && <p className="mt-2 text-xs text-slate-600">Who came: {meeting.attendees}</p>
                 )}
 
                 <MeetingShare meeting={meeting} department={departmentName(meeting.subteam_key)} />
@@ -291,7 +313,7 @@ function DefaultAgenda({ canEdit, onSaved }: { canEdit: boolean; onSaved: (messa
   }
 
   return (
-    <section className="mt-8 rounded-lg border border-slate-200 bg-white p-3" aria-labelledby={`${id}-heading`} data-tutorial="meeting-template">
+    <section className="mt-8 rounded-lg border border-slate-200 bg-surface p-3" aria-labelledby={`${id}-heading`} data-tutorial="meeting-template">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <h2 id={`${id}-heading`} className="text-sm font-semibold text-slate-900">
@@ -343,12 +365,12 @@ function DefaultAgenda({ canEdit, onSaved }: { canEdit: boolean; onSaved: (messa
               </p>
             )}
             <div className="mt-3">
-              <MarkdownField
+              <RichTextField
                 id={`${id}-body`}
                 label="Default agenda"
                 value={draft.body}
                 onChange={(body) => setDraft({ ...draft, body })}
-                rows={12}
+                size="large"
                 disabled={save.isPending}
               />
             </div>

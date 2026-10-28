@@ -58,7 +58,7 @@ export function TaskCard(props: Props) {
     <li
       ref={cardRef}
       tabIndex={focused ? -1 : undefined}
-      className={`rounded border bg-white p-2 ${focused ? 'border-slate-900 ring-2 ring-slate-400' : 'border-slate-200'}`}
+      className={`pc-lift rounded border bg-surface p-2 ${focused ? 'border-slate-900 ring-2 ring-slate-400' : 'border-slate-200'}`}
       data-testid={`task-${task.id}`}
       data-task-state={task.state}
       data-source-proposal={task.source_proposal ?? ''}
@@ -137,7 +137,7 @@ export function TaskCard(props: Props) {
         aria-haspopup="dialog"
         aria-expanded={props.detailsOpen}
         onClick={props.onOpenDetails}
-        className="mt-2 inline-flex min-h-11 items-center rounded text-xs font-medium text-slate-700 underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:outline-none sm:min-h-0"
+        className="mt-2 inline-flex min-h-11 items-center rounded text-xs font-medium text-slate-700 underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-accent-ring focus-visible:outline-none sm:min-h-0"
         data-testid={`task-more-${task.id}`}
       >
         {perms.canEdit ? 'Details and edit' : 'Details'}

@@ -17,17 +17,19 @@ describe('submissionProblems', () => {
   it.each<[string, Partial<NewProposal>]>([
     ['title', { title: '   ' }],
     ['title', { title: 'x'.repeat(201) }],
-    ['department', { departmentKey: '' }],
     ['dueDate', { dueDate: '' }],
     ['dueDate', { dueDate: '2026-13-45' }],
     ['dueDate', { dueDate: '2026-12-01T10:00:00Z' }],
-    ['milestone', { milestoneKey: '' }],
-    ['requirement', { requirementKeys: [] }],
   ])('names the missing %s', (problem, override) => {
     expect(submissionProblems({ ...complete, ...override })).toEqual([problem])
   })
 
+  it('needs only a title and a deadline: a department, a milestone and requirements are optional', () => {
+    expect(submissionProblems({ title: 'Mount the rear wing', dueDate: '2026-12-01' })).toEqual([])
+    expect(submissionProblems({ ...complete, departmentKey: '', milestoneKey: '', requirementKeys: [] })).toEqual([])
+  })
+
   it('reports every missing field at once', () => {
-    expect(submissionProblems({})).toEqual(['title', 'department', 'dueDate', 'milestone', 'requirement'])
+    expect(submissionProblems({})).toEqual(['title', 'dueDate'])
   })
 })

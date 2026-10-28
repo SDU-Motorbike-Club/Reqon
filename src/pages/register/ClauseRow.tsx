@@ -119,14 +119,14 @@ function ClauseRowInner({
         {specs.map((spec, i) => (
           <span
             key={i}
-            className="rounded border border-slate-300 bg-white px-1.5 py-0.5 font-mono text-[11px] text-slate-700"
+            className="rounded border border-slate-300 bg-surface px-1.5 py-0.5 font-mono text-[11px] text-slate-700"
           >
             {formatSpec(spec)}
           </span>
         ))}
       </div>
 
-      <p className={`mt-1 max-w-[80ch] text-sm ${parked ? 'text-slate-500' : 'text-slate-800'}`}>
+      <p className={`mt-1 text-sm ${parked ? 'text-slate-500' : 'text-slate-800'}`}>
         {clause.body}
       </p>
 
@@ -143,7 +143,7 @@ function ClauseRowInner({
           }}
           aria-current={reading ? 'true' : undefined}
           data-testid={`book-link-${clause.clause_key}`}
-          className="inline-flex min-h-11 items-center rounded text-slate-800 underline decoration-slate-400 underline-offset-2 hover:decoration-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+          className="inline-flex min-h-11 items-center rounded text-slate-800 underline decoration-slate-400 underline-offset-2 hover:decoration-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
         >
           Open in Requirements Book
           <span className="sr-only"> for {clause.printed_ref}</span>
@@ -182,7 +182,7 @@ function ClauseRowInner({
           id={`state-${clause.clause_key}`}
           value={row.state}
           onChange={(e) => onSetState(clause.clause_key, e.target.value as ClauseState)}
-          className="min-h-11 w-full min-w-0 rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0 sm:w-auto"
+          className="min-h-11 w-full min-w-0 rounded border border-slate-300 bg-surface px-2 py-1 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0 sm:w-auto"
         >
           {STATES.map((s) => (
             <option key={s.value} value={s.value}>
@@ -198,7 +198,7 @@ function ClauseRowInner({
           id={`owner-${clause.clause_key}`}
           value={row.ownerId ?? ''}
           onChange={(e) => onSetOwner(clause.clause_key, e.target.value || null)}
-          className="min-h-11 w-full max-w-full min-w-0 rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0 sm:w-48"
+          className="min-h-11 w-full max-w-full min-w-0 rounded border border-slate-300 bg-surface px-2 py-1 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0 sm:w-48"
         >
           <option value="">Unassigned</option>
           {owners.map((m) => (
@@ -224,7 +224,7 @@ function ClauseRowInner({
                 onSetEvidence(clause.clause_key, evidence)
               }
             }}
-            className="mt-0.5 min-h-11 w-full min-w-0 rounded border border-slate-300 px-2 py-1 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+            className="mt-0.5 min-h-11 w-full min-w-0 rounded border border-slate-300 px-2 py-1 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
           />
         </div>
 
@@ -233,10 +233,10 @@ function ClauseRowInner({
           aria-pressed={row.starred}
           aria-label={`${row.starred ? 'Unstar' : 'Star'} ${clause.printed_ref}`}
           onClick={() => onToggleStar(clause.clause_key, !row.starred)}
-          className={`min-h-11 min-w-11 rounded border px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0 sm:min-w-0 ${
+          className={`min-h-11 min-w-11 rounded border px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0 sm:min-w-0 ${
             row.starred
               ? 'border-amber-400 bg-amber-100 text-amber-900'
-              : 'border-slate-300 bg-white text-slate-500'
+              : 'border-slate-300 bg-surface text-slate-500'
           }`}
         >
           {row.starred ? '★' : '☆'}

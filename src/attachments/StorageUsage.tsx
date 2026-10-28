@@ -11,10 +11,10 @@ export function StorageUsage() {
   if (usage.error) return <ErrorState title="Could not load the storage usage" error={usage.error} onRetry={() => void usage.refetch()} />
   if (usage.isPending) return <LoadingState label="Loading storage usage…" />
   return (
-    <div className="space-y-3 rounded border border-slate-200 bg-white p-3" data-testid="storage-usage">
+    <div className="space-y-3 rounded border border-slate-200 bg-surface p-3" data-testid="storage-usage">
       {usage.data.map((row) => {
         const pct = row.quotaBytes > 0 ? Math.min(100, Math.round((row.usedBytes / row.quotaBytes) * 100)) : 0
-        const tone = pct >= 90 ? 'bg-red-600' : pct >= 75 ? 'bg-amber-500' : 'bg-slate-700'
+        const tone = pct >= 90 ? 'bg-danger' : pct >= 75 ? 'bg-amber-500' : 'bg-slate-700'
         return (
           <div key={row.quotaGroup}>
             <div className="flex justify-between text-sm">

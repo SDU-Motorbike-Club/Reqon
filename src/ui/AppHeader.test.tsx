@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { signOut, who, inbox } = vi.hoisted(() => ({ signOut: vi.fn(), who: { roles: [] as string[] }, inbox: { unread: 0 } }))
+const { signOut, who, inbox } = vi.hoisted(() => ({ signOut: vi.fn(), who: { roles: [] as string[], picture: null as string | null }, inbox: { unread: 0 } }))
 vi.mock('../auth/context.ts', () => ({
   useAuth: () => ({ status: 'member', user: { id: 'm1' }, member: { id: 'm1', full_name: 'Ada Rider' }, roles: who.roles, signOut }),
 }))
@@ -15,6 +15,9 @@ vi.mock('../data/useCurrentSeason.ts', () => ({
 vi.mock('../data/useTaskActor.ts', () => ({
   useTaskActor: () => ({ id: 'm1', status: 'active', isDeveloper: who.roles.includes('developer'), headOf: [] }),
 }))
+
+// Only your own picture is read here (one row); the header never loads everyone's.
+vi.mock('../data/useAvatars.ts', () => ({ useMyAvatar: () => ({ data: who.picture }) }))
 
 // The inbox count is its own query; the header only reads the number.
 vi.mock('../data/useNotifications.ts', () => ({
@@ -40,11 +43,23 @@ function renderHeader(path = '/register') {
 beforeEach(() => {
   signOut.mockClear()
   who.roles = []
+  who.picture = null
   inbox.unread = 0
   window.localStorage.setItem('reqon.tutorial.v2', 'completed')
 })
 
 const desktopNav = () => screen.getAllByRole('navigation', { name: 'Main' })[0]
+
+describe('your picture', () => {
+  it('shows your initials beside your name until you have a photo, then the photo', () => {
+    const { unmount } = renderHeader()
+    expect(screen.getAllByTestId('avatar-initials')[0]).toHaveTextContent('AR')
+    unmount()
+    who.picture = 'data:image/webp;base64,AAAA'
+    renderHeader()
+    expect(screen.getAllByTestId('avatar-image')[0]).toHaveAttribute('src', 'data:image/webp;base64,AAAA')
+  })
+})
 
 describe('inbox', () => {
   it('is one link outside the menu, on every width, with the unread count in words', () => {
@@ -75,9 +90,9 @@ describe('main navigation', () => {
     renderHeader()
     const labels = within(desktopNav()).getAllByRole('link').map((a) => a.textContent)
     // Now · daily work · planning · competition rules · records · admin. (Files shows only with attachments on,
-    // Finances only for people who may see money.) Proposals and Meetings are two screens.
+    // Finances only for people who may see money.) Proposals are an overlay on the Board, not a screen.
     expect(labels).toEqual([
-      'Now', 'Board', 'Tasks', 'Proposals', 'Meetings', 'Team', 'Milestones', 'Gantt', 'Register', 'Book', 'Spec sheet', 'Contacts', 'Contributions', 'Settings',
+      'Now', 'Board', 'Tasks', 'Meetings', 'Tools', 'Milestones', 'Gantt', 'Register', 'Book', 'Spec sheet', 'Contacts', 'Contributions', 'Settings',
     ])
   })
 

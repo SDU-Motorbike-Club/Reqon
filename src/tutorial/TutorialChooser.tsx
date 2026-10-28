@@ -4,11 +4,11 @@ import { Dialog } from '../ui/Dialog.tsx'
 import { useTutorial } from './context.ts'
 
 const option =
-  'flex min-h-11 w-full flex-col items-start gap-0.5 rounded-lg px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2'
-const optionPrimary = `${option} bg-slate-900 text-white hover:bg-slate-800`
-const optionSecondary = `${option} border border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50`
+  'flex min-h-11 w-full flex-col items-start gap-0.5 rounded-lg px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring focus-visible:ring-offset-2'
+const optionPrimary = `${option} bg-accent text-white hover:bg-accent-hover`
+const optionSecondary = `${option} border border-slate-300 bg-surface text-slate-900 hover:border-slate-400 hover:bg-slate-50`
 const chapterButton =
-  'flex min-h-11 w-full items-center justify-between gap-3 rounded border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-800 hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500'
+  'flex min-h-11 w-full items-center justify-between gap-3 rounded border border-slate-200 bg-surface px-3 py-2 text-left text-sm font-medium text-slate-800 hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring'
 
 const stepCount = (n: number) => `${n} ${n === 1 ? 'step' : 'steps'}`
 

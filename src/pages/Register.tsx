@@ -247,7 +247,7 @@ export default function Register() {
   const error = clauses.error ?? statuses.error ?? members.error ?? subteams.error
   if (error) {
     return (
-      <main id="main-content" tabIndex={-1} className={pageMain()}>
+      <main id="main-content" tabIndex={-1} className={pageMain('wide')}>
         <ErrorState
           title="Could not load the register"
           error={error}
@@ -279,7 +279,7 @@ export default function Register() {
         : null
 
   return (
-    <main id="main-content" tabIndex={-1} className={pageMain()}>
+    <main id="main-content" tabIndex={-1} className={pageMain('wide')}>
       <PageHeader
         title="Register"
         description="Every rule in the regulations, and what the team has done about each one."
@@ -301,7 +301,7 @@ export default function Register() {
         <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">
           Group by
         </legend>
-        <div className="inline-flex flex-wrap gap-0.5 rounded-md border border-slate-300 bg-white p-0.5">
+        <div className="inline-flex flex-wrap gap-0.5 rounded-md border border-slate-300 bg-surface p-0.5">
           {GROUPINGS.map((g) => (
             <button
               key={g.id}
@@ -309,9 +309,9 @@ export default function Register() {
               aria-pressed={grouping === g.id}
               title={g.hint}
               onClick={() => setGrouping(g.id)}
-              className={`min-h-11 rounded px-2.5 py-1 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0 ${
+              className={`min-h-11 rounded px-2.5 py-1 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0 ${
                 grouping === g.id
-                  ? 'bg-slate-900 text-white shadow-sm'
+                  ? 'bg-slate-200 text-slate-950'
                   : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
               }`}
             >
@@ -332,7 +332,7 @@ export default function Register() {
             value={filters.search}
             onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
             placeholder="Reference or wording…"
-            className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+            className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
           />
         </div>
 
@@ -344,7 +344,7 @@ export default function Register() {
             id="obligation"
             value={filters.obligation}
             onChange={(e) => setFilters((f) => ({ ...f, obligation: e.target.value }))}
-            className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+            className="mt-1 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
           >
             <option value="all">All kinds</option>
             {obligations.map((o) => (
@@ -363,7 +363,7 @@ export default function Register() {
             id="owner"
             value={filters.owner}
             onChange={(e) => setFilters((f) => ({ ...f, owner: e.target.value }))}
-            className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+            className="mt-1 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
           >
             <option value="all">Anyone</option>
             <option value="unassigned">Unassigned</option>
@@ -384,7 +384,7 @@ export default function Register() {
               onChange={(e) =>
                 setFilters((f) => ({ ...f, teamDutiesOnly: e.target.checked }))
               }
-              className="h-5 w-5 accent-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+              className="h-5 w-5 accent-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
             />
             Team duties only
           </label>
@@ -395,7 +395,7 @@ export default function Register() {
               onChange={(e) =>
                 setFilters((f) => ({ ...f, unresolvedOnly: e.target.checked }))
               }
-              className="h-5 w-5 accent-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+              className="h-5 w-5 accent-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
             />
             Unresolved only
           </label>
@@ -410,7 +410,7 @@ export default function Register() {
           <button
             type="button"
             onClick={() => setSearchParams((current) => mergeSearchParams(current, { chapter: null }), { replace: true })}
-            className="rounded border border-slate-300 bg-white px-2 py-0.5 text-xs hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+            className="rounded border border-slate-300 bg-surface px-2 py-0.5 text-xs hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
           >
             Clear
           </button>
@@ -424,7 +424,7 @@ export default function Register() {
           <button
             type="button"
             onClick={() => setSearchParams((current) => mergeSearchParams(current, { subteam: null }), { replace: true })}
-            className="rounded border border-slate-300 bg-white px-2 py-0.5 text-xs hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+            className="rounded border border-slate-300 bg-surface px-2 py-0.5 text-xs hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
           >
             Clear
           </button>
@@ -445,7 +445,7 @@ export default function Register() {
       <div id="register-list">
         {groups.map((group) => (
           <section key={group.key} className="mb-5">
-            <h2 className="sticky top-0 z-10 border-b border-slate-300 bg-white py-1.5 text-sm font-semibold text-slate-900">
+            <h2 className="sticky top-0 z-10 border-b border-slate-300 bg-surface py-1.5 text-sm font-semibold text-slate-900">
               {group.label}{' '}
               <span className="font-normal text-slate-500">({group.rows.length})</span>
             </h2>
@@ -484,10 +484,10 @@ export default function Register() {
           onKeyDown={(e) => {
             if (e.key === 'Escape') closeBook()
           }}
-          className="register-reader fixed inset-0 z-50 overflow-auto overscroll-contain bg-white px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:sticky lg:top-2 lg:z-auto lg:max-h-[calc(100dvh-1rem)] lg:rounded-lg lg:border lg:border-slate-300 lg:pt-3 lg:shadow-sm"
+          className="register-reader fixed inset-0 z-50 overflow-auto overscroll-contain bg-surface px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:sticky lg:top-2 lg:z-auto lg:max-h-[calc(100dvh-1rem)] lg:rounded-lg lg:border lg:border-slate-300 lg:pt-3 lg:shadow-sm"
         >
           {/* Stays on screen while the page is scrolled, so Close is always in reach. */}
-          <div className="sticky top-0 z-10 -mx-3 mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 lg:static lg:mx-0 lg:border-0 lg:p-0">
+          <div className="sticky top-0 z-10 -mx-3 mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-surface px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 lg:static lg:mx-0 lg:border-0 lg:p-0">
             <h2 id="register-reader-heading" ref={readerHeading} tabIndex={-1} className="text-base font-semibold text-slate-900 focus:outline-none">
               Requirements Book · <span className="font-mono">{reading.clause.printed_ref}</span>
             </h2>
@@ -495,7 +495,7 @@ export default function Register() {
               <Link to={targetHref((readingTarget ?? { kind: "unrecorded" as const }), reading.clause.printed_ref)} className="text-xs underline underline-offset-2">
                 Open full screen
               </Link>
-              <button type="button" onClick={closeBook} className="min-h-11 rounded border border-slate-300 bg-white px-3 py-1 text-sm font-medium hover:bg-slate-100 sm:min-h-0" data-testid="register-reader-close">
+              <button type="button" onClick={closeBook} className="min-h-11 rounded border border-slate-300 bg-surface px-3 py-1 text-sm font-medium hover:bg-slate-100 sm:min-h-0" data-testid="register-reader-close">
                 Close the book
               </button>
             </div>

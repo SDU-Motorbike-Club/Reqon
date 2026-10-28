@@ -3,7 +3,7 @@ import type { TaskRef } from '../../tasks/dependencies.ts'
 import { searchTasks } from './taskSearch.ts'
 
 const FIELD =
-  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0'
+  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0'
 const LABEL = 'block text-xs font-medium text-slate-700'
 
 // Pick one task out of a long list by typing part of its title or department.
@@ -90,7 +90,7 @@ export function TaskPicker({
         className={FIELD}
       />
       {showList && (
-        <div className="absolute z-20 mt-1 w-full rounded border border-slate-300 bg-white shadow-sm">
+        <div className="absolute z-20 mt-1 w-full rounded border border-slate-300 bg-surface shadow-sm">
           {matches.length === 0 ? (
             <p className="px-2 py-2 text-sm text-slate-600">No task matches “{query.trim()}”.</p>
           ) : (

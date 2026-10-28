@@ -33,12 +33,12 @@ export default function Inbox() {
           onClick={() => {
             if (isNew) markRead.mutate({ id: n.id })
           }}
-          className="flex items-start gap-2 px-3 py-2 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500"
+          className="flex items-start gap-2 px-3 py-2 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-ring"
           data-testid={`notification-${n.id}`}
         >
           <span
             aria-hidden="true"
-            className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${isNew ? 'bg-sky-600' : 'bg-transparent'}`}
+            className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${isNew ? 'bg-info' : 'bg-transparent'}`}
           />
           <span className="min-w-0">
             {isNew && <span className="sr-only">New: </span>}
@@ -58,7 +58,7 @@ export default function Inbox() {
         <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
           {label} <span className="font-normal text-slate-500">({group.length})</span>
         </h2>
-        <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">{group.map(item)}</ul>
+        <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-surface">{group.map(item)}</ul>
       </section>
     )
 

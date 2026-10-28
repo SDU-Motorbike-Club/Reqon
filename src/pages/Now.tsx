@@ -62,6 +62,7 @@ function Tile({
   testId,
   to,
   source,
+  className = '',
 }: {
   label: string
   value: string
@@ -70,17 +71,18 @@ function Tile({
   testId: string
   to: string
   source: Source
+  className?: string
 }) {
   const toneClass =
     tone === 'bad'
       ? 'border-red-300 bg-red-50 hover:border-red-400'
       : tone === 'warn'
         ? 'border-amber-300 bg-amber-50 hover:border-amber-400'
-        : 'border-slate-200 bg-white hover:border-slate-400'
+        : 'border-slate-200 bg-surface hover:border-slate-400'
   return (
     <Link
       to={to}
-      className={`group block rounded-lg border p-3 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 ${toneClass}`}
+      className={`group block rounded-lg border p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring focus-visible:ring-offset-2 ${toneClass} ${className}`}
     >
       <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-slate-600">
         {label}
@@ -88,7 +90,7 @@ function Tile({
           →
         </span>
       </div>
-      <div className="mt-0.5 text-2xl font-semibold text-slate-900" data-testid={testId} aria-busy={source.isLoading || undefined}>
+      <div className="mt-0.5 text-2xl font-semibold tabular-nums text-slate-950" data-testid={testId} aria-busy={source.isLoading || undefined}>
         {value}
       </div>
       <div className="mt-0.5 text-xs text-slate-600">{source.error ? 'Could not load — open to retry' : source.isLoading ? 'Loading…' : sub}</div>
@@ -115,7 +117,7 @@ function ActionList({
   testId: string
 }) {
   return (
-    <section aria-label={title} className="rounded-lg border border-slate-200 bg-white p-3" data-testid={testId}>
+    <section aria-label={title} className="rounded-lg border border-slate-200 bg-surface p-3" data-testid={testId}>
       <h2 className="flex items-baseline justify-between gap-2 text-sm font-semibold text-slate-900">
         <span>
           {title} {!source.isLoading && !source.error && <span className="font-normal text-slate-500 tabular-nums">({count})</span>}
@@ -146,15 +148,33 @@ function ActionList({
   )
 }
 
-function Row({ to, title, meta, tone }: { to: string; title: string; meta: string; tone?: 'bad' | 'warn' }) {
+// One line of a list. The title is the way in, so it is not underlined until it is pointed at or focused (a column
+// of underlined sentences reads as one wall of links). `meta` is who and where, in the neutral colour; `flag` is
+// the one fact that makes the row urgent (how late, why blocked) and is the only part drawn in the status colour,
+// so the eye lands on the reason and not on the whole sentence.
+function Row({ to, title, meta, flag, tone }: { to: string; title: string; meta: string; flag?: string; tone?: 'bad' | 'warn' }) {
   return (
-    <li className="py-1.5">
-      <Link to={to} className="font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900">
+    <li className="py-2">
+      <Link to={to} className="rounded text-[0.9375rem] font-medium leading-snug text-slate-950 underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring">
         {title}
       </Link>
-      <span className={`block text-xs ${tone === 'bad' ? 'text-red-800' : tone === 'warn' ? 'text-amber-900' : 'text-slate-600'}`}>{meta}</span>
+      <span className="mt-0.5 block text-xs text-slate-600">
+        {meta}
+        {flag && (
+          <>
+            {meta ? ' · ' : ''}
+            <span className={`font-medium tabular-nums ${tone === 'bad' ? 'text-red-700' : tone === 'warn' ? 'text-amber-700' : 'text-slate-700'}`}>{flag}</span>
+          </>
+        )}
+      </span>
     </li>
   )
+}
+
+// "3 days late", from two ISO days. Whole days; the caller only asks for a deadline that has passed.
+function daysLate(dueIso: string, todayIsoDay: string): string {
+  const days = Math.max(1, Math.round((Date.parse(todayIsoDay) - Date.parse(dueIso)) / 86_400_000))
+  return `${days} ${days === 1 ? 'day' : 'days'} late`
 }
 
 function Bar({ value, tone }: { value: number | null; tone: string }) {
@@ -218,7 +238,7 @@ function BookUnitRow({
             aria-expanded={toggle.expanded}
             aria-controls={toggle.controls}
             aria-label={`${toggle.expanded ? 'Hide' : 'Show'} the parts of ${unit.label}`}
-            className="-mt-2.5 -ml-3 min-h-11 min-w-11 shrink-0 rounded px-0.5 text-slate-500 hover:text-slate-900 sm:mt-0.5 sm:ml-0 sm:min-h-0 sm:min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+            className="-mt-2.5 -ml-3 min-h-11 min-w-11 shrink-0 rounded px-0.5 text-slate-500 hover:text-slate-900 sm:mt-0.5 sm:ml-0 sm:min-h-0 sm:min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
           >
             <span aria-hidden="true" className={`inline-block transition-transform ${toggle.expanded ? 'rotate-90' : ''}`}>
               ▸
@@ -230,7 +250,7 @@ function BookUnitRow({
         {unit.registerFilter ? (
           <Link
             to={`/register?chapter=${encodeURIComponent(unit.registerFilter)}&group=book&unresolved=1`}
-            className="min-w-0 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900"
+            className="min-w-0 rounded underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
             data-testid={`${testId}-link`}
           >
             {heading}
@@ -247,7 +267,7 @@ function BookUnitRow({
           {unit.percent !== null && <span className="tabular-nums">{unit.percent}%</span>}
         </span>
         {unit.status === 'measured' ? (
-          <Bar value={unit.percent} tone="bg-emerald-700" />
+          <Bar value={unit.percent} tone="bg-ok" />
         ) : (
           <span className={`block text-[11px] ${unit.status === 'not-imported' ? 'text-amber-900' : 'text-slate-500'}`}>
             {BOOK_STATUS_NOTE[unit.status]}
@@ -335,10 +355,18 @@ export default function Now() {
 
   const who = (ownerId: string | null) => (ownerId ? (memberName.get(ownerId) ?? 'someone no longer on the roster') : 'unassigned')
   const dept = (key: string | null) => (key ? (deptName.get(key) ?? key) : 'no department')
-  const taskMeta = (id: string | null) => {
+  // Who and where, without the deadline: the deadline is the row's flag, drawn in the status colour on its own.
+  const taskWhoWhere = (id: string | null) => {
     const t = id ? taskById.get(id) : undefined
-    if (!t) return ''
-    return `${who(t.owner_id)} · ${dept(t.subteam_key)}${t.due_date ? ` · due ${formatDay(t.due_date)}` : ''}`
+    return t ? `${who(t.owner_id)} · ${dept(t.subteam_key)}` : ''
+  }
+  const taskDue = (id: string | null) => {
+    const t = id ? taskById.get(id) : undefined
+    return t?.due_date ? `due ${formatDay(t.due_date)}` : ''
+  }
+  const overdueFlag = (id: string | null) => {
+    const t = id ? taskById.get(id) : undefined
+    return t?.due_date ? `due ${formatDay(t.due_date)} · ${daysLate(t.due_date, today)}` : taskDue(id)
   }
   // Why a task is blocked: the written reason, else the unfinished tasks it waits for, else an honest "none kept".
   const blockerText = (id: string | null) => {
@@ -367,13 +395,87 @@ export default function Now() {
           value={valueOf(tasks, () => String(mine.length))} sub={myId ? 'Assigned to you, not done' : 'Not on the roster'} />
         <Tile testId="tile-proposals" to="/proposals" label="Open proposals" source={proposals}
           value={valueOf(proposals, () => String(openProposals))} sub={isReviewer ? `${reviewQueue.length} wait for your review` : 'Not yet decided or made into a task'} />
-        <Tile testId="tile-deadline" to="/milestones" label="Next submission" source={milestones}
+        <Tile testId="tile-deadline" to="/milestones" label="Next submission" source={milestones} className="col-span-2 sm:col-span-1"
           value={valueOf(milestones, () => (deadline.kind === 'tbc' ? 'TBC' : `${deadline.days} day${deadline.days === 1 ? '' : 's'}`))}
           sub={deadline.kind === 'tbc' ? 'No published deadline' : `${deadline.label} · ${deadline.name} · ${formatDay(deadline.dueOn)}`}
           tone={deadline.kind === 'due' && deadline.days <= 14 ? 'warn' : 'plain'} />
       </section>
 
-      <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      {/* What needs you comes first in reading order (and first on a phone); the long-term progress follows. */}
+      <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <div className="space-y-3" data-tutorial="now-actions">
+          <ActionList title="Overdue" testId="now-overdue" source={taskSource} count={overdue.length} empty="Nothing is past its deadline."
+            more={{ to: '/priorities?reason=overdue', label: 'All overdue' }}>
+            {overdue.slice(0, 5).map((a) => (
+              <Row key={a.ref} to={`/board?task=${encodeURIComponent(a.ref ?? '')}`} title={a.title ?? 'Untitled task'} meta={taskWhoWhere(a.ref)} flag={overdueFlag(a.ref)} tone="bad" />
+            ))}
+          </ActionList>
+
+          <ActionList title="Blocked" testId="now-blocked" source={attention} count={blocked.length} empty="Nothing is marked blocked."
+            more={{ to: '/priorities?reason=blocked', label: 'All blocked' }}>
+            {blocked.slice(0, 5).map((a) =>
+              a.kind === 'clause' ? (
+                <Row key={`c-${a.clause_key}`} to={`/register?search=${encodeURIComponent(a.clause_key ?? a.ref ?? '')}`} title={`Rule ${a.ref}`} meta={`${who(a.owner_id)} · requirement`} tone="warn" />
+              ) : (
+                <Row key={`t-${a.ref}`} to={`/board?task=${encodeURIComponent(a.ref ?? '')}`} title={a.title ?? 'Untitled task'}
+                  meta={[taskWhoWhere(a.ref), taskDue(a.ref)].filter(Boolean).join(' · ')} flag={blockerText(a.ref)} tone="warn" />
+              ),
+            )}
+          </ActionList>
+
+          <ActionList title="Due in the next 14 days" testId="now-upcoming" source={tasks} count={upcoming.length} empty="No task deadline in the next two weeks.">
+            {upcoming.slice(0, 5).map((t) => (
+              <Row key={t.id} to={`/board?task=${encodeURIComponent(t.id)}`} title={t.title} meta={`${who(t.owner_id)} · ${dept(t.subteam_key)}`} flag={`due ${formatDay(t.due_date ?? '')}`} />
+            ))}
+          </ActionList>
+
+          {myId && (
+            <ActionList title="My tasks" testId="now-mine" source={tasks} count={mine.length} empty="Nothing open is assigned to you."
+              more={{ to: '/board?scope=mine', label: 'Open my tasks' }}>
+              {mine.slice(0, 5).map((t) => (
+                <Row key={t.id} to={`/board?task=${encodeURIComponent(t.id)}`} title={t.title}
+                  meta={`${TASK_STATE_LABEL[t.state]} · ${dept(t.subteam_key)}${t.due_date ? ` · due ${formatDay(t.due_date)}` : ' · no deadline'}`} />
+              ))}
+            </ActionList>
+          )}
+
+          {isReviewer ? (
+            <ActionList title="Proposals needing your review" testId="now-review" source={proposals} count={reviewQueue.length}
+              empty="Nothing waits for your decision." more={{ to: '/board?proposals=1', label: 'Review on the Board' }}>
+              {reviewQueue.slice(0, 4).map((p) => (
+                <Row key={p.id} to={`/board?proposals=1&dept=${encodeURIComponent(p.subteam_key ?? '')}`} title={p.title}
+                  meta={`${dept(p.subteam_key)} · ${proposalStatusLabel(p)} · raised by ${who(p.raised_by)}`} />
+              ))}
+            </ActionList>
+          ) : (
+            <ActionList title="My proposals" testId="now-my-proposals" source={proposals} count={myProposals.length}
+              empty="You have no open proposals." more={{ to: '/board?proposals=1&pscope=mine', label: 'See all mine' }}>
+              {myProposals.slice(0, 4).map((p) => (
+                <Row key={p.id} to={`/board?proposals=1&pscope=mine`} title={p.title} meta={`${dept(p.subteam_key)} · ${proposalStatusLabel(p)}`} />
+              ))}
+            </ActionList>
+          )}
+          <p className="text-xs text-slate-600">
+            Something needs deciding?{' '}
+            <Link to="/board?proposals=1&propose=1" className="font-medium underline underline-offset-2">
+              Propose a task
+            </Link>
+            .
+          </p>
+
+          <section aria-label="Milestone scoring" className="rounded-lg border border-dashed border-slate-300 p-3 text-xs text-slate-600" data-testid="now-points">
+            <p>
+              <span className="font-medium text-slate-800">Milestone scoring:</span>{' '}
+              {valueOf(milestones, () => String(points))} points are available across the MS1 deliverables. The organisers award
+              them per submission; a full progress bar is not a score.{' '}
+              <Link to="/milestones" className="font-medium underline underline-offset-2">
+                See Milestones
+              </Link>
+              .
+            </p>
+          </section>
+        </div>
+
         <section aria-labelledby="requirements-heading" data-tutorial="now-requirements">
           <h2 id="requirements-heading" className="text-sm font-semibold text-slate-900">
             Requirements progress
@@ -412,7 +514,7 @@ export default function Now() {
               This season&apos;s regulations edition has no chapter outline recorded, so progress cannot be shown by chapter.
             </p>
           ) : (
-            <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white" data-testid="now-book-chapters">
+            <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-surface" data-testid="now-book-chapters">
               {trackedChapters.map((chapter) => (
                 <BookChapterRow key={chapter.id} chapter={chapter} />
               ))}
@@ -431,78 +533,6 @@ export default function Now() {
             </>
           )}
         </section>
-
-        <div className="space-y-3" data-tutorial="now-actions">
-          <ActionList title="Overdue" testId="now-overdue" source={taskSource} count={overdue.length} empty="Nothing is past its deadline."
-            more={{ to: '/priorities?reason=overdue', label: 'All overdue' }}>
-            {overdue.slice(0, 5).map((a) => (
-              <Row key={a.ref} to={`/board?task=${encodeURIComponent(a.ref ?? '')}`} title={a.title ?? 'Untitled task'} meta={taskMeta(a.ref)} tone="bad" />
-            ))}
-          </ActionList>
-
-          <ActionList title="Blocked" testId="now-blocked" source={attention} count={blocked.length} empty="Nothing is marked blocked."
-            more={{ to: '/priorities?reason=blocked', label: 'All blocked' }}>
-            {blocked.slice(0, 5).map((a) =>
-              a.kind === 'clause' ? (
-                <Row key={`c-${a.clause_key}`} to={`/register?search=${encodeURIComponent(a.clause_key ?? a.ref ?? '')}`} title={`Rule ${a.ref}`} meta={`${who(a.owner_id)} · requirement`} tone="warn" />
-              ) : (
-                <Row key={`t-${a.ref}`} to={`/board?task=${encodeURIComponent(a.ref ?? '')}`} title={a.title ?? 'Untitled task'} meta={`${taskMeta(a.ref)} · ${blockerText(a.ref)}`} tone="warn" />
-              ),
-            )}
-          </ActionList>
-
-          <ActionList title="Due in the next 14 days" testId="now-upcoming" source={tasks} count={upcoming.length} empty="No task deadline in the next two weeks.">
-            {upcoming.slice(0, 5).map((t) => (
-              <Row key={t.id} to={`/board?task=${encodeURIComponent(t.id)}`} title={t.title} meta={`${who(t.owner_id)} · ${dept(t.subteam_key)} · due ${formatDay(t.due_date ?? '')}`} />
-            ))}
-          </ActionList>
-
-          {myId && (
-            <ActionList title="My tasks" testId="now-mine" source={tasks} count={mine.length} empty="Nothing open is assigned to you."
-              more={{ to: '/board?scope=mine', label: 'Open my tasks' }}>
-              {mine.slice(0, 5).map((t) => (
-                <Row key={t.id} to={`/board?task=${encodeURIComponent(t.id)}`} title={t.title}
-                  meta={`${TASK_STATE_LABEL[t.state]} · ${dept(t.subteam_key)}${t.due_date ? ` · due ${formatDay(t.due_date)}` : ' · no deadline'}`} />
-              ))}
-            </ActionList>
-          )}
-
-          {isReviewer ? (
-            <ActionList title="Proposals needing your review" testId="now-review" source={proposals} count={reviewQueue.length}
-              empty="Nothing waits for your decision." more={{ to: '/proposals', label: 'Review on Proposals' }}>
-              {reviewQueue.slice(0, 4).map((p) => (
-                <Row key={p.id} to={`/proposals?dept=${encodeURIComponent(p.subteam_key ?? '')}`} title={p.title}
-                  meta={`${dept(p.subteam_key)} · ${proposalStatusLabel(p)} · raised by ${who(p.raised_by)}`} />
-              ))}
-            </ActionList>
-          ) : (
-            <ActionList title="My proposals" testId="now-my-proposals" source={proposals} count={myProposals.length}
-              empty="You have no open proposals." more={{ to: '/proposals?scope=mine', label: 'See all mine' }}>
-              {myProposals.slice(0, 4).map((p) => (
-                <Row key={p.id} to={`/proposals?scope=mine`} title={p.title} meta={`${dept(p.subteam_key)} · ${proposalStatusLabel(p)}`} />
-              ))}
-            </ActionList>
-          )}
-          <p className="text-xs text-slate-600">
-            Something needs deciding?{' '}
-            <Link to="/proposals" className="font-medium underline underline-offset-2">
-              Raise a proposal
-            </Link>
-            .
-          </p>
-
-          <section aria-label="Milestone scoring" className="rounded-lg border border-dashed border-slate-300 p-3 text-xs text-slate-600" data-testid="now-points">
-            <p>
-              <span className="font-medium text-slate-800">Milestone scoring:</span>{' '}
-              {valueOf(milestones, () => String(points))} points are available across the MS1 deliverables. The organisers award
-              them per submission; a full progress bar is not a score.{' '}
-              <Link to="/milestones" className="font-medium underline underline-offset-2">
-                See Milestones
-              </Link>
-              .
-            </p>
-          </section>
-        </div>
       </div>
     </main>
   )

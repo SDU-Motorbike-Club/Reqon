@@ -36,7 +36,7 @@ export function IssuedPassword({
         sign in.
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <code data-testid="issued-password" className="rounded border border-slate-300 bg-white px-2 py-1 font-mono text-sm text-slate-900 select-all">
+        <code data-testid="issued-password" className="rounded border border-slate-300 bg-surface px-2 py-1 font-mono text-sm text-slate-900 select-all">
           {password}
         </code>
         <button type="button" onClick={() => void copy()} className={`${buttonSecondary} text-xs`}>

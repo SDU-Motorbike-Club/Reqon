@@ -6,7 +6,7 @@
 #                        (the remote itself is configured through RCLONE_CONFIG_BKR2_* variables)
 #   BACKUP_FOLDERS       override for tests: comma list of daily,weekly,monthly (default: by date)
 #
-# Every run writes to daily/; Sundays also to weekly/; the 1st of the month also to monthly/. How long each
+# Every run writes to daily/; Mondays also to weekly/; the 1st of the month also to monthly/. How long each
 # folder is kept is an R2 lifecycle rule per prefix (ops/backup/docs/R2_SETUP.md), not code. Each upload is
 # verified by asking the bucket for the object's size. Writes <out>/published (folder/name lines).
 # shellcheck source=ops/backup/common.sh
@@ -26,7 +26,7 @@ if [ -n "${BACKUP_FOLDERS:-}" ]; then
   IFS=, read -r -a FOLDERS <<<"$BACKUP_FOLDERS"
 else
   FOLDERS=(daily)
-  [ "$(date -u -d "$STAMP" +%u)" = "7" ] && FOLDERS+=(weekly)
+  [ "$(date -u -d "$STAMP" +%u)" = "1" ] && FOLDERS+=(weekly)
   [ "$(date -u -d "$STAMP" +%d)" = "01" ] && FOLDERS+=(monthly)
 fi
 

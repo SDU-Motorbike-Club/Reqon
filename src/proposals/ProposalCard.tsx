@@ -56,7 +56,7 @@ export function ProposalCard({
 
   return (
     <li
-      className="rounded-lg border border-slate-200 bg-white p-3"
+      className="pc-lift rounded-lg border border-slate-200 bg-surface p-3"
       data-testid={`proposal-${proposal.id}`}
       data-proposal-state={proposal.state}
       data-tutorial={tutorial ? 'proposal-card' : undefined}
@@ -77,7 +77,7 @@ export function ProposalCard({
       </div>
       {proposal.context && <p className="mt-0.5 text-sm text-slate-600">{proposal.context}</p>}
       <p className="mt-0.5 text-xs text-slate-500">
-        Raised{suggester ? ` by ${suggester}` : ''} on {proposal.raised_on}
+        Raised{suggester ? ` by ${suggester}` : ''} on {formatDay(proposal.raised_on) || proposal.raised_on}
       </p>
       <p className="mt-0.5 text-xs text-slate-600" data-testid={`proposal-facts-${proposal.id}`}>
         {departmentName ?? 'No department'}
@@ -112,7 +112,7 @@ export function ProposalCard({
               Created the task “{taskFromProposal?.title}”
               <Link
                 to={`/board?task=${encodeURIComponent(taskFromProposal?.id ?? '')}`}
-                className="inline-flex min-h-11 items-center rounded font-medium text-slate-900 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+                className="inline-flex min-h-11 items-center rounded font-medium text-slate-900 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
               >
                 Open on Board
               </Link>
@@ -125,7 +125,7 @@ export function ProposalCard({
             onClick={() => onReview(proposal)}
             data-testid={`review-open-${proposal.id}`}
             data-tutorial={tutorial ? 'proposal-decision' : undefined}
-            className="min-h-11 rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+            className="min-h-11 rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
           >
             {canReview ? 'Review' : isAuthor ? 'Discuss or revise' : 'Discussion'}
           </button>

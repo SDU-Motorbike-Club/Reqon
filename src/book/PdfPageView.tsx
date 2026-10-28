@@ -118,7 +118,7 @@ export default function PdfPageView({
           Opening the document…
         </p>
       )}
-      <canvas ref={canvasRef} role="img" aria-label={label} className="block max-w-full bg-white" />
+      <canvas ref={canvasRef} role="img" aria-label={label} className="block max-w-full bg-surface" />
     </div>
   )
 }

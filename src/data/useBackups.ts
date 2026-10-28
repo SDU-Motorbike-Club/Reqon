@@ -17,9 +17,13 @@ export type BackupRun = Pick<
 const COLUMNS = 'id, destination, taken_at, ok, object_key, size_bytes, sha256, migration_version, db_size_bytes, row_count, recipients, detail'
 
 // Newest first; 60 rows cover more than the last month of three destinations.
-export function useBackupRuns(): UseQueryResult<BackupRun[], Error> {
+// `enabled: false` is for a screen that only wants to know IF something is wrong and the person may not read the
+// table at all (RLS is_admin()): it then asks nothing and fails nothing.
+export function useBackupRuns({ enabled = true, retry }: { enabled?: boolean; retry?: number | false } = {}): UseQueryResult<BackupRun[], Error> {
   return useQuery({
     queryKey: queryKeys.backupRuns,
+    enabled,
+    ...(retry === undefined ? {} : { retry }),
     queryFn: async () =>
       unwrap(
         'load the backup status',

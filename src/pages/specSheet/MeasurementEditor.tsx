@@ -179,7 +179,7 @@ export function MeasurementEditor({
                   id={`measured-${specId}${suffix}`}
                   value={text}
                   onChange={(event) => updateText(event.target.value)}
-                  className="mt-1 min-h-11 rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+                  className="mt-1 min-h-11 rounded border border-slate-300 bg-surface px-2 py-1 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
                 >
                   <option value="">—</option>
                   <option value="true">Yes</option>
@@ -194,7 +194,7 @@ export function MeasurementEditor({
                   value={text}
                   placeholder="—"
                   onChange={(event) => updateText(event.target.value)}
-                  className="mt-1 min-h-11 w-32 rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+                  className="mt-1 min-h-11 w-32 rounded border border-slate-300 bg-surface px-2 py-1 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
                 />
               )}
             </div>
@@ -212,7 +212,7 @@ export function MeasurementEditor({
                   value={note}
                   maxLength={1000}
                   onChange={(event) => setNote(event.target.value)}
-                  className="mt-1 min-h-16 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900"
+                  className="mt-1 min-h-16 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm text-slate-900"
                 />
               </label>
               <label>
@@ -221,7 +221,7 @@ export function MeasurementEditor({
                   value={source}
                   maxLength={300}
                   onChange={(event) => setSource(event.target.value)}
-                  className="mt-1 min-h-11 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 sm:min-h-0"
+                  className="mt-1 min-h-11 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm text-slate-900 sm:min-h-0"
                 />
               </label>
             </div>
@@ -231,7 +231,7 @@ export function MeasurementEditor({
         <div
           role="group"
           aria-label={`Confirm measurement for ${spec.parameter}`}
-          className="mt-2 rounded border border-slate-300 bg-white p-2"
+          className="mt-2 rounded border border-slate-300 bg-surface p-2"
           data-testid={`confirm-${specId}${suffix}`}
         >
           <p className="text-sm text-slate-900">

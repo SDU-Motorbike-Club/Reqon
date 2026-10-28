@@ -9,7 +9,7 @@ import { useSeason } from '../../season/context.ts'
 import { ActionError, ErrorState, LoadingState } from '../../ui/states.tsx'
 
 const inputClass =
-  'mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0'
+  'mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0'
 
 // Where the Requirements Book document lives, for the regulations edition this
 // season reads. Administrators only (the caller decides who sees it, and the
@@ -96,7 +96,7 @@ function BookSettingsForm({ regsRef, doc }: { regsRef: string; doc: RegulationDo
   const configured = Boolean(doc?.url || doc?.storage_path)
 
   return (
-    <form onSubmit={submit} className="rounded-lg border border-slate-200 bg-white p-3" noValidate>
+    <form onSubmit={submit} className="rounded-lg border border-slate-200 bg-surface p-3" noValidate>
       <p className="text-sm text-slate-800" data-testid="book-config-status">
         Edition <strong>{regsRef}</strong>:{' '}
         {configured ? 'a document is configured.' : 'no document is configured yet.'}
@@ -206,7 +206,7 @@ function BookSettingsForm({ regsRef, doc }: { regsRef: string; doc: RegulationDo
       <button
         type="submit"
         disabled={save.isPending}
-        className="mt-3 min-h-11 rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 disabled:opacity-60 sm:min-h-0"
+        className="mt-3 min-h-11 rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring disabled:opacity-60 sm:min-h-0"
       >
         {save.isPending ? 'Saving…' : 'Save Requirements Book source'}
       </button>

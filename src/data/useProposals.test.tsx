@@ -81,7 +81,7 @@ describe('useSubmitProposal', () => {
   it('refuses a visibly incomplete proposal without sending anything', async () => {
     const submit = hook(() => useSubmitProposal())
     await expect(submit.current.mutateAsync({ ...complete, requirementKeys: [], dueDate: '' })).rejects.toThrow(
-      /a deadline, at least one requirement/,
+      /it needs a deadline/,
     )
     expect(calls).toEqual([])
   })

@@ -2,15 +2,12 @@ import type { Proposal } from './types.ts'
 
 // Exactly which fields stop a proposal being promoted, mirroring
 // promote_proposal()'s own checks (legacy_incomplete, missing department,
-// deadline, milestone, requirements). The database refuses regardless; this
+// deadline). A department, a milestone and requirements are optional (20260149000000). The database refuses regardless; this
 // only lets the review dialog say WHAT is missing instead of a bare refusal.
-export type PromotionBlocker = 'department' | 'deadline' | 'milestone' | 'requirements'
+export type PromotionBlocker = 'deadline'
 
 export const PROMOTION_BLOCKER_LABEL: Record<PromotionBlocker, string> = {
-  department: 'a department',
   deadline: 'a deadline',
-  milestone: 'a milestone',
-  requirements: 'at least one requirement',
 }
 
 export type PromotionDraft = {
@@ -31,10 +28,7 @@ export function draftFrom(proposal: Pick<Proposal, 'subteam_key' | 'due_date' | 
 
 export function promotionBlockers(draft: PromotionDraft): PromotionBlocker[] {
   const blockers: PromotionBlocker[] = []
-  if (!draft.departmentKey) blockers.push('department')
   if (!draft.dueDate) blockers.push('deadline')
-  if (!draft.milestoneKey) blockers.push('milestone')
-  if (draft.requirementCount < 1) blockers.push('requirements')
   return blockers
 }
 

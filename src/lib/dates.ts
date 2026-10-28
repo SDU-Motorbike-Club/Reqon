@@ -37,7 +37,14 @@ export function todayIso(): string {
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
 
-// A stored calendar date as a person reads it: "5 Sept 2026". Date-only —
+// Every date on the site is written DD/MM/YY ("05/09/26"): two digits each, day first, a two-digit year. One
+// helper builds it from a Date's own (local) day, so no screen can pick a different style.
+const two = (n: number) => String(n).padStart(2, '0')
+function ddmmyy(day: Date): string {
+  return `${two(day.getDate())}/${two(day.getMonth() + 1)}/${two(day.getFullYear() % 100)}`
+}
+
+// A stored calendar date as a person reads it: "05/09/26". Date-only —
 // see the file header. Anything that is not exactly YYYY-MM-DD, including a
 // full timestamp, returns '' rather than silently reading the wrong (UTC)
 // day; genuinely unparseable input does the same.
@@ -45,25 +52,23 @@ export function formatDay(iso: string): string {
   if (!DATE_ONLY.test(iso)) return ''
   const day = new Date(`${iso}T00:00:00`)
   if (Number.isNaN(day.getTime())) return ''
-  return day.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  return ddmmyy(day)
 }
 
 // A stored instant (timestamptz), converted to the reader's own local time
-// zone: "5 Sept 2026, 14:30". Use for completed_at, archived_at, measured_at,
+// zone: "05/09/26, 14:30". Use for completed_at, archived_at, measured_at,
 // observed_at and activity's `at` — never for a calendar-date column.
 export function formatInstant(iso: string): string {
   const instant = new Date(iso)
   if (Number.isNaN(instant.getTime())) return ''
-  return instant.toLocaleString('en-GB', {
-    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  })
+  return `${ddmmyy(instant)}, ${two(instant.getHours())}:${two(instant.getMinutes())}`
 }
 
-// The same instant, but only its reader-local calendar day: "5 Sept 2026".
+// The same instant, but only its reader-local calendar day: "05/09/26".
 // Unlike formatDay, this is meant for a timestamp — it deliberately reads
 // the reader's local day off a real instant instead of truncating UTC text.
 export function formatInstantDay(iso: string): string {
   const instant = new Date(iso)
   if (Number.isNaN(instant.getTime())) return ''
-  return instant.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  return ddmmyy(instant)
 }

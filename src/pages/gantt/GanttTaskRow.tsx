@@ -7,8 +7,9 @@ import { isSatisfied, openPrerequisites, scheduleConflict, type TaskRef } from '
 import { TASK_STATES, TASK_STATE_LABEL } from '../../tasks/taskState.ts'
 import { isUrgent, TASK_PRIORITY_BADGE_TONE, TASK_PRIORITY_LABEL } from '../../tasks/priority.ts'
 import { buttonSecondary } from '../../ui/buttons.ts'
+import { Dialog } from '../../ui/Dialog.tsx'
 import { BlockReasonForm } from '../board/BlockReasonForm.tsx'
-import { Bar, Marker, ROW, STICKY_LABEL, selectSmall, Track } from './GanttChart.tsx'
+import { Marker, ROW, STICKY_LABEL, selectSmall, Track } from './GanttChart.tsx'
 import type { LinkTarget } from './ganttLinking.ts'
 import { taskMark, taskSummary } from './ganttMarks.ts'
 import { shortDay, spanCaption, type Span } from './ganttModel.ts'
@@ -27,7 +28,7 @@ export type UnlinkOption =
 type MoveTarget = { key: string; label: string; target: LinkTarget }
 
 const FIELD =
-  'mt-0.5 min-h-11 w-full rounded border border-slate-300 bg-white px-1.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0'
+  'mt-0.5 min-h-11 w-full rounded border border-slate-300 bg-surface px-1.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0'
 
 // A readable status cue beside the title: words, plus a symbol, never colour
 // alone. Overdue and Blocked are the two that need attention.
@@ -127,7 +128,7 @@ export function GanttTaskRow({
     <div data-testid={`gantt-task-${task.id}`} data-task-state={task.state}>
       <div className={`${ROW} group py-1`}>
         <div
-          className={`${STICKY_LABEL} flex flex-wrap items-center gap-1 bg-white ${indent} pr-2 group-hover:bg-slate-100`}
+          className={`${STICKY_LABEL} flex flex-wrap items-center gap-1 bg-surface ${indent} pr-2 group-hover:bg-slate-100`}
           draggable={perms.canEdit}
           onDragStart={(event) => {
             event.dataTransfer.setData(TASK_DRAG_TYPE, task.id)
@@ -140,7 +141,7 @@ export function GanttTaskRow({
               aria-expanded={expanded}
               aria-controls={`${uid}-more`}
               onClick={onToggle}
-              className="flex min-h-11 min-w-6 items-center justify-center rounded text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+              className="flex min-h-11 min-w-6 items-center justify-center rounded text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
             >
               <span aria-hidden="true">{expanded ? '▾' : '▸'}</span>
               <span className="sr-only">{expanded ? 'Hide' : 'Show'} details of {task.title}</span>
@@ -152,7 +153,7 @@ export function GanttTaskRow({
             )}
             <Link
               to={`/board?task=${encodeURIComponent(task.id)}`}
-              className="min-h-11 py-2 underline decoration-slate-400 underline-offset-2 hover:decoration-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0 sm:py-0"
+              className="min-h-11 py-2 underline decoration-slate-400 underline-offset-2 hover:decoration-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0 sm:py-0"
             >
               {task.title}
             </Link>
@@ -233,7 +234,7 @@ export function GanttTaskRow({
               type="button"
               onClick={unlink.onUnlink}
               aria-label={unlink.label}
-              className="min-h-11 rounded px-1 text-[11px] text-slate-600 underline underline-offset-2 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+              className="min-h-11 rounded px-1 text-[11px] text-slate-600 underline underline-offset-2 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
             >
               Unlink
             </button>
@@ -242,13 +243,15 @@ export function GanttTaskRow({
         </div>
 
         <Track today={todayLeft} label={mark.kind === 'undated' ? 'No dates set' : undefined} summary={summary}>
+          {/* One dot per task, on its deadline (or its start when it has no deadline). The start and end of a period are
+              still written out in the caption, the tooltip and the details sheet. */}
           {mark.kind === 'period' && (
-            <Bar
-              span={mark.span}
+            <Marker
+              day={mark.span.to}
               range={range}
-              variant="outline"
-              tone={mark.overdue ? 'border-red-600 text-red-800' : mark.done ? 'border-slate-400 text-slate-600' : 'border-slate-600 text-slate-800'}
-              glyph={mark.done ? '✓' : mark.overdue ? '!' : undefined}
+              kind="task-deadline"
+              overdue={mark.overdue}
+              done={mark.done}
               caption={spanCaption(mark.span)}
               title={`${task.title}: ${formatDay(mark.span.from)} → ${formatDay(mark.span.to)}${mark.overdue ? ' · overdue' : ''}`}
             />
@@ -287,15 +290,29 @@ export function GanttTaskRow({
             />
           )}
           {preview && (
-            <span className="absolute -top-0.5 right-1 z-[3] rounded bg-slate-900 px-1 text-[10px] text-white" aria-hidden="true">
+            <span className="absolute -top-0.5 right-1 z-[3] rounded bg-accent px-1 text-[10px] text-white" aria-hidden="true">
               {preview.start ? formatDay(preview.start) : '—'} → {preview.due ? formatDay(preview.due) : '—'}
             </span>
           )}
         </Track>
       </div>
 
-      {expanded && (
-        <div id={`${uid}-more`} className="sticky left-0 z-10 mb-2 ml-6 w-[min(42rem,calc(100vw-2.5rem))] rounded border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700 sm:ml-12" data-testid={`gantt-task-more-${task.id}`}>
+      {/* The details open in a side sheet, not in the middle of the chart: the chart keeps its place and its width. */}
+      <Dialog open={expanded} onClose={onToggle} labelledBy={`${uid}-title`} size="side">
+        <div id={`${uid}-more`} className="text-sm text-slate-700" data-testid={`gantt-task-more-${task.id}`}>
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 id={`${uid}-title`} className="text-base font-semibold break-words text-slate-900">
+                {task.title}
+              </h2>
+              <Link to={`/board?task=${encodeURIComponent(task.id)}`} className="text-xs underline underline-offset-2">
+                Open on the Board
+              </Link>
+            </div>
+            <button type="button" className={`${buttonSecondary} text-xs`} onClick={onToggle}>
+              Close
+            </button>
+          </div>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
             <dt className="font-medium">Start date</dt>
             <dd>{task.starts_on ? formatDay(task.starts_on) : 'Not recorded'}</dd>
@@ -429,7 +446,7 @@ export function GanttTaskRow({
             <p className="mt-1 text-[11px] text-slate-500">Read-only for you: its owner or its department&apos;s Head can change it.</p>
           )}
         </div>
-      )}
+      </Dialog>
     </div>
   )
 }

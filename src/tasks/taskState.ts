@@ -30,10 +30,10 @@ export type TaskStateMeta = {
 }
 
 export const TASK_STATES: readonly TaskStateMeta[] = [
-  { state: 'todo', label: 'To do', order: 0, boardTone: 'border-slate-200 bg-white', ganttBarTone: 'bg-slate-400', creationEligible: true },
+  { state: 'todo', label: 'To do', order: 0, boardTone: 'border-slate-200 bg-surface', ganttBarTone: 'bg-slate-400', creationEligible: true },
   { state: 'wip', label: 'In progress', order: 1, boardTone: 'border-blue-200 bg-blue-50', ganttBarTone: 'bg-blue-500', creationEligible: true },
   { state: 'blocked', label: 'Blocked', order: 2, boardTone: 'border-amber-300 bg-amber-50', ganttBarTone: 'bg-amber-500', creationEligible: false },
-  { state: 'done', label: 'Done', order: 3, boardTone: 'border-green-200 bg-green-50', ganttBarTone: 'bg-green-600', creationEligible: false },
+  { state: 'done', label: 'Done', order: 3, boardTone: 'border-green-200 bg-green-50', ganttBarTone: 'bg-ok', creationEligible: false },
   { state: 'cancelled', label: 'Cancelled', order: 4, boardTone: 'border-slate-200 bg-slate-100', ganttBarTone: 'bg-slate-300', creationEligible: false },
 ]
 

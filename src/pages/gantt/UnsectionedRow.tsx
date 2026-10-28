@@ -2,14 +2,12 @@ import { milestoneLabel } from '../../milestones/label.ts'
 import { useState } from 'react'
 import type { Milestone } from '../../data/useMilestones.ts'
 import type { Task } from '../../data/useTasks.ts'
-import { formatDay } from '../../lib/dates.ts'
-import { Bar, ROW, STICKY_LABEL, Track } from './GanttChart.tsx'
+import { ROW, STICKY_LABEL, Track } from './GanttChart.tsx'
 import { taskDropHandlers } from './ganttDrag.ts'
 import { GanttTaskRow } from './GanttTaskRow.tsx'
 import { LinkTaskTool } from './LinkTaskTool.tsx'
 import type { GanttEnv } from './ganttEnv.ts'
 import { canUnlinkMilestone, currentTargetKey, linkCandidates, relinkFrom } from './ganttLinking.ts'
-import { spanCaption, spanOfDates } from './ganttModel.ts'
 import { lensProgress, progressLabel, unsectionedFor, type ProgressSource } from './ganttProgress.ts'
 
 // Work linked to a submission before any section is chosen. It is a group in the
@@ -34,7 +32,6 @@ export function UnsectionedRow({
   const under = unsectionedFor(tasks, milestone.key)
   const shown = under.filter(env.lens.matches)
   const words = progressLabel(lensProgress([], unsectionedFor(progressTasks, milestone.key), milestone.key))
-  const span = spanOfDates(under.flatMap((t) => [t.starts_on, t.due_date]))
   const target = { seasonId: env.seasonId, milestoneKey: milestone.key, sectionId: null }
   const { direct, relink } = linkCandidates(tasks, target, (t) => env.permsFor(t).canEdit)
   const byId = new Map(tasks.map((t) => [t.id, t]))
@@ -49,15 +46,18 @@ export function UnsectionedRow({
     if (task) env.onLink(task, target)
   }
 
+  // An empty group nobody here can link into is only noise, repeated under every submission.
+  if (under.length === 0 && !env.canManage) return null
+
   return (
     <div data-testid={`gantt-unsectioned-${milestone.key}`} className={env.lens.active && shown.length === 0 ? 'opacity-70' : undefined}>
       <div className={`${ROW} group py-1 ${dropOver ? "rounded ring-2 ring-slate-900" : ""}`} {...drop} data-drop-target="true">
-        <div className={`${STICKY_LABEL} flex items-center gap-1.5 bg-white pl-6 pr-2 group-hover:bg-slate-100`}>
+        <div className={`${STICKY_LABEL} flex items-center gap-1.5 bg-surface pl-6 pr-2 group-hover:bg-slate-100`}>
           <button
             type="button"
             aria-expanded={open}
             onClick={onToggle}
-            className="flex min-h-11 items-center gap-1.5 text-left text-xs italic text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+            className="flex min-h-11 items-center gap-1.5 text-left text-xs italic text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
           >
             <span aria-hidden="true" className="w-3 text-slate-500">
               {open ? '▾' : '▸'}
@@ -70,16 +70,6 @@ export function UnsectionedRow({
           today={env.todayLeft}
           summary={`Unsectioned work under ${milestoneLabel(milestone)}: ${under.length} task${under.length === 1 ? '' : 's'}, ${words}`}
         >
-          {span && (
-            <Bar
-              span={span}
-              range={env.range}
-              variant="outline"
-              tone="border-slate-400 text-slate-600"
-              caption={spanCaption(span)}
-              title={`Unsectioned work: ${formatDay(span.from)} → ${formatDay(span.to)} · ${words}`}
-            />
-          )}
         </Track>
       </div>
 
@@ -119,13 +109,13 @@ export function UnsectionedRow({
           })}
 
           {under.length === 0 && (
-            <p className="sticky left-0 z-10 w-fit bg-white pl-12 text-[11px] text-slate-600">
+            <p className="sticky left-0 z-10 w-fit bg-surface pl-12 text-[11px] text-slate-600">
               Nothing is linked to {milestoneLabel(milestone)} without a section.
               {env.canManage ? ' Link a Board task below, or link it to a section above.' : ''}
             </p>
           )}
           {under.length > 0 && shown.length === 0 && (
-            <p className="sticky left-0 z-10 w-fit bg-white pl-12 text-[11px] text-slate-600" data-testid={`gantt-unsectioned-empty-${milestone.key}`}>
+            <p className="sticky left-0 z-10 w-fit bg-surface pl-12 text-[11px] text-slate-600" data-testid={`gantt-unsectioned-empty-${milestone.key}`}>
               Nothing for {env.lens.name} without a section ({under.length} task{under.length === 1 ? '' : 's'} hidden by
               the filter).
             </p>

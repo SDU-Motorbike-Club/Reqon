@@ -30,7 +30,7 @@ export type TaskPermissions = {
 }
 
 const FIELD =
-  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0'
+  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0'
 const LABEL = 'block text-xs font-medium text-slate-700'
 const SECTION_HEADING = 'text-[11px] font-semibold tracking-wide text-slate-500 uppercase'
 
@@ -376,6 +376,13 @@ export function TaskDetails(props: Props) {
               </select>
             </div>
             <div>
+              <label htmlFor={fid('start')} className={LABEL}>
+                Start date
+              </label>
+              <input id={fid('start')} type="date" value={start} onChange={(e) => setStart(e.target.value)} className={FIELD} />
+              {!task.starts_on && <p className="mt-1 text-xs text-slate-500">No start date recorded.</p>}
+            </div>
+            <div>
               <label htmlFor={fid('due')} className={LABEL}>
                 Deadline
               </label>
@@ -384,13 +391,6 @@ export function TaskDetails(props: Props) {
               {task.links_required && task.due_date && (
                 <p className="mt-1 text-xs text-slate-500">Created from a proposal: the deadline can change but not be removed.</p>
               )}
-            </div>
-            <div>
-              <label htmlFor={fid('start')} className={LABEL}>
-                Start date
-              </label>
-              <input id={fid('start')} type="date" value={start} onChange={(e) => setStart(e.target.value)} className={FIELD} />
-              {!task.starts_on && <p className="mt-1 text-xs text-slate-500">No start date recorded.</p>}
             </div>
           </fieldset>
 
@@ -585,7 +585,7 @@ export function TaskDetails(props: Props) {
         <>
         {/* Below the Department section, and sticky: the panel is longer than the dialog, and Save must stay in reach.
             It belongs to the edit form above through its `form` attribute. */}
-        <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-2 border-t border-slate-100 bg-white px-1 py-2">
+        <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-2 border-t border-slate-100 bg-surface px-1 py-2">
           <button type="submit" form={fid('edit')} className={buttonPrimary} disabled={busy} data-testid={`task-save-${task.id}`}>
             {busy ? 'Saving…' : dirtyKeys ? 'Save details and requirements' : 'Save details'}
           </button>

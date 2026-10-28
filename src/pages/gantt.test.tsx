@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // from the real permission mirrors and the mocked departments' Heads, never from
 // a flag in the test. The clock is pinned so "today" and "overdue" are exact.
 
-const TODAY = new Date(2026, 10, 15, 12, 0, 0) // 15 Nov 2026, local noon
+const TODAY = new Date(2026, 10, 15, 12, 0, 0) // 15/11/26, local noon
 
 const { updateTask, updateTaskAsync, who, state, deps } = vi.hoisted(() => ({
   updateTask: vi.fn(),
@@ -81,9 +81,12 @@ vi.mock('../data/useTasks.ts', () => ({
 
 const { default: Gantt } = await import('./Gantt.tsx')
 
-function renderGantt(url = '/gantt') {
+// Starts from "nothing chosen yet" with every submission closed (?open=-), as the structure tests expect;
+// pass `asFirstVisit` to see what a person who has not touched anything sees (the next due submission open).
+function renderGantt(url = '/gantt', asFirstVisit = false) {
+  const entry = asFirstVisit || /[?&]open=/.test(url) ? url : `${url}${url.includes('?') ? '&' : '?'}open=-`
   return render(
-    <MemoryRouter initialEntries={[url]}>
+    <MemoryRouter initialEntries={[entry]}>
       <Gantt />
     </MemoryRouter>,
   )
@@ -122,6 +125,29 @@ afterEach(() => {
 async function open(user: ReturnType<typeof userEvent.setup>, ...names: RegExp[]) {
   for (const name of names) await user.click(screen.getByRole('button', { name }))
 }
+
+describe('what a first visit shows', () => {
+  it('opens the submission due next, and leaves the others closed', () => {
+    renderGantt('/gantt', true)
+    expect(screen.getByRole('button', { name: /MS1-1/ })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: /MS1-2/ })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByTestId('gantt-section-sec1')).toBeInTheDocument()
+  })
+
+  it('stays closed once somebody collapses everything (an empty choice is a choice)', async () => {
+    const user = userEvent.setup()
+    renderGantt('/gantt', true)
+    await user.click(screen.getByRole('button', { name: /MS1-1/ }))
+    expect(screen.getByRole('button', { name: /MS1-1/ })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('gantt-section-sec1')).not.toBeInTheDocument()
+  })
+
+  it('says in words how long each submission has left', () => {
+    renderGantt()
+    expect(screen.getByTestId('gantt-note-MS1-1')).toHaveTextContent(/^Due in \d+ (days|weeks)/)
+    expect(screen.getByTestId('gantt-note-MS1-1')).toHaveTextContent('30/11/26')
+  })
+})
 
 describe('the timeline structure', () => {
   it('shows the submissions first, with sections and subtasks folded away', () => {
@@ -184,15 +210,15 @@ describe('honest dates', () => {
     // No window bar (its title starts with the key and a colon)...
     expect(within(row).queryByTitle(/^MS1-2:/)).not.toBeInTheDocument()
     // ...but the deadline is marked, and the text says why there is no window.
-    expect(within(row).getByTitle(/MS1-2 deadline: 28 Feb 2027.*no opening date published/)).toBeInTheDocument()
+    expect(within(row).getByTitle(/MS1-2 deadline: 28\/02\/27.*no opening date published/)).toBeInTheDocument()
     expect(row).toHaveTextContent('no opening date published')
   })
 
-  it('a milestone with both dates draws its window and its deadline as different shapes', () => {
+  it('a submission is one flag on its deadline, with no window bar', () => {
     renderGantt()
     const row = screen.getByTestId('gantt-milestone-MS1-1')
-    expect(within(row).getByTitle(/^MS1-1: 1 Nov 2026 → 30 Nov 2026/)).toBeInTheDocument()
-    expect(within(row).getByTitle(/MS1-1 deadline: 30 Nov 2026$/)).toBeInTheDocument()
+    expect(within(row).getByTitle(/MS1-1 deadline: 30\/11\/26$/)).toBeInTheDocument()
+    expect(within(row).queryByTitle(/^MS1-1: 01\/11\/26 → 30\/11\/26/)).not.toBeInTheDocument()
   })
 
   it('draws a task with both dates as a period, and a deadline-only task as a marker with no invented start', async () => {
@@ -200,11 +226,11 @@ describe('honest dates', () => {
     renderGantt()
     await open(user, /MS1-1/, /Cover sheet/)
     const period = screen.getByTestId('gantt-task-t1')
-    expect(within(period).getByTitle('Draft the cover: 20 Nov 2026 → 25 Nov 2026')).toBeInTheDocument()
-    expect(period).toHaveTextContent('20 Nov 2026 to 25 Nov 2026')
+    expect(within(period).getByTitle('Draft the cover: 20/11/26 → 25/11/26')).toBeInTheDocument()
+    expect(period).toHaveTextContent('20/11/26 to 25/11/26')
     const deadline = screen.getByTestId('gantt-task-t2')
-    expect(within(deadline).getByTitle('Bodywork budget line: due 27 Nov 2026')).toBeInTheDocument()
-    expect(deadline).toHaveTextContent('deadline 27 Nov 2026 (no start date)')
+    expect(within(deadline).getByTitle('Bodywork budget line: due 27/11/26')).toBeInTheDocument()
+    expect(deadline).toHaveTextContent('deadline 27/11/26 (no start date)')
   })
 
   it('marks overdue open work with "!" and text, and says undated work is undated', async () => {
@@ -212,8 +238,8 @@ describe('honest dates', () => {
     renderGantt()
     await open(user, /MS1-1/, /Unsectioned work/)
     const late = screen.getByTestId('gantt-task-t3')
-    expect(late).toHaveTextContent('deadline 1 Nov 2026 (no start date), To do, overdue')
-    expect(within(late).getByTitle('Late unsectioned: due 1 Nov 2026 · overdue')).toHaveTextContent('!')
+    expect(late).toHaveTextContent('deadline 01/11/26 (no start date), To do, overdue')
+    expect(within(late).getByTitle('Late unsectioned: due 01/11/26 · overdue')).toHaveTextContent('!')
     const undated = screen.getByTestId('gantt-task-t4')
     expect(undated).toHaveTextContent('No dates set')
     expect(undated).toHaveTextContent('no dates set, To do')
@@ -225,7 +251,7 @@ describe('honest dates', () => {
     renderGantt()
     await open(user, /MS1-1/, /Cover sheet/)
     const row = screen.getByTestId('gantt-task-d1')
-    expect(within(row).getByTitle('Finished late: due 1 Nov 2026')).toHaveTextContent('✓')
+    expect(within(row).getByTitle('Finished late: due 01/11/26')).toHaveTextContent('✓')
     expect(row).not.toHaveTextContent('overdue')
   })
 
@@ -245,11 +271,11 @@ describe('honest dates', () => {
   it('writes the periods and deadlines on the chart, not only in tooltips', async () => {
     const user = userEvent.setup()
     renderGantt()
-    expect(screen.getByTestId('gantt-milestone-MS1-1')).toHaveTextContent('1 Nov → Due 30 Nov')
-    expect(screen.getByTestId('gantt-milestone-MS1-2')).toHaveTextContent('Due 28 Feb')
+    expect(screen.getByTestId('gantt-milestone-MS1-1')).toHaveTextContent('Due 30/11/26')
+    expect(screen.getByTestId('gantt-milestone-MS1-2')).toHaveTextContent('Due 28/02/27')
     await open(user, /MS1-1/, /Cover sheet/)
-    expect(screen.getByTestId('gantt-task-t1')).toHaveTextContent('20 Nov → 25 Nov')
-    expect(screen.getByTestId('gantt-task-t2')).toHaveTextContent('Due 27 Nov')
+    expect(screen.getByTestId('gantt-task-t1')).toHaveTextContent('20/11/26 → 25/11/26')
+    expect(screen.getByTestId('gantt-task-t2')).toHaveTextContent('Due 27/11/26')
   })
 
   it('names today with a word on the ruler as well as a line', () => {
@@ -275,13 +301,14 @@ describe('progress', () => {
     expect(screen.getByTestId('gantt-overall-MS1-7')).toHaveTextContent('No linked work')
   })
 
-  it('a ticked section reads as drafted, the same word as Milestones — never as done work', async () => {
+  it('an untouched section reads as not drafted, the same word as Milestones — never as done work', async () => {
     const user = userEvent.setup()
     renderGantt()
     await open(user, /MS1-1/)
     const empty = screen.getByTestId('gantt-section-sec2')
     expect(empty).toHaveTextContent('Budget: Not drafted (no tasks linked)')
-    expect(within(empty).getByRole('checkbox', { name: 'Budget drafted' })).toBeEnabled()
+    // The tick lives on Milestones; the chart no longer offers it.
+    expect(within(empty).queryByRole('checkbox')).not.toBeInTheDocument()
     expect(empty).not.toHaveTextContent(/\bdone\b/i)
   })
 
@@ -462,7 +489,7 @@ describe('view only for plain members', () => {
     expect(screen.queryByRole('button', { name: /^Unlink/ })).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/Link an existing board task/)).not.toBeInTheDocument()
     expect(screen.queryByTestId('link-none')).not.toBeInTheDocument()
-    expect(screen.getByRole('checkbox', { name: 'Cover sheet drafted' })).toBeDisabled()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Show details of Draft the cover' }))
     expect(within(screen.getByTestId('gantt-task-more-t1')).queryByLabelText('Deadline')).not.toBeInTheDocument()
   })
@@ -572,7 +599,7 @@ describe('reading the chart without colour, and with a keyboard', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     const legend = screen.getByTestId('gantt-legend')
     expect(toggle).toHaveAttribute('aria-controls', legend.id)
-    for (const text of [/Today/, /Submission window/, /Submission deadline/, /Task period/, /Task deadline, no start date/, /Task start, no deadline/, /Overdue, still open/, /Done/]) {
+    for (const text of [/^Today$/, /^Submission deadline$/, /^Task date$/, /^Overdue$/, /^Done$/]) {
       expect(within(legend).getByText(text)).toBeInTheDocument()
     }
     expect(legend).toHaveTextContent('Nothing is estimated')
@@ -581,7 +608,7 @@ describe('reading the chart without colour, and with a keyboard', () => {
   it('gives every bar and marker a sentence a screen reader can read', async () => {
     const user = userEvent.setup()
     renderGantt()
-    expect(screen.getByTestId('gantt-milestone-MS1-1')).toHaveTextContent('MS1-1 Team Plan: submission window 1 Nov 2026 to 30 Nov 2026, deadline 30 Nov 2026')
+    expect(screen.getByTestId('gantt-milestone-MS1-1')).toHaveTextContent('MS1-1 Team Plan: submission window 01/11/26 to 30/11/26, deadline 30/11/26')
     expect(screen.getByTestId('gantt-milestone-MS1-7')).toHaveTextContent('MS1-7 Final Event: deadline TBC (not yet published)')
     await open(user, /MS1-1/, /Cover sheet/)
     expect(screen.getByTestId('gantt-section-sec1')).toHaveTextContent('Cover sheet: 1 of 4 tasks done')
@@ -591,7 +618,7 @@ describe('reading the chart without colour, and with a keyboard', () => {
     renderGantt()
     const summary = screen.getByTestId('gantt-summary')
     expect(summary).toHaveTextContent('3 submissions.')
-    expect(summary).toHaveTextContent('Next deadline: MS1-1 on 30 Nov 2026.')
+    expect(summary).toHaveTextContent('Next deadline: MS1-1 on 30/11/26.')
     // Linked, live: t1 t2 t3 t4 t7 = 5; undated: t4; overdue: t3.
     expect(summary).toHaveTextContent('5 linked tasks (1 undated, 1 overdue)')
     expect(summary).toHaveTextContent('Progress counts archived done work')
@@ -728,7 +755,7 @@ describe('subsections, prerequisites and blockers', () => {
     tasks.push(task('t9', { title: 'Itemise the budget', section_id: 'sub1', milestone_key: 'MS1-1', state: 'done' }))
     renderGantt('/gantt?open=MS1-1')
     const parentRow = screen.getByTestId('gantt-section-sec2')
-    expect(within(parentRow).getByLabelText('Budget drafted').closest('label')).toHaveTextContent('1/1')
+    expect(parentRow).toHaveTextContent('1/1')
   })
 
   it('offers a subsection as a place to move a task, by name, from the keyboard-reachable select', async () => {

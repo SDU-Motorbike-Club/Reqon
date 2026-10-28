@@ -79,7 +79,7 @@ function TrendChart({ spec, rows }: { spec: SpecVerdict; rows: SpecMeasurement[]
   const unit = spec.unit ? ` ${spec.unit}` : ''
 
   return (
-    <figure className="rounded-md border border-slate-200 bg-white p-2" data-testid={`trend-${spec.id}`}>
+    <figure className="rounded-md border border-slate-200 bg-surface p-2" data-testid={`trend-${spec.id}`}>
       <figcaption className="text-xs font-semibold text-slate-700">Accepted numeric progression</figcaption>
       <p className="mt-0.5 overflow-x-auto whitespace-nowrap font-mono text-sm text-slate-900" data-testid={`progression-${spec.id}`}>
         {progression}{unit}
@@ -104,7 +104,7 @@ function TrendChart({ spec, rows }: { spec: SpecVerdict; rows: SpecMeasurement[]
                 x2={width - right}
                 y1={lineY}
                 y2={lineY}
-                stroke={line.kind === 'goal' ? '#0f766e' : '#b45309'}
+                stroke={line.kind === 'goal' ? '#2dd4bf' : '#fbbf24'}
                 strokeDasharray={line.kind === 'goal' ? '7 4' : '2 4'}
                 strokeWidth="1.5"
               />
@@ -114,11 +114,11 @@ function TrendChart({ spec, rows }: { spec: SpecVerdict; rows: SpecMeasurement[]
             </g>
           )
         })}
-        <line x1={left} x2={width - right} y1={height - bottom} y2={height - bottom} stroke="#cbd5e1" />
-        <polyline points={points} fill="none" stroke="#0f172a" strokeWidth="2.5" />
+        <line x1={left} x2={width - right} y1={height - bottom} y2={height - bottom} stroke="#70707a" />
+        <polyline points={points} fill="none" stroke="#f1f1f4" strokeWidth="2.5" />
         {accepted.map((row, index) => (
           <g key={row.id}>
-            <circle cx={x(index)} cy={y(row.value_numeric as number)} r="4" fill="#fff" stroke="#0f172a" strokeWidth="2" />
+            <circle cx={x(index)} cy={y(row.value_numeric as number)} r="4" fill="#1e1e22" stroke="#f1f1f4" strokeWidth="2" />
             <text x={x(index)} y={height - 12} textAnchor="middle" className="fill-slate-600 text-[10px]">
               {index + 1}
             </text>
@@ -205,7 +205,7 @@ function MeasurementActionDialog({
               <select
                 value={text}
                 onChange={(event) => setText(event.target.value)}
-                className="mt-1 min-h-11 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm sm:min-h-0"
+                className="mt-1 min-h-11 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm sm:min-h-0"
               >
                 <option value="true">Yes</option>
                 <option value="false">No</option>
@@ -217,7 +217,7 @@ function MeasurementActionDialog({
                 step="any"
                 value={text}
                 onChange={(event) => setText(event.target.value)}
-                className="mt-1 min-h-11 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm sm:min-h-0"
+                className="mt-1 min-h-11 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm sm:min-h-0"
               />
             )}
           </label>
@@ -285,11 +285,11 @@ export function SpecHistory({
       </div>
 
       {rows.length === 0 ? (
-        <p className="rounded border border-slate-200 bg-white p-3 text-sm text-slate-600">No observations recorded yet.</p>
+        <p className="rounded border border-slate-200 bg-surface p-3 text-sm text-slate-600">No observations recorded yet.</p>
       ) : (
         <>
           <TrendChart spec={spec} rows={rows} />
-          <div className="relative overflow-x-auto rounded-md border border-slate-200 bg-white">
+          <div className="relative overflow-x-auto rounded-md border border-slate-200 bg-surface">
             <table className="min-w-[48rem] w-full border-collapse text-left text-xs" data-testid={`history-table-${spec.id}`}>
               <caption className="sr-only">
                 Text alternative for {spec.parameter} progression. Project goal {projectGoalText(spec) ?? 'not set'};

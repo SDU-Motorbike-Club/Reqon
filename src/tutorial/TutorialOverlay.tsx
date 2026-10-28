@@ -6,7 +6,7 @@ import { AUDIENCES, type TutorialStep } from './steps.ts'
 import { chapterLabel } from './tour.ts'
 
 const PAD = 6
-const DIM = 'rgba(15, 23, 42, 0.55)'
+const DIM = 'rgba(0, 0, 0, 0.62)'
 
 function prefersReducedMotion(): boolean {
   return (
@@ -233,7 +233,7 @@ export function TutorialOverlay({
         ref={spotlightRef}
         aria-hidden="true"
         className="pc-fade-in pointer-events-none fixed z-[61] rounded-md"
-        style={{ display: 'none', boxShadow: `0 0 0 2px #fff, 0 0 0 9999px ${DIM}` }}
+        style={{ display: 'none', boxShadow: `0 0 0 2px #f87171, 0 0 0 9999px ${DIM}` }}
         data-testid="tutorial-spotlight"
       />
       <div
@@ -245,7 +245,7 @@ export function TutorialOverlay({
         aria-describedby={bodyId}
         tabIndex={-1}
         onKeyDown={keepTabInCard}
-        className="pc-pop fixed z-[62] max-h-[calc(100vh-1rem)] w-[24rem] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 shadow-xl outline-none"
+        className="pc-pop fixed z-[62] max-h-[calc(100vh-1rem)] w-[24rem] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-lg border border-slate-200 bg-surface p-4 shadow-xl outline-none"
         style={{ top: 0, left: 0 }}
         data-testid="tutorial-card"
       >
@@ -260,13 +260,13 @@ export function TutorialOverlay({
             </span>
           </p>
           <div className="h-1 w-20 shrink-0 overflow-hidden rounded bg-slate-200" aria-hidden="true">
-            <div className="h-full bg-slate-900" style={{ width: `${(number / tutorial.total) * 100}%` }} />
+            <div className="h-full bg-accent" style={{ width: `${(number / tutorial.total) * 100}%` }} />
           </div>
         </div>
         {/* Role steps say so, so nobody wonders why a colleague's tour
             showed them a button they do not have. */}
         {step.guide && (
-          <p className="mt-2 inline-block rounded bg-slate-900 px-1.5 py-0.5 text-[11px] font-semibold text-white">Developer guide</p>
+          <p className="mt-2 inline-block rounded bg-accent px-1.5 py-0.5 text-[11px] font-semibold text-white">Developer guide</p>
         )}
         {step.audience && (
           <p className="mt-2 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-900">

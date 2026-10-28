@@ -4,10 +4,12 @@ import { canGrantRole, canResetPassword, type PrivilegedRole } from '../../auth/
 import { useAuth } from '../../auth/context.ts'
 import { usePermissions } from '../../auth/usePermissions.ts'
 import { useAddMember, useCreateMember, useMembers, useResetPassword, useUpdateMember, type MemberState } from '../../data/useMembers.ts'
+import { useAvatars } from '../../data/useAvatars.ts'
 import { useSubteams } from '../../data/useSubteams.ts'
 import { isActive } from '../../departments/types.ts'
 import { mergeSearchParams } from '../../lib/searchParams.ts'
 import { RoleBadges } from '../../roles/RoleBadges.tsx'
+import { Avatar } from '../../ui/Avatar.tsx'
 import { buttonDanger, buttonQuiet, buttonSecondary } from '../../ui/buttons.ts'
 import { ActionError, ErrorState } from '../../ui/states.tsx'
 import { useState, type FormEvent } from 'react'
@@ -18,6 +20,7 @@ import { useRoleSettings } from './RoleSettings.tsx'
 
 function RosterRow({
   member,
+  image,
   roles,
   titles,
   tutorial,
@@ -35,6 +38,8 @@ function RosterRow({
   resetPending = false,
 }: {
   member: RosterMember
+  // Their picture, if they have one (loaded once for the whole roster).
+  image?: string | null
   roles: PrivilegedRole[]
   // Active departments this person is Head of (subteams.lead_id).
   heads: { key: string; name: string }[]
@@ -60,13 +65,17 @@ function RosterRow({
   return (
     <li className="px-3 py-2" data-testid={`member-${member.id}`}>
       <div className="flex flex-wrap items-center gap-2">
+        <Avatar name={member.full_name} image={image} size="sm" />
         <span className={`text-sm font-medium ${retired ? 'text-slate-500' : 'text-slate-900'}`}>
           {member.full_name}
         </span>
-        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] whitespace-nowrap text-slate-700">
-          <span className="sr-only">Job title: </span>
-          {member.role}
-        </span>
+        {/* Whoever can edit the title sees it in the picker below; showing it here too printed it twice. */}
+        {!canAdminister && (
+          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] whitespace-nowrap text-slate-700">
+            <span className="sr-only">Job title: </span>
+            {member.role}
+          </span>
+        )}
         <RoleBadges roles={roles} />
         {retired && (
           <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] text-slate-700">alumni</span>
@@ -148,7 +157,7 @@ function RosterRow({
                   disabled={disabled || statusLocked}
                   title={statusLocked ? 'Only someone who may change all of this person’s roles can change their status.' : undefined}
                   onChange={(e) => onStatus(e.target.value as MemberState)}
-                  className="min-h-11 rounded border border-slate-300 bg-white px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 disabled:opacity-60 sm:min-h-0"
+                  className="min-h-11 rounded border border-slate-300 bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring disabled:opacity-60 sm:min-h-0"
                 >
                   <option value="trial">Trial</option>
                   <option value="active">Active</option>
@@ -236,6 +245,7 @@ export function RosterSettings() {
   const auth = useAuth()
   const myId = auth.status === 'member' ? auth.member.id : null
   const members = useMembers()
+  const avatars = useAvatars()
   const subteams = useSubteams()
   const headsOf = (memberId: string) =>
     (subteams.data ?? []).filter((d) => isActive(d) && d.lead_id === memberId).map((d) => ({ key: d.key, name: d.name }))
@@ -347,11 +357,12 @@ export function RosterSettings() {
               {group.empty}
             </p>
           ) : (
-            <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+            <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-surface">
               {group.people.map((m, index) => (
                 <RosterRow
                   key={m.id}
                   member={m}
+                  image={avatars.data?.get(m.id) ?? null}
                   roles={roleSettings.rolesByMember.get(m.id) ?? []}
                   titles={titles}
                   tutorial={group.heading === 'On the team' && index === 0}
@@ -399,7 +410,7 @@ export function RosterSettings() {
       {roleSettings.dialog as ReactNode}
 
       {canAddMembers && (
-        <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3" data-tutorial="add-member">
+        <div className="mt-3 rounded-lg border border-slate-200 bg-surface p-3" data-tutorial="add-member">
           <form onSubmit={submitRecruit} aria-labelledby="add-member-heading">
             <h3 id="add-member-heading" className="text-sm font-medium text-slate-900">
               Add someone to the roster
@@ -423,7 +434,7 @@ export function RosterSettings() {
               autoComplete="off"
               value={recruit.fullName}
               onChange={(e) => setRecruit((s) => ({ ...s, fullName: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+              className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
             />
             <label className="mt-2 block text-xs font-medium text-slate-600" htmlFor="recruit-email">
               Email they sign in with
@@ -436,7 +447,7 @@ export function RosterSettings() {
               autoComplete="off"
               value={recruit.email}
               onChange={(e) => setRecruit((s) => ({ ...s, email: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+              className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
             />
             <span aria-hidden="true" className="mt-2 block text-xs font-medium text-slate-600">
               Job title
@@ -456,7 +467,7 @@ export function RosterSettings() {
             <button
               type="submit"
               disabled={createMember.isPending}
-              className="mt-2 min-h-11 rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 disabled:opacity-60 sm:min-h-0"
+              className="mt-2 min-h-11 rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring disabled:opacity-60 sm:min-h-0"
             >
               {createMember.isPending ? 'Adding…' : 'Add to roster'}
             </button>
@@ -495,7 +506,7 @@ export function RosterSettings() {
                 value={newMember.id}
                 onChange={(e) => setNewMember((s) => ({ ...s, id: e.target.value }))}
                 placeholder="00000000-0000-0000-0000-000000000000"
-                className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+                className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
               />
               <label className="mt-2 block text-xs font-medium text-slate-600" htmlFor="new-member-name">
                 Full name of the linked person
@@ -504,7 +515,7 @@ export function RosterSettings() {
                 id="new-member-name"
                 value={newMember.fullName}
                 onChange={(e) => setNewMember((s) => ({ ...s, fullName: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+                className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
               />
               <span aria-hidden="true" className="mt-2 block text-xs font-medium text-slate-600">
                 Job title

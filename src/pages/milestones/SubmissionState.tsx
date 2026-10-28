@@ -59,29 +59,32 @@ export function SubmissionState({
 
   return (
     <div className="mt-1 text-xs" data-testid={`submission-${key}`}>
-      <dl className="flex flex-wrap gap-x-4 gap-y-0.5 text-slate-700">
-        <div className="flex gap-1">
-          <dt className="font-medium">Submitted:</dt>
-          <dd data-testid={`submitted-${key}`}>
-            {milestone.submitted_on ? `${formatDay(milestone.submitted_on)}${submittedBy ? ` · ${submittedBy}` : ''}` : <span className="text-slate-500">Not recorded</span>}
-          </dd>
-        </div>
-        <div className="flex gap-1">
-          <dt className="font-medium">Accepted:</dt>
-          <dd data-testid={`accepted-${key}`}>
-            {milestone.accepted_on ? `${formatDay(milestone.accepted_on)}${acceptedBy ? ` · ${acceptedBy}` : ''}` : <span className="text-slate-500">Not recorded</span>}
-          </dd>
-        </div>
-      </dl>
+      {/* Submitted over accepted, the button on the right: two dates read as a pair, not a sentence. */}
+      <div className="flex items-start justify-between gap-3">
+        <dl className="flex flex-col gap-0.5 text-slate-700">
+          <div className="flex gap-1">
+            <dt className="font-medium">Submitted:</dt>
+            <dd data-testid={`submitted-${key}`}>
+              {milestone.submitted_on ? `${formatDay(milestone.submitted_on)}${submittedBy ? ` · ${submittedBy}` : ''}` : <span className="text-slate-500">Not recorded</span>}
+            </dd>
+          </div>
+          <div className="flex gap-1">
+            <dt className="font-medium">Accepted:</dt>
+            <dd data-testid={`accepted-${key}`}>
+              {milestone.accepted_on ? `${formatDay(milestone.accepted_on)}${acceptedBy ? ` · ${acceptedBy}` : ''}` : <span className="text-slate-500">Not recorded</span>}
+            </dd>
+          </div>
+        </dl>
 
-      {canRecord && !editing && (
-        <button id={`submission-edit-${key}`} type="button" className={`${buttonSecondary} mt-1`} onClick={open} data-testid={`submission-edit-${key}`}>
-          Record submission…
-        </button>
-      )}
+        {canRecord && !editing && (
+          <button id={`submission-edit-${key}`} type="button" className={`${buttonSecondary} shrink-0`} onClick={open} data-testid={`submission-edit-${key}`}>
+            Record submission…
+          </button>
+        )}
+      </div>
       {canRecord && editing && (
         <form
-          className="mt-1 flex flex-wrap items-end gap-2 rounded border border-slate-200 bg-white p-2"
+          className="mt-1 flex flex-wrap items-end gap-2 rounded border border-slate-200 bg-surface p-2"
           onSubmit={(e) => {
             e.preventDefault()
             if (problem || changedElsewhere) return
@@ -96,14 +99,14 @@ export function SubmissionState({
               Submitted on
             </label>
             <input id={`submitted-on-${key}`} autoFocus type="date" max={today} value={submitted} onChange={(e) => setSubmitted(e.target.value)}
-              className="mt-0.5 min-h-11 rounded border border-slate-300 bg-white px-2 py-1 text-sm sm:min-h-0" />
+              className="mt-0.5 min-h-11 rounded border border-slate-300 bg-surface px-2 py-1 text-sm sm:min-h-0" />
           </div>
           <div>
             <label className="block font-medium text-slate-700" htmlFor={`accepted-on-${key}`}>
               Accepted on
             </label>
             <input id={`accepted-on-${key}`} type="date" max={today} value={accepted} onChange={(e) => setAccepted(e.target.value)}
-              className="mt-0.5 min-h-11 rounded border border-slate-300 bg-white px-2 py-1 text-sm sm:min-h-0" />
+              className="mt-0.5 min-h-11 rounded border border-slate-300 bg-surface px-2 py-1 text-sm sm:min-h-0" />
           </div>
           <button type="submit" className={buttonPrimary} disabled={problem !== null || changedElsewhere || save.isPending}>
             {save.isPending ? 'Saving…' : `Save record for ${milestoneLabel(milestone)}`}

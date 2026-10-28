@@ -1,3 +1,4 @@
+import { formatDay } from '../../lib/dates.ts'
 import type { Milestone, MilestoneSection } from '../../milestones/types.ts'
 import { taskProgress, tasksInMilestone } from '../../tasks/progress.ts'
 import type { Task } from '../../tasks/types.ts'
@@ -134,11 +135,8 @@ export function weekTicks(range: Span): Tick[] {
       ticks.push({
         ...box,
         key: from,
-        label: new Date(`${from}T00:00:00Z`).toLocaleDateString('en-GB', {
-          day: 'numeric',
-          month: 'short',
-          timeZone: 'UTC',
-        }),
+        // The Monday the week starts on, as DD/MM/YY like every other date.
+        label: formatDay(from),
       })
     }
     day += 7
@@ -215,11 +213,9 @@ export function sectionSpan(tasks: Task[], sectionId: string, fallback: Span | n
   return spanOfDates(tasks.filter((t) => t.section_id !== null && ids.has(t.section_id)).flatMap((t) => [t.starts_on, t.due_date])) ?? fallback
 }
 
-// "20 Nov": short enough to sit beside a mark. The full date (with the year) is
-// in the mark's title and the row's summary.
+// "20/11/26": the same DD/MM/YY as everywhere else, to sit beside a mark.
 export function shortDay(iso: string): string {
-  const day = new Date(`${iso.slice(0, 10)}T00:00:00`)
-  return Number.isNaN(day.getTime()) ? '' : day.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  return formatDay(iso.slice(0, 10))
 }
 
 export const spanCaption = (span: Span) =>

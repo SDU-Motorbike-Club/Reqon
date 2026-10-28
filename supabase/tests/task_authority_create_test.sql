@@ -58,7 +58,7 @@ declare
   ms text := 'AUT-MS1';
   ms_other text := 'AUT-MS2';
   clause text;
-  t1 uuid; t2 uuid; p1 uuid;
+  t1 uuid; t2 uuid; t2b uuid; t2c uuid; p1 uuid;
   rev int;
   n int;
   err text;
@@ -152,6 +152,40 @@ begin
     'it carries its requirement, starts today and says who made it',
     exists (select 1 from task_requirements where task_id = t2 and clause_key = clause)
       and exists (select 1 from tasks where id = t2 and starts_on = (now() at time zone 'Europe/Copenhagen')::date and created_by = hB));
+  -- Only a title and a deadline are required: no department, no start date, no owner, no milestone.
+  perform pg_temp.as_user(hB);
+  select (create_task(season, 'Title and deadline only', null, null, current_date + 6, null, '{}'::text[])).id into t2c;
+  perform pg_temp.as_owner();
+  select * into lines, failures from pg_temp.note(lines, failures,
+    'a task needs only a title and a deadline: no department, no start date',
+    exists (select 1 from tasks where id = t2c and subteam_key is null and owner_id is null
+            and starts_on = (now() at time zone 'Europe/Copenhagen')::date and due_date = current_date + 6));
+  begin
+    perform pg_temp.as_user(hB);
+    perform create_task(season, 'Bad department', 'NO_SUCH_DEPT', null, current_date + 6, null, '{}'::text[]);
+    err := 'allowed';
+  exception when check_violation then err := 'refused';
+  end;
+  perform pg_temp.as_owner();
+  select * into lines, failures from pg_temp.note(lines, failures,
+    'a department that IS given must still be a real, active one', err = 'refused', err);
+
+  -- A chosen start date: any day up to the deadline, never after it.
+  perform pg_temp.as_user(hB);
+  select (create_task(season, 'Early start', dA, m2, current_date + 10, ms, array[clause], null, 'normal', current_date - 20)).id into t2b;
+  perform pg_temp.as_owner();
+  select * into lines, failures from pg_temp.note(lines, failures,
+    'a chosen start date is kept, even weeks from today',
+    exists (select 1 from tasks where id = t2b and starts_on = current_date - 20));
+  begin
+    perform pg_temp.as_user(hB);
+    perform create_task(season, 'Backwards', dA, m2, current_date + 10, ms, array[clause], null, 'normal', current_date + 11);
+    err := 'allowed';
+  exception when check_violation then err := 'refused';
+  end;
+  perform pg_temp.as_owner();
+  select * into lines, failures from pg_temp.note(lines, failures,
+    'a start date after the deadline is refused', err = 'refused', err);
   select * into lines, failures from pg_temp.note(lines, failures,
     'it is logged as created, once',
     (select count(*) from activity where entity = 'task' and entity_id = t2::text and action = 'created') = 1);
@@ -212,7 +246,7 @@ begin
   select * into lines, failures from pg_temp.note(lines, failures,
     'with a milestone AND a requirement it keeps them, like a promoted task',
     (select links_required from tasks where id = t2));
-  delete from tasks where title in ('Bare task', 'Milestone only', 'Requirement only');
+  delete from tasks where title in ('Bare task', 'Milestone only', 'Requirement only', 'Early start', 'Title and deadline only');
 
   -- ---------------------------------------------------------- the list view
   perform pg_temp.as_user(m2);

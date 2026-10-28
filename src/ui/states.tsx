@@ -6,9 +6,15 @@ import { isPermissionError } from '../core/errors.ts'
 
 export function LoadingState({ label = 'Loading…' }: { label?: string }) {
   return (
-    <p role="status" className="py-6 text-center text-sm text-slate-600">
-      {label}
-    </p>
+    <div role="status" className="py-6">
+      <p className="text-sm text-slate-600">{label}</p>
+      {/* A still outline of what is coming, so the page does not jump when it arrives. It is not announced. */}
+      <div aria-hidden="true" className="mt-3 space-y-2">
+        <div className="h-3 w-2/3 rounded bg-slate-100" />
+        <div className="h-3 w-5/6 rounded bg-slate-100" />
+        <div className="h-3 w-1/2 rounded bg-slate-100" />
+      </div>
+    </div>
   )
 }
 
@@ -33,7 +39,7 @@ export function ErrorState({
       <button
         type="button"
         onClick={onRetry}
-        className="mt-3 min-h-11 rounded bg-red-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-900 sm:min-h-0"
+        className="mt-3 min-h-11 rounded bg-danger-hover px-3 py-1.5 text-sm font-medium text-white hover:bg-danger-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-900 sm:min-h-0"
       >
         Try again
       </button>

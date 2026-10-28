@@ -111,27 +111,30 @@ begin
   select * into lines, failures from pg_temp.note(lines, failures,
     'changing the place is not a new call', pg_temp.told(mem, m1::text) = 1);
 
-  -- 3. A club-wide meeting is logged nowhere and tells nobody.
+  -- 3. A club-wide meeting tells every active member once (20260144000000), and nobody twice.
   perform pg_temp.as_user(pre);
   insert into meetings (season_id, title, held_on) values (season, 'Everyone', current_date + 3) returning id into m2;
   perform pg_temp.as_owner();
   select * into lines, failures from pg_temp.note(lines, failures,
-    'a meeting with no department writes no audit row and no notification',
-    not exists (select 1 from activity where entity = 'meeting' and entity_id = m2::text)
-      and not exists (select 1 from notifications where entity = 'meeting' and entity_id = m2::text));
+    'a meeting with no department tells every active member once, but not its author or a retired member',
+    pg_temp.told(mem, m2::text) = 1 and pg_temp.told(hd, m2::text) = 1 and pg_temp.told(other, m2::text) = 1
+      and pg_temp.told(pre, m2::text) = 0 and pg_temp.told(mem2, m2::text) = 0);
+  select * into lines, failures from pg_temp.note(lines, failures,
+    'and writes exactly one audit row',
+    (select count(*) from activity where entity = 'meeting' and entity_id = m2::text and action = 'called') = 1);
 
-  -- 4. Choosing the department afterwards calls it then.
+  -- 4. Choosing the department afterwards calls it then (they already heard of it as a club meeting, so now twice).
   perform pg_temp.as_user(pre);
   update meetings set subteam_key = dept where id = m2;
   perform pg_temp.as_owner();
   select * into lines, failures from pg_temp.note(lines, failures,
-    'adding a department later tells that department', pg_temp.told(mem, m2::text) = 1 and pg_temp.told(hd, m2::text) = 1);
+    'adding a department later tells that department', pg_temp.told(mem, m2::text) = 2 and pg_temp.told(hd, m2::text) = 2);
   perform pg_temp.as_user(pre);
   update meetings set subteam_key = dept2 where id = m2;
   perform pg_temp.as_owner();
   select * into lines, failures from pg_temp.note(lines, failures,
     'moving it to another department does not repeat the first one''s notice',
-    pg_temp.told(mem, m2::text) = 1);
+    pg_temp.told(mem, m2::text) = 2);
 
   -- 5. A meeting already in the past is a record, not a call.
   perform pg_temp.as_user(pre);
@@ -174,7 +177,7 @@ begin
   select count(*) into n from notifications where kind = 'meeting_called';
   perform pg_temp.as_owner();
   select * into lines, failures from pg_temp.note(lines, failures,
-    'a member reads only their own meeting notices (3 for them: m1, m2, m4)', n = 3, n::text);
+    'a member reads only their own meeting notices (4 for them: m1; m2 twice, as a club meeting and then for the department; m4)', n = 4, n::text);
 
   -- 9. Nobody can call the trigger functions from the API.
   perform pg_temp.as_user(pre);

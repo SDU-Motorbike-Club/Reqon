@@ -97,7 +97,7 @@ export function DepartmentSettings() {
         </p>
       )}
 
-      <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+      <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-surface">
         {active.map((d, i) => (
           <li key={d.key} className="group px-3 py-2" data-testid={`department-row-${d.key}`}>
             {editingKey === d.key ? (
@@ -200,7 +200,7 @@ export function DepartmentSettings() {
             onChange={(e) => setNewKey(e.target.value)}
             placeholder="e.g. SWDATA"
             disabled={atCap}
-            className="min-h-11 w-32 rounded border border-slate-300 px-2 py-1 text-sm uppercase focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 disabled:opacity-50 sm:min-h-0"
+            className="min-h-11 w-32 rounded border border-slate-300 px-2 py-1 text-sm uppercase focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring disabled:opacity-50 sm:min-h-0"
           />
         </div>
         <div className="flex-1">
@@ -211,7 +211,7 @@ export function DepartmentSettings() {
             onChange={(e) => setNewName(e.target.value)}
             placeholder="e.g. Software & Data Collection"
             disabled={atCap}
-            className="min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 disabled:opacity-50 sm:min-h-0"
+            className="min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring disabled:opacity-50 sm:min-h-0"
           />
         </div>
         <button
@@ -342,7 +342,7 @@ function DepartmentEditor({
   }
 
   const field =
-    'mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0'
+    'mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0'
   return (
     <div ref={boxRef} role="group" aria-labelledby={`${id}-title`} data-testid={`department-editor-${department.key}`}>
       <p id={`${id}-title`} className="text-sm font-medium text-slate-900">
@@ -359,7 +359,7 @@ function DepartmentEditor({
           <label className="block text-xs font-medium text-slate-700" htmlFor={`dept-head-${department.key}`}>
             Head of Department for {department.key}
           </label>
-          <select id={`dept-head-${department.key}`} value={leadId} onChange={(e) => setLeadId(e.target.value)} className={`${field} bg-white`}>
+          <select id={`dept-head-${department.key}`} value={leadId} onChange={(e) => setLeadId(e.target.value)} className={`${field} bg-surface`}>
             <option value="">No Head appointed</option>
             {activeMembers.map((m) => (
               <option key={m.id} value={m.id}>

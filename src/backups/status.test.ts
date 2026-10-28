@@ -37,6 +37,12 @@ describe('backupHealth', () => {
     expect(by([run('github', 9 * 24 + 1)]).github.state).toBe('stale')
   })
 
+  it('the GitHub and Drive copies run on different days, so one failed run cannot cost both', () => {
+    const h = by([run('github', 9 * 24 + 1), run('drive', 9 * 24 + 1)])
+    expect(h.github.message).toBe('The newest backup is 9 days ago; one is expected every Monday.')
+    expect(h.drive.message).toBe('The newest backup is 9 days ago; one is expected every Thursday.')
+  })
+
   it('a failed latest attempt is "failed" even when an older one was good, and says how old the good one is', () => {
     const h = by([run('r2', 30), fail('r2', 6, 'dump_too_big')])
     expect(h.r2.state).toBe('failed')

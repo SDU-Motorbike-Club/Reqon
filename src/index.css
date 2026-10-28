@@ -1,8 +1,147 @@
 @import 'tailwindcss';
+/* Self-hosted, so the app asks nobody else for a font. Only the letters a page uses are downloaded. */
+@import '@fontsource-variable/plus-jakarta-sans';
 
-/* The team asked for light only — do not add a dark theme. */
+/* ---------------------------------------------------------------------------
+   The theme: dark grey with red accents, and nothing else.
+
+   The app is written against Tailwind's grey ("slate") and status scales, so the theme is made HERE, once, by
+   giving those names dark values: slate-50 is now the faintest raised panel, slate-900 the brightest text. A
+   class such as `text-slate-600` or `bg-red-50 text-red-800` therefore keeps meaning "secondary text" and "an error
+   box" and simply reads on a dark page. What this cannot do is a SOLID fill with white text on it (a button, a
+   badge): there the scale would flip the wrong way, so those use the named colours below (accent, danger, ok,
+   info). Page and surface are named too: bg-surface is a card, an input, a dialog.
+
+   Greys are neutral and slightly cool, never pure black: the page is #151518. Red is the accent, used for the
+   primary action, the active item and the focus ring; the status colours keep their meaning (red wrong, amber
+   careful, green fine, blue information), just on dark tints. Every text pairing used by the UI is checked for
+   contrast in theme.test.ts.
+   ------------------------------------------------------------------------ */
+@theme {
+  /* Type: one family, Plus Jakarta Sans, for titles and reading alike. Hierarchy comes from size, weight and
+     spacing, not from a second typeface; it also means one font file to download instead of two. The latin-ext
+     subset is in the package, so Romanian and Nordic names (ș, ț, ă, å, ø, æ) draw in the real face. */
+  --font-sans: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-sans);
+
+  /* Corners, one step softer than Tailwind's: controls and chips (rounded) 6px, cards (rounded-lg) 12px,
+     dialogs (rounded-xl) 16px. Pills (rounded-full) are unchanged. */
+  --radius: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  --color-page: #151518;
+  --color-surface: #1e1e22;
+
+  --color-slate-50: #232328;
+  --color-slate-100: #2a2a30;
+  --color-slate-200: #36363d;
+  --color-slate-300: #5e5e67;
+  --color-slate-400: #80808a;
+  --color-slate-500: #a3a3ad;
+  --color-slate-600: #b4b4bd;
+  --color-slate-700: #cbcbd2;
+  --color-slate-800: #dedee3;
+  --color-slate-900: #f1f1f4;
+  --color-slate-950: #fafafb;
+
+  /* Solid fills that carry white text. */
+  --color-accent: #dc2626;
+  --color-accent-hover: #c62222;
+  --color-accent-ring: #f87171;
+  --color-danger: #b91c1c;
+  --color-danger-hover: #a01818;
+  --color-ok: #15803d;
+  --color-info: #0369a1;
+
+  /* Status scales: 50-300 are dark tints for boxes and borders, 600-900 are light text for them. 400 and 500
+     keep Tailwind's own values (they were never boxes or body text). */
+  --color-red-50: #2a1517;
+  --color-red-100: #3a1a1d;
+  --color-red-200: #5c2429;
+  --color-red-300: #8a3038;
+  --color-red-600: #f06565;
+  --color-red-700: #f58a8a;
+  --color-red-800: #f9a8a8;
+  --color-red-900: #fecaca;
+  /* 950 is the strongest text of a status hue (it was the darkest shade in Tailwind's own scale), so here it is
+     the lightest: without it `text-amber-950` fell back to near-black on a dark tint. */
+  --color-red-950: #ffe4e4;
+
+  --color-amber-50: #2a2111;
+  --color-amber-100: #3a2d12;
+  --color-amber-200: #5c4617;
+  --color-amber-300: #8a6a1c;
+  --color-amber-600: #f6b53a;
+  --color-amber-700: #f9c764;
+  --color-amber-800: #fbd98f;
+  --color-amber-900: #fde9b8;
+  --color-amber-950: #fff3d1;
+
+  --color-emerald-50: #11261c;
+  --color-emerald-100: #163325;
+  --color-emerald-200: #1f4a35;
+  --color-emerald-300: #2c6b4b;
+  --color-emerald-600: #3ecf93;
+  --color-emerald-700: #6ee0ae;
+  --color-emerald-800: #9aebc8;
+  --color-emerald-900: #c5f4de;
+  --color-emerald-950: #dcfaeb;
+
+  --color-green-50: #11261c;
+  --color-green-100: #163325;
+  --color-green-200: #1f4a35;
+  --color-green-300: #2c6b4b;
+  --color-green-600: #3ecf93;
+  --color-green-700: #6ee0ae;
+  --color-green-800: #9aebc8;
+  --color-green-900: #c5f4de;
+  --color-green-950: #dcfaeb;
+
+  --color-sky-50: #10202c;
+  --color-sky-100: #162b3a;
+  --color-sky-200: #1f3f55;
+  --color-sky-300: #2c5d7f;
+  --color-sky-600: #4cc3f5;
+  --color-sky-700: #7dd3fa;
+  --color-sky-800: #a5e0fc;
+  --color-sky-900: #cdeefe;
+  --color-sky-950: #e3f6ff;
+
+  --color-blue-50: #10202c;
+  --color-blue-100: #162b3a;
+  --color-blue-200: #1f3f55;
+  --color-blue-300: #2c5d7f;
+  --color-blue-600: #4cc3f5;
+  --color-blue-700: #7dd3fa;
+  --color-blue-800: #a5e0fc;
+  --color-blue-900: #cdeefe;
+  --color-blue-950: #e3f6ff;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.011em;
+  /* A title that wraps breaks into even lines, not one word on the second. */
+  text-wrap: balance;
+}
+
+/* Figures line up in columns and do not jitter as they change: dates, counts, points, money. */
+time,
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
 html {
-  color-scheme: light;
+  /* Native controls (date pickers, scrollbars, the inside of a <dialog>) draw dark too. */
+  color-scheme: dark;
+  background-color: var(--color-page);
+  color: var(--color-slate-900);
+  /* Checkboxes, radios and ranges draw in the accent, not the browser's blue. */
+  accent-color: var(--color-accent);
 }
 
 /* ---------------------------------------------------------------------------
@@ -36,6 +175,14 @@ html {
     cursor: not-allowed;
   }
 
+  /* Tailwind's focus ring leaves a gap (ring-offset) that it paints white; on this dark page that is a white halo.
+     Paint the gap in the page colour instead, once, for every control that uses an offset. */
+  *,
+  ::before,
+  ::after {
+    --tw-ring-offset-color: var(--color-page);
+  }
+
   /* A small press, so a tap registers before the network answers. */
   button:not(:disabled):active {
     transform: scale(0.98);
@@ -44,9 +191,21 @@ html {
   /* A visible keyboard focus ring for anything that did not bring its own.
      Controls with focus-visible:ring-* keep theirs: utilities beat this layer. */
   :where(a, button, select, input, textarea, summary, [tabindex]:not([tabindex='-1'])):focus-visible {
-    outline: 2px solid var(--color-slate-900, #0f172a);
+    outline: 2px solid var(--color-accent-ring, #f87171);
     outline-offset: 2px;
   }
+}
+
+/* A drop-down keeps room for its arrow, so a long choice ("Open (not done or cancelled)") ends in an ellipsis
+   before the arrow and never runs under it. Unlayered on purpose: it must win over each screen's own px-* class. */
+select:not([multiple]):not([size]) {
+  appearance: none;
+  padding-right: 2rem;
+  text-overflow: ellipsis;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23a3a3ad' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 1rem;
 }
 
 /* While a dialog is open, the page behind it stays put. */
@@ -81,17 +240,140 @@ html:has(dialog[open]) {
 .pc-fade-in { animation: pc-fade 160ms ease-out both; }
 .pc-slide-up { animation: pc-slide-up 200ms cubic-bezier(0.2, 0, 0, 1) both; }
 
-/* People who ask their system for less motion get none. */
+/* People who ask their system for less motion get none. Scoped to what this file animates, not to every element:
+   a blanket near-zero duration on `*` would also cut short animations that other code waits on. State changes
+   (a colour, a border) still happen at once; only the movement and the fades are removed. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  .pc-pop,
+  .pc-fade-in,
+  .pc-slide-up,
+  .pc-arrive,
+  main#main-content {
+    animation: none;
+  }
+  :where(a, button, select, input, textarea, summary, .pc-lift) {
+    transition: none;
   }
   button:not(:disabled):active {
     transform: none;
   }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The meeting editor's writing area (meetings/RichTextEditor.tsx): a page you
+   write on. Tailwind's reset strips lists and heading sizes, so they are put
+   back here, scoped to the editor and nothing else. Sizes follow how the same
+   text is drawn on the Meetings page (MarkdownView), a little larger to write in.
+   ------------------------------------------------------------------------ */
+.pc-doc {
+  min-height: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--color-slate-900, #0f172a);
+  outline: none;
+}
+.pc-doc > * + * {
+  margin-top: 0.5rem;
+}
+.pc-doc h1,
+.pc-doc h2 {
+  margin-top: 1.25rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.pc-doc h3,
+.pc-doc h4,
+.pc-doc h5,
+.pc-doc h6 {
+  margin-top: 1rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.pc-doc > :first-child {
+  margin-top: 0;
+}
+.pc-doc ul {
+  list-style: disc;
+  padding-left: 1.5rem;
+}
+.pc-doc ol {
+  list-style: decimal;
+  padding-left: 1.5rem;
+}
+.pc-doc li > p {
+  margin: 0;
+}
+.pc-doc li > ul,
+.pc-doc li > ol {
+  margin-top: 0.125rem;
+}
+.pc-doc blockquote {
+  border-left: 2px solid var(--color-slate-300, #cbd5e1);
+  padding-left: 0.75rem;
+  color: var(--color-slate-700, #334155);
+}
+.pc-doc hr {
+  border: 0;
+  border-top: 1px solid var(--color-slate-300, #cbd5e1);
+}
+.pc-doc code {
+  border-radius: 0.25rem;
+  background: var(--color-slate-100, #f1f5f9);
+  padding: 0 0.25rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.85em;
+}
+/* The empty-document hint (Placeholder extension). */
+.pc-doc p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--color-slate-400, #94a3b8);
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Motion explains change; it never adds waiting.
+
+   A screen opens with ONE short opacity fade (160ms, no movement, no delay), so a route change reads as a change
+   and nothing is hidden behind a stagger: every control is usable from the first frame. A card that is a link
+   answers a real pointer with a border colour change only (no lift, no shadow), gated to hover-capable pointers so
+   a tap on a phone never leaves it stuck. Nothing loops, bounces, blurs or follows the scroll.
+
+   Only opacity is animated, and the fade uses `backwards` fill: once it ends the element is back to its own style,
+   so a finished animation cannot leave a transform or filter behind that would trap a sticky or fixed child.
+   Reduced motion is handled once, above, for the classes below.
+   ------------------------------------------------------------------------ */
+@keyframes pc-open {
+  from { opacity: 0; }
+}
+:root {
+  --pc-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+main#main-content {
+  animation: pc-open 160ms ease-out backwards;
+}
+
+/* A card that opens something: its edge answers a pointer. */
+.pc-lift {
+  transition-property: border-color, background-color;
+  transition-duration: 140ms;
+  transition-timing-function: var(--pc-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .pc-lift:hover {
+    border-color: color-mix(in oklab, var(--color-accent) 45%, var(--color-slate-300));
+  }
+}
+
+/* An item that has just arrived (a card moved into a lane, a message after an action) fades in where it lands. */
+.pc-arrive {
+  animation: pc-open 200ms ease-out backwards;
 }

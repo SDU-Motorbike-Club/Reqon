@@ -43,7 +43,7 @@ const supabase = {
 vi.mock('../lib/supabase.ts', () => ({ get supabase() { return supabase } }))
 vi.mock('../season/context.ts', () => ({ useSeasonId: () => 'season-a' }))
 
-const { useUpdateTask, useArchiveTask, useRestoreTask, useLinkTaskRequirement, useUnlinkTaskRequirement } =
+const { useUpdateTask, useArchiveTask, useRestoreTask, useDeleteArchivedTask, useLinkTaskRequirement, useUnlinkTaskRequirement } =
   await import('./useTasks.ts')
 
 function hookWithClient<T>(useHook: () => T, seed?: unknown[]) {
@@ -151,6 +151,21 @@ describe('useRestoreTask', () => {
     rpcResults.restore_task = { data: null, error: { message: 'This task is not archived', code: '22023' } }
     const restore = hook(() => useRestoreTask())
     await expect(restore.current.mutateAsync({ id: 't1' })).rejects.toThrow(/not archived/)
+  })
+})
+
+describe('useDeleteArchivedTask', () => {
+  it('counts the empty answer of a void function as success (it used to say "no data returned")', async () => {
+    rpcResults.delete_archived_task = { data: null, error: null }
+    const remove = hook(() => useDeleteArchivedTask())
+    await expect(remove.current.mutateAsync({ id: 't1' })).resolves.toBeUndefined()
+    expect(lastRpc).toEqual({ fn: 'delete_archived_task', args: { p_task_id: 't1' } })
+  })
+
+  it('still surfaces the refusal when the task is not archived', async () => {
+    rpcResults.delete_archived_task = { data: null, error: { message: 'Archive the task first. Only an archived task can be deleted.', code: '22023' } }
+    const remove = hook(() => useDeleteArchivedTask())
+    await expect(remove.current.mutateAsync({ id: 't1' })).rejects.toThrow(/Archive the task first/)
   })
 })
 

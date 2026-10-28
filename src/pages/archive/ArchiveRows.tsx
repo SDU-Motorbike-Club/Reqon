@@ -31,6 +31,8 @@ export function ArchivedTaskRow({
   canRestore,
   restoring,
   onRestore,
+  canDelete = false,
+  onDelete,
   memberNames,
 }: {
   task: Task
@@ -40,11 +42,14 @@ export function ArchivedTaskRow({
   canRestore: boolean
   restoring: boolean
   onRestore: (task: Task) => void
+  // Permanent delete, for the President, Vice President and Developer only.
+  canDelete?: boolean
+  onDelete?: (task: Task) => void
   memberNames: ReadonlyMap<string, string>
 }) {
   const completed = completionLabel(task)
   return (
-    <li className="rounded-lg border border-slate-200 bg-white p-3" data-testid={`archived-task-${task.id}`}>
+    <li className="rounded-lg border border-slate-200 bg-surface p-3" data-testid={`archived-task-${task.id}`}>
       <div className="flex flex-wrap items-baseline gap-2">
         <h3 className="text-sm font-semibold text-slate-900">{task.title}</h3>
         <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700">{TASK_STATE_LABEL[task.state]} when archived</span>
@@ -66,11 +71,18 @@ export function ArchivedTaskRow({
           </Link>
         </p>
       )}
-      {canRestore && (
-        <div className="mt-2">
-          <button type="button" className={buttonSecondary} disabled={restoring} onClick={() => onRestore(task)} data-testid={`restore-${task.id}`}>
-            {restoring ? 'Restoring…' : 'Restore…'}
-          </button>
+      {(canRestore || (canDelete && onDelete)) && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {canRestore && (
+            <button type="button" className={buttonSecondary} disabled={restoring} onClick={() => onRestore(task)} data-testid={`restore-${task.id}`}>
+              {restoring ? 'Restoring…' : 'Restore…'}
+            </button>
+          )}
+          {canDelete && onDelete && (
+            <button type="button" className={buttonSecondary} onClick={() => onDelete(task)} data-testid={`delete-${task.id}`}>
+              Delete permanently…
+            </button>
+          )}
         </div>
       )}
       <ActivityHistory entity="task" entityId={task.id} memberNames={memberNames} />
@@ -95,7 +107,7 @@ export function HistoryProposalRow({
   const when = proposal.archived_at ?? proposal.decided_at
   const reason = proposal.archive_reason ? PROPOSAL_ARCHIVE_REASON[proposal.archive_reason] : null
   return (
-    <li className="rounded-lg border border-slate-200 bg-white p-3" data-testid={`history-proposal-${proposal.id}`}>
+    <li className="rounded-lg border border-slate-200 bg-surface p-3" data-testid={`history-proposal-${proposal.id}`}>
       <div className="flex flex-wrap items-baseline gap-2">
         <h3 className="text-sm font-semibold text-slate-900">{proposal.title}</h3>
         <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700" data-testid={`history-status-${proposal.id}`}>

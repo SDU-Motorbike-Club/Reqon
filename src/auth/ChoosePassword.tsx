@@ -98,7 +98,7 @@ export default function ChoosePassword() {
         onSubmit={submit}
         noValidate
         aria-labelledby={`${ids}-title`}
-        className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
+        className="w-full max-w-sm rounded-lg border border-slate-200 bg-surface p-6 shadow-sm"
       >
         <h1 id={`${ids}-title`} className="text-xl font-semibold text-slate-900">
           Choose your password
@@ -140,7 +140,7 @@ export default function ChoosePassword() {
         <button
           type="submit"
           disabled={busy}
-          className="w-full rounded-md bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-60"
+          className="w-full rounded-md bg-accent px-4 py-2 font-medium text-white hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-60"
         >
           {busy ? 'Saving…' : 'Save and continue'}
         </button>

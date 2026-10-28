@@ -769,6 +769,128 @@ export type Database = {
           },
         ]
       }
+      meeting_attendees: {
+        Row: {
+          created_at: string
+          marked_by: string | null
+          meeting_id: string
+          member_id: string
+        }
+        Insert: {
+          created_at?: string
+          marked_by?: string | null
+          meeting_id: string
+          member_id: string
+        }
+        Update: {
+          created_at?: string
+          marked_by?: string | null
+          meeting_id?: string
+          member_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_attendees_marked_by_fkey"
+            columns: ["marked_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_attendees_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "meetings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_attendees_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meeting_schedule: {
+        Row: {
+          enabled: boolean
+          ends_at: string | null
+          id: boolean
+          lead_days: number
+          location: string | null
+          starts_at: string
+          timezone: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+          weekday: number
+        }
+        Insert: {
+          enabled?: boolean
+          ends_at?: string | null
+          id?: boolean
+          lead_days?: number
+          location?: string | null
+          starts_at?: string
+          timezone?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          weekday?: number
+        }
+        Update: {
+          enabled?: boolean
+          ends_at?: string | null
+          id?: boolean
+          lead_days?: number
+          location?: string | null
+          starts_at?: string
+          timezone?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          weekday?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_schedule_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meeting_skips: {
+        Row: {
+          created_at: string
+          occurrence_date: string
+          reason: string | null
+          skipped_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          occurrence_date: string
+          reason?: string | null
+          skipped_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          occurrence_date?: string
+          reason?: string | null
+          skipped_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_skips_skipped_by_fkey"
+            columns: ["skipped_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_template: {
         Row: {
           body: string
@@ -809,6 +931,7 @@ export type Database = {
           id: string
           location: string | null
           notes: string | null
+          occurrence_date: string | null
           season_id: string
           starts_at: string | null
           subteam_key: string | null
@@ -826,6 +949,7 @@ export type Database = {
           id?: string
           location?: string | null
           notes?: string | null
+          occurrence_date?: string | null
           season_id: string
           starts_at?: string | null
           subteam_key?: string | null
@@ -843,6 +967,7 @@ export type Database = {
           id?: string
           location?: string | null
           notes?: string | null
+          occurrence_date?: string | null
           season_id?: string
           starts_at?: string | null
           subteam_key?: string | null
@@ -892,6 +1017,32 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_subteam_progress"
             referencedColumns: ["key"]
+          },
+        ]
+      }
+      member_avatars: {
+        Row: {
+          image: string
+          member_id: string
+          updated_at: string
+        }
+        Insert: {
+          image: string
+          member_id: string
+          updated_at?: string
+        }
+        Update: {
+          image?: string
+          member_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_avatars_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: true
+            referencedRelation: "members"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1454,6 +1605,35 @@ export type Database = {
           university?: string
         }
         Relationships: []
+      }
+      settings_usage: {
+        Row: {
+          member_id: string
+          score: number
+          scored_at: string
+          section: string
+        }
+        Insert: {
+          member_id: string
+          score?: number
+          scored_at?: string
+          section: string
+        }
+        Update: {
+          member_id?: string
+          score?: number
+          scored_at?: string
+          section?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settings_usage_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       spec_measurements: {
         Row: {
@@ -2523,6 +2703,7 @@ export type Database = {
           item: string
           location: string
           owner_id: string
+          shared: boolean
           updated_at: string
         }
         Insert: {
@@ -2532,6 +2713,7 @@ export type Database = {
           item: string
           location?: string
           owner_id?: string
+          shared?: boolean
           updated_at?: string
         }
         Update: {
@@ -2541,6 +2723,7 @@ export type Database = {
           item?: string
           location?: string
           owner_id?: string
+          shared?: boolean
           updated_at?: string
         }
         Relationships: [
@@ -3252,6 +3435,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_scheduled_meetings: { Args: never; Returns: number }
       create_task: {
         Args: {
           p_clause_keys: string[]
@@ -3300,6 +3484,7 @@ export type Database = {
         }
       }
       dearmor: { Args: { "": string }; Returns: string }
+      delete_archived_task: { Args: { p_task_id: string }; Returns: undefined }
       delete_attachment: { Args: { p_attachment_id: string }; Returns: boolean }
       department_authority: { Args: { p_key: string }; Returns: string }
       enqueue_attachment_purge: {
@@ -3414,6 +3599,11 @@ export type Database = {
       }
       mark_attachment_purged: { Args: { p_ids: number[] }; Returns: number }
       mark_password_reset: { Args: { p_member: string }; Returns: undefined }
+      meeting_schedule_dates: { Args: { p_count: number }; Returns: string[] }
+      notify_unassigned_tasks: {
+        Args: { p_include_developers?: boolean }
+        Returns: number
+      }
       pgp_armor_headers: {
         Args: { "": string }
         Returns: Record<string, unknown>[]
@@ -3470,6 +3660,7 @@ export type Database = {
         }
         Returns: number
       }
+      record_settings_open: { Args: { p_section: string }; Returns: undefined }
       record_spec_measurement: {
         Args: {
           p_context?: string
@@ -3769,6 +3960,10 @@ export type Database = {
         Returns: boolean
       }
       set_current_season: { Args: { p_season_id: string }; Returns: undefined }
+      set_meeting_attendees: {
+        Args: { p_meeting: string; p_members: string[] }
+        Returns: undefined
+      }
       set_milestone_submission: {
         Args: { p_accepted_on: string; p_key: string; p_submitted_on: string }
         Returns: {
@@ -4037,6 +4232,15 @@ export type Database = {
       unlink_task_requirement: {
         Args: { p_clause_key: string; p_task_id: string }
         Returns: boolean
+      }
+      upcoming_meeting_occurrences: {
+        Args: { p_count?: number }
+        Returns: {
+          held_on: string
+          meeting_id: string
+          occurrence_date: string
+          status: string
+        }[]
       }
     }
     Enums: {

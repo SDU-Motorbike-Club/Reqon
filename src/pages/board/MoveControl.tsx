@@ -48,7 +48,7 @@ export function MoveControl({
           setAsking(false)
           onMove(task.id, next)
         }}
-        className={`${visibleLabel ? 'mt-1 ' : ''}min-h-11 w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 disabled:opacity-60 sm:min-h-0`}
+        className={`${visibleLabel ? 'mt-1 ' : ''}min-h-11 w-full rounded border border-slate-300 bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring disabled:opacity-60 sm:min-h-0`}
       >
         {TASK_STATES.map((l) => (
           <option key={l.state} value={l.state}>

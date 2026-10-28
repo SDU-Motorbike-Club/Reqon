@@ -6,7 +6,7 @@ import { useAuth } from './context.ts'
 function Centered({ children }: { children: ReactNode }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
-      <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 text-center shadow-sm">
+      <div className="w-full max-w-md rounded-lg border border-slate-200 bg-surface p-6 text-center shadow-sm">
         {children}
       </div>
     </main>
@@ -48,7 +48,7 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
         <button
           type="button"
           onClick={auth.retry}
-          className="mt-4 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+          className="mt-4 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover"
         >
           Try again
         </button>
@@ -73,7 +73,7 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
         <button
           type="button"
           onClick={() => void auth.signOut()}
-          className="mt-4 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+          className="mt-4 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover"
         >
           Sign out
         </button>

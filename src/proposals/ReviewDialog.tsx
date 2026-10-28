@@ -17,7 +17,8 @@ import type { RequirementOption } from './requirementOptions.ts'
 import { describeBlockers, promotionBlockers } from './promotion.ts'
 import { REVIEW_ACTION_LABEL, proposalStatusLabel, reviewActionsFor, type ReviewAction } from './proposalStates.ts'
 
-const FIELD = 'mt-1 min-h-11 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 disabled:bg-slate-50 disabled:text-slate-500 sm:min-h-0'
+const FIELD = 'mt-1 min-h-11 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring disabled:bg-slate-50 disabled:text-slate-500 sm:min-h-0'
+const REQUIRED = "after:ml-0.5 after:text-accent-ring after:content-['*']"
 const LABEL = 'block text-xs font-medium text-slate-700'
 
 type Props = {
@@ -220,14 +221,14 @@ function Form({ proposal, comments, members, departments, milestones, requiremen
 
       {!closed && <fieldset className="mt-4 grid gap-3" disabled={busy || !canEdit}>
         <legend className="text-sm font-semibold text-slate-900">Proposal content</legend>
-        <div><label htmlFor={fid('title')} className={LABEL}>Title</label><input id={fid('title')} value={title} onChange={(event) => setTitle(event.target.value)} className={FIELD} maxLength={200} required /></div>
+        <div><label htmlFor={fid('title')} className={`${LABEL} ${REQUIRED}`}>Title</label><input id={fid('title')} value={title} onChange={(event) => setTitle(event.target.value)} className={FIELD} maxLength={200} required /></div>
         <div><label htmlFor={fid('description')} className={LABEL}>Description</label><textarea id={fid('description')} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} className={FIELD} /></div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div><label htmlFor={fid('department')} className={LABEL}>Department</label><select id={fid('department')} value={department} onChange={(event) => setDepartment(event.target.value)} className={FIELD} disabled={!canMove || busy}><option value="">Choose a department</option>{departments.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
           <div><label htmlFor={fid('owner')} className={LABEL}>Owner</label><select id={fid('owner')} value={owner} onChange={(event) => setOwner(event.target.value)} className={FIELD}><option value="">Nobody yet</option>{activeMembers.map((member) => <option key={member.id} value={member.id}>{member.full_name}</option>)}</select></div>
-          <div><label htmlFor={fid('due')} className={LABEL}>Deadline</label><input id={fid('due')} type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className={FIELD} required /></div>
+          <div><label htmlFor={fid('due')} className={`${LABEL} ${REQUIRED}`}>Deadline</label><input id={fid('due')} type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className={FIELD} required /></div>
           <div><label htmlFor={fid('priority')} className={LABEL}>Priority</label><select id={fid('priority')} value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority)} className={FIELD}>{TASK_PRIORITIES.map((value) => <option key={value} value={value}>{TASK_PRIORITY_LABEL[value]}</option>)}</select></div>
-          <div className="sm:col-span-2"><label htmlFor={fid('milestone')} className={LABEL}>Milestone</label><select id={fid('milestone')} value={milestone} onChange={(event) => setMilestone(event.target.value)} className={FIELD} required><option value="">Choose a milestone</option>{milestones.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
+          <div className="sm:col-span-2"><label htmlFor={fid('milestone')} className={LABEL}>Milestone</label><select id={fid('milestone')} value={milestone} onChange={(event) => setMilestone(event.target.value)} className={FIELD}><option value="">No milestone</option>{milestones.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
         </div>
         <div role="group" aria-labelledby={fid('req-label')}><p id={fid('req-label')} className={LABEL}>Related requirements</p><RequirementPicker id={fid('req')} options={requirementOptions} selected={keys} onChange={setKeys} disabled={busy || !canEdit} /></div>
         {departmentChanged ? <div><label htmlFor={fid('move-reason')} className={LABEL}>Why this department changes</label><textarea id={fid('move-reason')} rows={2} value={moveReason} onChange={(event) => setMoveReason(event.target.value)} className={FIELD} maxLength={500} required /></div>

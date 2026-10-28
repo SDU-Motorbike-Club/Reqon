@@ -1,12 +1,13 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { canRestoreTask } from '../auth/permissions.ts'
+import { usePermissions } from '../auth/usePermissions.ts'
 import { departmentChoices } from '../departments/filter.ts'
 import { useMembers } from '../data/useMembers.ts'
 import { useSubteams } from '../data/useSubteams.ts'
 import { useTaskActor } from '../data/useTaskActor.ts'
 import { NO_DEPARTMENT, useArchivedTasks, useProposalHistory, useSourceProposals, useTasksBySource } from '../data/useTaskHistory.ts'
-import { useRestoreTask } from '../data/useTasks.ts'
+import { useDeleteArchivedTask, useRestoreTask } from '../data/useTasks.ts'
 import { TASK_STATES } from '../tasks/taskState.ts'
 import type { Task } from '../tasks/types.ts'
 import { Dialog } from '../ui/Dialog.tsx'
@@ -20,7 +21,7 @@ import { useRealtimeTasks } from '../data/useRealtimeTasks.ts'
 import { useRealtimeProposals } from '../data/useRealtimeProposals.ts'
 
 const FIELD =
-  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0'
+  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0'
 const LABEL = 'block text-xs font-medium text-slate-600'
 const STATUS_LABEL: Record<string, string> = { approved: 'Approved', rejected: 'Rejected', other: 'Decided (outcome not recorded)' }
 
@@ -38,6 +39,9 @@ export default function Archive() {
   const departments = useSubteams()
   const actor = useTaskActor()
   const restore = useRestoreTask()
+  const remove = useDeleteArchivedTask()
+  const { canAdminister } = usePermissions()
+  const [deleting, setDeleting] = useState<Task | null>(null)
   const [restoring, setRestoring] = useState<Task | null>(null)
   const [message, setMessage] = useState('')
   const [draft, setDraft] = useState(value.search)
@@ -85,9 +89,20 @@ export default function Archive() {
     }
   }
 
+  async function confirmDelete() {
+    if (!deleting) return
+    try {
+      await remove.mutateAsync({ id: deleting.id })
+      setMessage(`“${deleting.title}” was deleted for good.`)
+      setDeleting(null)
+    } catch {
+      // The error is shown in the dialog by ActionError; nothing else changes.
+    }
+  }
+
   return (
     <main id="main-content" tabIndex={-1} className={pageMain()}>
-      <PageHeader title="Archive" description="Work that is no longer live: tasks archived by hand or automatically 24 hours after they were done, and proposals that were approved, rejected or decided. Everyone can read it; nothing here is deleted." />
+      <PageHeader title="Archive" description="Work that is no longer live: tasks archived by hand or automatically 24 hours after they were done, and proposals that were approved, rejected or decided. Everyone can read it; the President, Vice President and Developer can delete an archived task for good." />
 
       <div role="group" aria-label="What to browse" className="mb-3 flex flex-wrap gap-1 rounded-md bg-slate-50 p-1" data-testid="archive-tabs">
         {(['tasks', 'proposals'] as const).map((tab) => (
@@ -96,7 +111,7 @@ export default function Archive() {
             type="button"
             aria-pressed={value.tab === tab}
             onClick={() => setSearch(archiveParamsToSearch({ tab, department: '', owner: '', state: '', search: '', id: '', page: 0 }), { replace: true })}
-            className={`min-h-11 rounded px-3 py-1.5 text-sm font-medium focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:outline-none sm:min-h-0 ${value.tab === tab ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+            className={`min-h-11 rounded px-3 py-1.5 text-sm font-medium focus-visible:ring-2 focus-visible:ring-accent-ring focus-visible:outline-none sm:min-h-0 ${value.tab === tab ? 'bg-slate-200 text-slate-950' : 'text-slate-700 hover:bg-slate-100'}`}
           >
             {tab === 'tasks' ? 'Archived tasks' : 'Proposal history'}
           </button>
@@ -117,7 +132,7 @@ export default function Archive() {
         </p>
       )}
 
-      <form onSubmit={submitSearch} className="mb-3 space-y-3 rounded-lg border border-slate-200 bg-white p-3" data-testid="archive-filters" data-tutorial="archive-filters" role="search" aria-label="Filter the archive">
+      <form onSubmit={submitSearch} className="mb-3 space-y-3 rounded-lg border border-slate-200 bg-surface p-3" data-testid="archive-filters" data-tutorial="archive-filters" role="search" aria-label="Filter the archive">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="sm:col-span-2 lg:col-span-1">
             <label htmlFor="archive-q" className={LABEL}>
@@ -187,7 +202,7 @@ export default function Archive() {
                 setDraft('')
                 setSearch(archiveParamsToSearch({ tab: value.tab, department: '', owner: '', state: '', search: '', id: '', page: 0 }), { replace: true })
               }}
-              className="inline-flex min-h-11 items-center rounded font-medium text-slate-900 underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:outline-none sm:min-h-0"
+              className="inline-flex min-h-11 items-center rounded font-medium text-slate-900 underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-accent-ring focus-visible:outline-none sm:min-h-0"
             >
               Clear filters
             </button>
@@ -217,6 +232,8 @@ export default function Archive() {
                     canRestore={actor !== null && canRestoreTask(actor, task)}
                     restoring={restore.isPending && restoring?.id === task.id}
                     onRestore={setRestoring}
+                    canDelete={canAdminister}
+                    onDelete={setDeleting}
                     memberNames={memberName}
                   />
                 ))
@@ -248,6 +265,7 @@ export default function Archive() {
         </>
       )}
 
+      <DeleteDialog task={deleting} pending={remove.isPending} error={remove.error} onCancel={() => { remove.reset(); setDeleting(null) }} onConfirm={() => void confirmDelete()} />
       <RestoreDialog task={restoring} pending={restore.isPending} error={restore.error} onCancel={() => { restore.reset(); setRestoring(null) }} onConfirm={() => void confirmRestore()} />
     </main>
   )
@@ -275,6 +293,34 @@ function RestoreDialog({ task, pending, error, onCancel, onConfirm }: { task: Ta
             </button>
             <button type="button" className={buttonPrimary} disabled={pending} onClick={onConfirm} data-testid="restore-confirm">
               {pending ? 'Restoring…' : 'Restore task'}
+            </button>
+          </div>
+        </div>
+      )}
+    </Dialog>
+  )
+}
+
+function DeleteDialog({ task, pending, error, onCancel, onConfirm }: { task: Task | null; pending: boolean; error: Error | null; onCancel: () => void; onConfirm: () => void }) {
+  const titleId = 'delete-title'
+  return (
+    <Dialog open={task !== null} onClose={onCancel} labelledBy={titleId} dismissible={!pending}>
+      {task && (
+        <div>
+          <h2 id={titleId} className="text-base font-semibold text-slate-900">
+            Delete “{task.title}” for good?
+          </h2>
+          <p className="mt-2 text-sm text-slate-700">
+            This erases the task, its dependencies and its attachment records. It cannot be restored from the app
+            afterwards; only the nightly backup still holds it. If you only want it off the Board, it is already archived.
+          </p>
+          <ActionError error={error} className="mt-3" />
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <button type="button" className={buttonSecondary} disabled={pending} onClick={onCancel}>
+              Keep it
+            </button>
+            <button type="button" className={buttonPrimary} disabled={pending} onClick={onConfirm} data-testid="delete-confirm">
+              {pending ? 'Deleting…' : 'Delete task'}
             </button>
           </div>
         </div>

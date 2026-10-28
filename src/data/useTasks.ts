@@ -2,7 +2,7 @@ import { useMutation, useQueryClient, type QueryClient, type UseQueryResult } fr
 import { supabase } from '../lib/supabase.ts'
 import { useSeasonId } from '../season/context.ts'
 import { DataError } from '../core/errors.ts'
-import { fetchAllRows, unwrap } from './errors.ts'
+import { fetchAllRows, unwrap, unwrapMaybe } from './errors.ts'
 import { useOptimisticListMutation } from './optimistic.ts'
 import { queryKeys } from './queryKeys.ts'
 import { useSeasonScopedQuery } from './seasonQuery.ts'
@@ -294,13 +294,29 @@ export function useRestoreTask() {
   })
 }
 
+// Permanently deletes a task that is ALREADY archived (delete_archived_task, 20260146000000): President, Vice
+// President or Developer. Archive first, delete second.
+export function useDeleteArchivedTask() {
+  const refresh = useRefreshTaskViews()
+  return useMutation<void, Error, { id: string }>({
+    // The function returns nothing (void), so an empty answer is success: `unwrap` would call it "no data returned".
+    mutationFn: async ({ id }) => {
+      unwrapMaybe('delete that task', await supabase.rpc('delete_archived_task', { p_task_id: id }))
+    },
+    onSuccess: refresh,
+  })
+}
+
 // A task leader creates a task straight on the Board (create_task, 20260142000000): no
 // proposal, but the same facts a promoted task has. The new task appears in To do.
 export type NewTask = {
   title: string
   detail: string | null
-  departmentKey: string
+  // Optional: a task with no department is looked after by the President, Vice President or a Developer.
+  departmentKey: string | null
   ownerId: string | null
+  // Optional: left out, the task starts today. Never later than the deadline.
+  startsOn: string | null
   dueDate: string
   // Both optional at creation: they can be added later on the task.
   milestoneKey: string | null
@@ -319,9 +335,10 @@ export function useCreateTask() {
         await supabase.rpc('create_task', {
           p_season_id: seasonId,
           p_title: t.title,
-          p_subteam_key: t.departmentKey,
+          p_subteam_key: t.departmentKey as string,
           // null is a valid owner (unassigned); the generated type has no default for this argument.
           p_owner_id: t.ownerId as string,
+          ...(t.startsOn ? { p_starts_on: t.startsOn } : {}),
           p_due_date: t.dueDate,
           p_milestone_key: t.milestoneKey as string,
           p_clause_keys: t.clauseKeys,

@@ -41,12 +41,12 @@ export function ProposalFilters({
   const set = (patch: Partial<ProposalFilter>) => onChange({ ...filter, ...patch })
 
   const button = (active: boolean) =>
-    `min-h-11 rounded px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0 ${
-      active ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
+    `min-h-11 rounded px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0 ${
+      active ? 'bg-slate-200 text-slate-950' : 'text-slate-700 hover:bg-slate-100'
     }`
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3" data-testid="proposal-filters">
+    <div className="rounded-lg border border-slate-200 bg-surface p-3" data-testid="proposal-filters">
       {showViews && (
         <div role="group" aria-label="Which proposals" className="mb-2 flex flex-wrap gap-1 rounded-md bg-slate-50 p-1" data-testid="proposal-views">
           {(['queue', 'history'] as const).map((view) => (
@@ -85,7 +85,7 @@ export function ProposalFilters({
           <button
             type="button"
             onClick={() => onChange({ ...DEFAULT_FILTER, view: filter.view })}
-            className="inline-flex min-h-11 items-center rounded font-medium text-slate-900 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+            className="inline-flex min-h-11 items-center rounded font-medium text-slate-900 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
           >
             Clear filters
           </button>

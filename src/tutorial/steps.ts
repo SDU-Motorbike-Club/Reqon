@@ -21,7 +21,7 @@ export const CHAPTERS = [
   { id: 'priorities', label: 'Priorities' },
   { id: 'proposals', label: 'Task proposals' },
   { id: 'meetings', label: 'Meetings' },
-  { id: 'team', label: 'Team' },
+  { id: 'team', label: 'Tools' },
   { id: 'milestones', label: 'Milestones' },
   { id: 'gantt', label: 'Gantt' },
   { id: 'register', label: 'Register' },
@@ -292,7 +292,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/gantt',
     target: 'gantt-chart',
     title: 'Gantt — the season on one timeline',
-    body: 'Every submission as a bar across the months; today is the dashed line. The Legend button explains each shape. A bar fills as linked work is done; “TBC” means no date is published — none is guessed.',
+    body: 'Every submission as a flag on its deadline, with each task as a dot on its date; today is the dashed line. The Legend button explains each shape. Open a task to change its dates; “TBC” means no date is published — none is guessed.',
   },
   {
     id: 'gantt-expand',
@@ -300,7 +300,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/gantt',
     target: 'gantt-chart',
     title: 'Three levels',
-    body: 'Open a submission for its sections and its unsectioned work, and a section for its tasks. A task with a start and a deadline is a period; with only a deadline it is a dot. Undated tasks say so.',
+    body: 'Open a submission for its sections, and a section for its tasks. Each task is one dot on its deadline (its start day if none). The submission due next opens by itself; a task’s details open in a side sheet.',
   },
   {
     id: 'gantt-tasks',
@@ -316,10 +316,18 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/gantt',
     target: 'gantt-chart',
     title: 'Linking work to a section',
-    body: 'The Gantt never creates tasks. Adopt a Board task you own or head, drag it onto a section, or drag its bar to change dates — “Move to” and the date fields in its details do the same by keyboard. Unlink keeps it on the Board.',
+    body: 'The Gantt never creates tasks. Adopt a Board task you own or head, drag it onto a section, or drag its dot to change its deadline — “Move to” and the date fields in its details do the same by keyboard. Unlink keeps it on the Board.',
   },
 
   // --------------------------------------------------------------------- Board
+  {
+    id: 'board-new-task',
+    chapter: 'board',
+    route: '/board',
+    target: 'board-new-task',
+    title: 'New task — start date and deadline',
+    body: 'Heads and the President or Vice President make a task here. Only the title and deadline (marked *) are required; the department, start date and the rest can be added later.',
+  },
   {
     id: 'board',
     chapter: 'board',
@@ -341,41 +349,33 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 'proposals',
     chapter: 'proposals',
-    route: '/proposals',
-    target: 'proposal-raise',
+    route: '/board',
+    target: 'board-propose',
     title: 'Task proposals — raise work',
-    body: 'Anything the club should take on. Open “Raise a proposal” and give its department, deadline, milestone and requirement so its Head can decide. A folded-away draft is kept.',
-  },
-  {
-    id: 'proposal-flow',
-    chapter: 'proposals',
-    route: '/proposals',
-    target: 'proposal-flow',
-    title: 'How a proposal moves',
-    body: 'Raised, Under review (the Head may ask for changes), Approved, then Decided once it becomes a task or is rejected. Parked sets one aside without deleting it.',
+    body: 'Anything the club should take on. Choose “Propose a task” and give a title and a deadline (marked *). A department, milestone and requirement can follow. A folded-away draft is kept.',
   },
   {
     id: 'proposal-card',
     chapter: 'proposals',
-    route: '/proposals',
-    target: 'proposal-card',
-    title: 'A proposal',
-    body: 'Who raised it, its department, deadline and milestone, and where it stands. Its department’s Head decides; the President and the Vice President can decide for any department.',
+    route: '/board',
+    target: 'board-proposals',
+    title: 'Proposals waiting',
+    body: 'Opens the proposals for the department in view, and how many are still open. Its department’s Head decides; the President and the Vice President can decide for any department.',
   },
   {
     id: 'proposal-decision',
     chapter: 'proposals',
-    route: '/proposals',
-    target: 'proposal-decision',
+    route: '/board',
+    target: 'board-proposals',
     audience: 'proposalReviewer',
     title: 'Reviewing a proposal',
-    body: 'Review opens the discussion with the author. Write a note, then Approve and create task — or ask for changes. Editing an approved proposal withdraws the approval. Its Head decides, and so can the President or Vice President.',
+    body: 'Review opens the discussion with the author. Write a note, then Approve and create task — or ask for changes. Editing an approved proposal withdraws the approval.',
   },
   {
     id: 'proposal-promote',
     chapter: 'proposals',
-    route: '/proposals',
-    target: 'proposal-promote',
+    route: '/board',
+    target: 'board-proposals',
     audience: 'proposalReviewer',
     title: 'Promoting a proposal',
     body: 'Approve and create task puts it on the Board with the proposal\'s department, deadline, priority, milestone and requirements. A proposal is approved once, and the task remembers where it came from.',
@@ -387,7 +387,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/board',
     target: 'board-card',
     title: 'Who can edit a task',
-    body: 'Its owner, its department’s Head, the President or the Vice President. Only they reassign it; moving it to another department needs a reason. Nothing is deleted: a Done task archives itself after 24 hours.',
+    body: 'Its owner, its department’s Head, the President or the Vice President. Only they reassign it; a move to another department needs a reason. A Done task archives itself after 24 hours.',
   },
 
   // --------------------------------------------------------------------- Files
@@ -410,14 +410,14 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     body: 'People who can help, by area: what each knows and how to reach them. Pick a category or search for a skill. Department Heads, the President and the Vice President keep it up to date.',
   },
 
-  // ---------------------------------------------------------------------- Team
+  // --------------------------------------------------------------------- Tools
   {
     id: 'team',
     chapter: 'team',
-    route: '/team',
+    route: '/tools',
     target: 'team-overview',
-    title: 'Team — the club’s tools',
-    body: 'Each tool says whose it is, where it is and who has it now. Take a tool nobody has with “I have it”, and update yours when it moves.',
+    title: 'Tools — what the club shares',
+    body: 'Tools are listed by place, so you see where each is. Add one as your own or a club tool; take a free one with “I have it” and give it back when done.',
   },
 
   // ------------------------------------------------------------- Contributions
@@ -437,7 +437,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/archive',
     target: 'archive-filters',
     title: 'Archive — finished and decided work',
-    body: 'Archived tasks and proposals that were approved or rejected, a page at a time. Search by title and filter by department, owner and status. Everyone can read it; nothing is deleted here.',
+    body: 'Archived tasks and decided proposals, a page at a time. Search by title; filter by department, owner and status. Everyone can read it. The President or Vice President can delete an archived task for good.',
   },
   {
     id: 'archive-list',
@@ -455,7 +455,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/meetings',
     target: 'meeting-list',
     title: 'Meetings — what was decided',
-    body: 'Every club meeting with its date, place, agenda and minutes, formatted as headings and lists. Everyone reads these; the board writes them. Proposals have their own screen.',
+    body: 'Every club meeting with its date, place, agenda, minutes and who came. Everyone reads these; the board writes them. The weekly meeting is made for you; the President sets it in Settings.',
   },
   {
     id: 'meeting-new',
@@ -464,7 +464,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     target: 'meeting-new',
     audience: 'admins',
     title: 'Calling a meeting',
-    body: 'A name and a date are required; the rest is optional. The agenda starts from the default agenda and can change for this meeting only. Preview shows how it will read.',
+    body: 'A name and a date are required. Write the agenda like a document, with the buttons for headings and bullets. It starts from the default agenda. Tick who came. Every member is told when it is called.',
   },
   {
     id: 'meeting-template',
@@ -557,15 +557,15 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/settings',
     target: 'settings-overview',
     title: 'Settings — what you can do here',
-    body: 'Everyone can change their password, write handover notes and download the season. Forms your role cannot use are hidden, and a note at the top says what you cannot change; the rest is for the President and Vice President.',
+    body: 'Everyone can set their photo and password, write handover notes and download the season. The sections you use most come first. Forms your role cannot use are hidden, and a note says what you cannot change.',
   },
   {
     id: 'settings-account',
     chapter: 'settings',
     route: '/settings',
     target: 'settings-account',
-    title: 'Your password',
-    body: 'Type your current password, then the new one twice. Every other device you are signed in on is signed out; this one stays signed in.',
+    title: 'Your photo and password',
+    body: 'Add a photo with the button under your name; it is shown beside it. To change your password, type the current one, then the new one twice. Your other devices are signed out; this one stays signed in.',
   },
   {
     id: 'settings-roster',
@@ -707,7 +707,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/settings',
     target: 'backups-status',
     title: 'What runs every night',
-    body: 'The Backup workflow, daily at 03:17 UTC (Actions → Backup; tick force_weekly to run the Sunday steps now):\n1. log in as the read-only backup_reader\n2. dump public and auth, check before equals after\n3. encrypt with age to ops/backup/recipients.txt\n4. upload to R2 daily/ (weekly/ on Sundays, monthly/ on the 1st)\n5. Sundays: private repository, Drive, encrypted attachment files\n6. record the result, purge expired files',
+    body: 'The Backup workflow, daily at 03:17 UTC (Actions → Backup; tick force_weekly to run the Monday and Thursday steps now):\n1. log in as the read-only backup_reader\n2. dump public and auth, check before equals after\n3. encrypt with age to ops/backup/recipients.txt\n4. upload to R2 daily/ (weekly/ on Mondays, monthly/ on the 1st)\n5. Mondays: private repository. Thursdays: Drive, encrypted attachment files\n6. record the result, purge expired files',
   },
   {
     id: 'dev-where',

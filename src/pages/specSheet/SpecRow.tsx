@@ -93,7 +93,7 @@ export function SpecRow({
   return (
     <div
       role="rowgroup"
-      className={`rounded-lg border bg-white ${GLOW[zone] ?? GLOW.grey}`}
+      className={`rounded-lg border bg-surface ${GLOW[zone] ?? GLOW.grey}`}
       data-testid={`spec-${specId}`}
       data-verdict={spec.verdict ?? ''}
       data-zone={spec.zone ?? ''}
@@ -106,7 +106,7 @@ export function SpecRow({
             aria-expanded={expanded}
             aria-controls={detailsId}
             onClick={onToggle}
-            className="group -mx-1 inline-flex min-h-11 max-w-full items-start gap-1.5 rounded px-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 md:min-h-0"
+            className="group -mx-1 inline-flex min-h-11 max-w-full items-start gap-1.5 rounded px-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring md:min-h-0"
             data-testid={`spec-toggle-${specId}`}
           >
             <span aria-hidden="true" className={`mt-0.5 inline-block text-xs text-slate-500 transition-transform ${expanded ? 'rotate-90' : ''}`}>

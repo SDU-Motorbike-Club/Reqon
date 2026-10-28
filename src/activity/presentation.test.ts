@@ -14,7 +14,7 @@ describe('activity presentation', () => {
       icon: '!', summary: 'State: wip → blocked',
     })
     expect(presentActivity(row('deadline_changed', { from: '2026-10-01', to: '2026-10-08' }), names).summary)
-      .toMatch(/Deadline: 1 Oct 2026 → 8 Oct 2026/)
+      .toMatch(/Deadline: 01\/10\/26 → 08\/10\/26/)
   })
 
   it('says a password was reset without showing anything secret', () => {

@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Outlet, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import RequireAuth from './auth/RequireAuth.tsx'
 import NotFound from './pages/NotFound.tsx'
 import { SeasonGate } from './season/SeasonGate.tsx'
@@ -27,7 +27,6 @@ const Book = lazy(() => import('./pages/Book.tsx'))
 const Milestones = lazy(() => import('./pages/Milestones.tsx'))
 const Gantt = lazy(() => import('./pages/Gantt.tsx'))
 const Board = lazy(() => import('./pages/Board.tsx'))
-const Proposals = lazy(() => import('./pages/Proposals.tsx'))
 const Archive = lazy(() => import('./pages/Archive.tsx'))
 const Files = lazy(() => import('./pages/Files.tsx'))
 const Meetings = lazy(() => import('./pages/Meetings.tsx'))
@@ -50,6 +49,19 @@ function RouteFallback() {
       <LoadingState label="Loading page…" />
     </main>
   )
+}
+
+// Proposals used to be a screen. They are an overlay on the Board now, for the department in view, so the
+// old address (bookmarks, inbox links from before) lands there with its filters and the overlay open.
+function ProposalsRedirect() {
+  const { search } = useLocation()
+  const params = new URLSearchParams(search)
+  // The panel's "mine" is its own choice now, not the Board's My tasks (an old inbox link says ?scope=mine).
+  const scope = params.get('scope')
+  params.delete('scope')
+  if (scope === 'mine') params.set('pscope', 'mine')
+  params.set('proposals', '1')
+  return <Navigate to={`/board?${params.toString()}`} replace />
 }
 
 // Every screen that reads season-scoped data lives under this layout route.
@@ -91,7 +103,7 @@ export default function App() {
               content. Off-screen until focused, then visible. */}
           <a
             href="#main-content"
-            className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-slate-900 focus:px-3 focus:py-2 focus:text-sm focus:text-white"
+            className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-accent focus:px-3 focus:py-2 focus:text-sm focus:text-white"
           >
             Skip to main content
           </a>
@@ -115,7 +127,7 @@ export default function App() {
                   <Route path="/milestones" element={<Milestones />} />
                   <Route path="/gantt" element={<Gantt />} />
                   <Route path="/board" element={<Board />} />
-                  <Route path="/proposals" element={<Proposals />} />
+                  <Route path="/proposals" element={<ProposalsRedirect />} />
                   <Route path="/archive" element={<Archive />} />
                   <Route path="/files" element={<Files />} />
                   <Route path="/meetings" element={<Meetings />} />
@@ -134,7 +146,9 @@ export default function App() {
                 {/* Across seasons by design: it is a person's record, not a season's. */}
                 <Route path="/contributions" element={<Contributions />} />
                 {/* Your first steps and the club's tools outlive a season too. */}
-                <Route path="/team" element={<Team />} />
+                <Route path="/tools" element={<Team />} />
+                {/* The old address, from before this screen was called Tools. */}
+                <Route path="/team" element={<Navigate to="/tools" replace />} />
                 {/* Any other address: say so, with a way back. */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

@@ -1,12 +1,16 @@
 import { useId, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { attachmentPermissions, canArchiveTask, canCreateTask, canEditTask, canReassignTaskOwner, canRestoreTask, taskDepartmentTargets } from '../auth/permissions.ts'
+import { attachmentPermissions, canArchiveTask, canCreateTask, canEditTask, canReassignTaskOwner, canRestoreTask, canSubmitProposal, taskDepartmentTargets } from '../auth/permissions.ts'
 import { useAuth } from '../auth/context.ts'
 import { departmentChoices } from '../departments/filter.ts'
 import { DepartmentNav } from '../departments/DepartmentNav.tsx'
 import { ScopeDepartmentFilter } from '../departments/ScopeDepartmentFilter.tsx'
 import { useMembers } from '../data/useMembers.ts'
 import { useMilestones } from '../data/useMilestones.ts'
+import { useProposals } from '../data/useProposals.ts'
+import { useRealtimeProposalComments } from '../data/useRealtimeProposalComments.ts'
+import { useRealtimeProposalRequirements } from '../data/useRealtimeProposalRequirements.ts'
+import { useRealtimeProposals } from '../data/useRealtimeProposals.ts'
 import { useRealtimeTaskDependencies } from '../data/useRealtimeTaskDependencies.ts'
 import { useRealtimeTaskRequirements } from '../data/useRealtimeTaskRequirements.ts'
 import { useRealtimeTasks } from '../data/useRealtimeTasks.ts'
@@ -17,6 +21,8 @@ import { useSourceProposals, useTaskRequirements, useTasksForProgress } from '..
 import { useRestoreTask, useTasks, useUpdateTask, type Task } from '../data/useTasks.ts'
 import { todayIso } from '../lib/dates.ts'
 import { milestoneLabel } from '../milestones/label.ts'
+import { isHistory } from '../proposals/filters.ts'
+import { ProposalsPanel } from '../proposals/ProposalsPanel.tsx'
 import { dependentsOf, openPrerequisites, prerequisiteCandidates, prerequisitesOf, taskRefLookup } from '../tasks/dependencies.ts'
 import { applyTaskFilter, DEFAULT_TASK_FILTER, filterTasks, isDefaultTaskFilter, taskFilterFromParams, taskScopeCounts, type TaskFilter } from '../tasks/filters.ts'
 import type { TaskScope } from '../tasks/scope.ts'
@@ -25,12 +31,13 @@ import { pageMain } from '../ui/layout.ts'
 import { PageHeader } from '../ui/PageHeader.tsx'
 import { ActionError, ErrorState } from '../ui/states.tsx'
 import { Dialog } from '../ui/Dialog.tsx'
-import { buttonPrimary } from '../ui/buttons.ts'
+import { buttonPrimary, buttonSecondary } from '../ui/buttons.ts'
 import { LANE_PAGE, laneWindow } from './board/boardView.ts'
 import { MoveControl } from './board/MoveControl.tsx'
 import { NewTaskDialog } from './board/NewTaskDialog.tsx'
 import { TaskCard } from './board/TaskCard.tsx'
 import { TaskDetails, type TaskLinksView, type TaskPermissions } from './board/TaskDetails.tsx'
+import { mergeSearchParams } from '../lib/searchParams.ts'
 import { useUrlParams } from '../lib/useUrlParams.ts'
 
 // The five lanes, exactly the task_state values in the schema, from the one
@@ -59,6 +66,11 @@ export default function Board() {
   useRealtimeTaskRequirements()
   useRealtimeTaskDependencies()
   const dependencies = useTaskDependencies()
+  // Proposals are not a page of their own: they are an overlay on the Board, for the department in view.
+  const proposals = useProposals()
+  const proposalsRealtime = useRealtimeProposals()
+  useRealtimeProposalRequirements()
+  useRealtimeProposalComments()
   const [params, setParams] = useUrlParams()
   const today = todayIso()
 
@@ -108,6 +120,12 @@ export default function Board() {
   }
   const openTask = openTaskId ? allTasks.find((t) => t.id === openTaskId) : undefined
   const dialogTitleId = useId()
+  const proposalsTitleId = useId()
+  // ?proposals=1 opens the overlay (a link from the inbox or Now can name it); ?propose=1 also opens its form.
+  const proposalsOpen = params.get('proposals') === '1'
+  const openProposals = (propose: boolean) =>
+    setParams((current) => mergeSearchParams(current, { proposals: '1', propose: propose ? '1' : null }), { replace: true })
+  const closeProposals = () => setParams((current) => mergeSearchParams(current, { proposals: null, propose: null, pscope: null, view: null }), { replace: true })
   // After an archive the card is gone: say so, and offer Undo to whoever may restore.
   // The New task dialog (a task leader creates a task straight on the Board), and the line that says it was made.
   const [creating, setCreating] = useState(false)
@@ -122,6 +140,11 @@ export default function Board() {
     for (const task of inScope) if (task.subteam_key) out[task.subteam_key] = (out[task.subteam_key] ?? 0) + 1
     return out
   }, [allTasks, filter.scope, myId])
+  // Proposals still being worked on in the department in view (all departments: all of them).
+  const pendingProposals = useMemo(
+    () => (proposals.data ?? []).filter((p) => !isHistory(p) && (filter.department === 'all' || p.subteam_key === filter.department)).length,
+    [proposals.data, filter.department],
+  )
   // Active departments, plus the selected one even if it has since been archived,
   // so a bookmarked filter still names what it is filtering by.
   const choices = useMemo(
@@ -218,12 +241,15 @@ export default function Board() {
         </p>
       </PageHeader>
 
-      {canCreateTask(actor) && (
-        <div className="mb-3 flex flex-wrap items-center gap-3">
+      {/* Whoever may create a task does; everyone else on the roster can only propose one, and the department's
+          Head decides. Both sit here, and the proposals already waiting are one button away. */}
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        {canCreateTask(actor) && (
           <button
             type="button"
             className={buttonPrimary}
             data-testid="board-new-task"
+            data-tutorial="board-new-task"
             onClick={() => {
               setCreated(null)
               setCreating(true)
@@ -231,13 +257,28 @@ export default function Board() {
           >
             New task
           </button>
-          {created && (
-            <p role="status" className="text-sm text-emerald-800" data-testid="board-task-created">
-              Created “{created}”.
-            </p>
-          )}
-        </div>
-      )}
+        )}
+        {actor && canSubmitProposal(actor) && (
+          <button
+            type="button"
+            className={canCreateTask(actor) ? buttonSecondary : buttonPrimary}
+            data-testid="board-propose-task"
+            data-tutorial="board-propose"
+            onClick={() => openProposals(true)}
+          >
+            Propose a task
+          </button>
+        )}
+        <button type="button" className={buttonSecondary} data-testid="board-proposals" data-tutorial="board-proposals" onClick={() => openProposals(false)}>
+          Proposals <span className="tabular-nums">({pendingProposals})</span>
+          <span className="sr-only"> {filter.department === 'all' ? 'in all departments' : 'in this department'} still open</span>
+        </button>
+        {created && (
+          <p role="status" className="text-sm text-emerald-800" data-testid="board-task-created">
+            Created “{created}”.
+          </p>
+        )}
+      </div>
 
       <DepartmentNav choices={choices} value={filter.department} counts={departmentCounts} testId="board-departments" />
 
@@ -256,7 +297,7 @@ export default function Board() {
           <button
             type="button"
             onClick={() => setParams(new URLSearchParams({ task: focusId as string }), { replace: true })}
-            className="min-h-11 rounded border border-amber-300 bg-white px-2 py-0.5 text-xs font-medium sm:min-h-0"
+            className="min-h-11 rounded border border-amber-300 bg-surface px-2 py-0.5 text-xs font-medium sm:min-h-0"
           >
             Show all tasks
           </button>
@@ -270,7 +311,7 @@ export default function Board() {
 
       {/* "My tasks" needs a member row to mean anything, so the scope buttons
           are only offered to someone the roster knows; Department always is. */}
-      <div className="mb-3 rounded-lg border border-slate-200 bg-white p-3" data-testid="board-filters">
+      <div className="mb-3 rounded-lg border border-slate-200 bg-surface p-3" data-testid="board-filters">
         {myId ? (
           <ScopeDepartmentFilter
             scopes={SCOPES}
@@ -296,7 +337,7 @@ export default function Board() {
             {filtered ? ` · ${filter.scope === 'mine' ? 'My tasks' : 'All tasks'} · ${filter.department === 'all' ? 'All departments' : (choices.find((c) => c.key === filter.department)?.label ?? filter.department)}` : ''}
           </span>
           {filtered && (
-            <button type="button" onClick={() => setFilter(DEFAULT_TASK_FILTER)} className="inline-flex min-h-11 items-center rounded font-medium text-slate-900 underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:outline-none sm:min-h-0">
+            <button type="button" onClick={() => setFilter(DEFAULT_TASK_FILTER)} className="inline-flex min-h-11 items-center rounded font-medium text-slate-900 underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-accent-ring focus-visible:outline-none sm:min-h-0">
               Clear filters
             </button>
           )}
@@ -351,9 +392,9 @@ export default function Board() {
       {nothingAtAll && (
         <p className="mb-3 rounded border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700" data-testid="board-empty">
           There are no active tasks in this season yet. A task is created when a proposal is approved, in{' '}
-          <Link to="/proposals" className="underline underline-offset-2">
+          <button type="button" onClick={() => openProposals(false)} className="underline underline-offset-2">
             Proposals
-          </Link>
+          </button>
           .
         </p>
       )}
@@ -415,7 +456,7 @@ export default function Board() {
                     <button
                       type="button"
                       onClick={() => setExtra((e) => ({ ...e, [lane.state]: (e[lane.state] ?? 0) + LANE_PAGE }))}
-                      className="inline-flex min-h-11 items-center rounded border border-slate-300 bg-white px-3 text-xs font-medium text-slate-800 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:outline-none sm:min-h-0 sm:py-1"
+                      className="inline-flex min-h-11 items-center rounded border border-slate-300 bg-surface px-3 text-xs font-medium text-slate-800 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-accent-ring focus-visible:outline-none sm:min-h-0 sm:py-1"
                       data-testid={`board-more-${lane.state}`}
                     >
                       Show {Math.min(LANE_PAGE, hidden)} more ({hidden} left)
@@ -451,6 +492,29 @@ export default function Board() {
         viewerId={myId}
         defaultDepartment={filter.department}
       />
+
+      <Dialog open={proposalsOpen} onClose={closeProposals} labelledBy={proposalsTitleId}>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h2 id={proposalsTitleId} className="text-base font-semibold text-balance text-slate-900">
+              Task proposals{filter.department === 'all' ? '' : ` · ${choices.find((c) => c.key === filter.department)?.label ?? filter.department}`}
+            </h2>
+            <p className="mt-0.5 text-xs text-slate-600">
+              Work anyone can raise. The department’s Head — or the President or Vice President — approves it, and it becomes a task on this Board.
+            </p>
+          </div>
+          <button type="button" onClick={closeProposals} className="min-h-11 shrink-0 rounded px-2 text-sm underline underline-offset-2 sm:min-h-0">
+            Close
+          </button>
+        </div>
+        <ProposalsPanel
+          embedded
+          heading="Proposals"
+          emptyHint="Nothing raised here yet. Propose the first one — anything the club should take on."
+          proposals={proposals}
+          realtime={proposalsRealtime}
+        />
+      </Dialog>
 
       <Dialog open={openTask !== undefined} onClose={() => setOpenTaskId(null)} labelledBy={dialogTitleId}>
         {openTask && (

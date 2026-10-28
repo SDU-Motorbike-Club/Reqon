@@ -47,8 +47,12 @@ describe('the proposal form fields', () => {
 
   it('marks the mandatory fields and leaves description and owner optional', () => {
     renderForm()
-    for (const label of [/^Title/, /^Department/, /^Deadline/, /^Related milestone/]) {
+    for (const label of [/^Title/, /^Deadline/]) {
       expect(screen.getByLabelText(label)).toBeRequired()
+    }
+    // Everything else is optional, and not marked as required.
+    for (const label of [/^Department/, /^Related milestone/]) {
+      expect(screen.getByLabelText(label)).not.toBeRequired()
     }
     expect(screen.getByLabelText('Description (optional)')).not.toBeRequired()
     expect(screen.getByLabelText(/^Proposed owner/)).not.toBeRequired()
@@ -94,23 +98,30 @@ describe('suggested starting values', () => {
 })
 
 describe('each required field refuses on its own', () => {
-  it.each(['title', 'department', 'dueDate', 'milestone', 'requirement'] as const)('missing %s', async (problem) => {
+  it.each(['title', 'dueDate'] as const)('missing %s', async (problem) => {
     const user = userEvent.setup()
     const onRaise = renderForm()
     await fillAll(user)
     // Undo just one field.
     if (problem === 'title') await user.clear(screen.getByLabelText(/^Title/))
-    if (problem === 'department') await user.selectOptions(screen.getByLabelText(/^Department/), '')
     if (problem === 'dueDate') fireEvent.change(screen.getByLabelText(/^Deadline/), { target: { value: '' } })
-    if (problem === 'milestone') await user.selectOptions(screen.getByLabelText(/^Related milestone/), '')
-    if (problem === 'requirement') await user.click(screen.getByRole('checkbox', { name: /A\.1/ }))
     await user.click(screen.getByRole('button', { name: 'Raise proposal' }))
 
     expect(onRaise).not.toHaveBeenCalled()
     expect(await screen.findByTestId(`error-${problem}`)).toBeInTheDocument()
     expect(screen.getByTestId('proposal-summary')).toHaveTextContent('One thing needs fixing')
-    // The other four fields report nothing.
+    // The other field reports nothing.
     expect(screen.getAllByTestId(/^error-/)).toHaveLength(1)
+  })
+
+  it('raises a proposal with only a title and a deadline: no department, milestone or requirement', async () => {
+    const user = userEvent.setup()
+    const onRaise = renderForm()
+    await user.type(screen.getByLabelText(/^Title/), 'Just an idea')
+    fireEvent.change(screen.getByLabelText(/^Deadline/), { target: { value: '2026-12-01' } })
+    await user.click(screen.getByRole('button', { name: 'Raise proposal' }))
+    await waitFor(() => expect(onRaise).toHaveBeenCalledTimes(1))
+    expect(onRaise.mock.calls[0][0]).toMatchObject({ title: 'Just an idea', dueDate: '2026-12-01', departmentKey: '', milestoneKey: '', requirementKeys: [] })
   })
 })
 
@@ -122,15 +133,15 @@ describe('accessibility of errors', () => {
     const summary = await screen.findByTestId('proposal-summary')
     expect(summary).toHaveFocus()
     expect(summary).toHaveAttribute('role', 'alert')
-    expect(summary).toHaveTextContent('5 things need fixing')
+    expect(summary).toHaveTextContent('2 things need fixing')
 
     const title = screen.getByLabelText(/^Title/)
     expect(title).toHaveAttribute('aria-invalid', 'true')
     const describedBy = title.getAttribute('aria-describedby') ?? ''
     expect(document.getElementById(describedBy)).toHaveTextContent(/Enter a title/)
 
-    await user.click(within(summary).getByRole('link', { name: /Choose the department/ }))
-    expect(screen.getByLabelText(/^Department/)).toHaveFocus()
+    await user.click(within(summary).getByRole('link', { name: /Choose a deadline/ }))
+    expect(screen.getByLabelText(/^Deadline/)).toHaveFocus()
   })
 })
 
@@ -157,18 +168,11 @@ describe('failure and repeat submission', () => {
 })
 
 describe('honest empty states', () => {
-  it('says what is missing and points a governance user to Settings', () => {
-    renderForm({ departments: [], milestones: [], canConfigure: true })
-    expect(screen.getByTestId('proposal-empty')).toHaveTextContent('there is no active department and no milestone for this season yet')
-    expect(screen.getByRole('link', { name: /Open Settings/ })).toHaveAttribute('href', '/settings')
-    expect(screen.queryByLabelText(/^Title/)).not.toBeInTheDocument()
-  })
-
-  it('offers everyone else no link, only who can fix it', () => {
-    renderForm({ requirements: [], canConfigure: false })
-    expect(screen.getByTestId('proposal-empty')).toHaveTextContent('requirements book')
-    expect(screen.queryByRole('link')).not.toBeInTheDocument()
-    expect(screen.getByTestId('proposal-empty')).toHaveTextContent('President or Vice President')
+  it('still offers the form when there is no department, milestone or requirement to choose from', () => {
+    renderForm({ departments: [], milestones: [], requirements: [] })
+    expect(screen.queryByTestId('proposal-empty')).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/^Title/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Deadline/)).toBeInTheDocument()
   })
 
   it('does not call a still-loading list empty, and reports a load failure', () => {

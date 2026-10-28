@@ -11,15 +11,16 @@ import { buttonPrimary, buttonSecondary } from '../../ui/buttons.ts'
 import { ActionError } from '../../ui/states.tsx'
 
 const FIELD =
-  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0'
+  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0'
+const REQUIRED = "after:ml-0.5 after:text-accent-ring after:content-['*']"
 const LABEL = 'block text-xs font-medium text-slate-700'
 const SECTION_HEADING = 'text-[11px] font-semibold tracking-wide text-slate-500 uppercase'
 
-type Errors = { title?: string; department?: string; due?: string }
+type Errors = { title?: string; start?: string; due?: string }
 
 // A new task, made straight on the Board by a task leader (create_task). It is laid out
 // like the task overlay, in the same order: what it is, who and when, linked work,
-// department. A title, a department and a deadline are needed. The milestone and the
+// department. A title and a deadline are needed. The milestone and the
 // requirements are optional: they can be added later on the task (when both are given
 // the task keeps them, like a promoted one).
 export function NewTaskDialog({
@@ -109,6 +110,7 @@ function Form({
   const [detail, setDetail] = useState('')
   const [owner, setOwner] = useState('')
   const [priority, setPriority] = useState<TaskPriority>('normal')
+  const [start, setStart] = useState('')
   const [due, setDue] = useState('')
   const [milestone, setMilestone] = useState('')
   const [keys, setKeys] = useState<string[]>([])
@@ -120,9 +122,9 @@ function Form({
     if (pending) return
     const found: Errors = {}
     if (title.trim() === '') found.title = 'Give the task a name.'
-    if (department === '') found.department = 'Choose a department.'
     if (due === '') found.due = 'Give the task a deadline.'
-    const first = found.title ? 'title' : found.due ? 'due' : found.department ? 'department' : null
+    else if (start !== '' && start > due) found.due = 'The deadline cannot be before the start date.'
+    const first = found.title ? 'title' : found.due ? 'due' : null
     if (first) {
       // Render the messages before moving focus, or focus lands on a field whose error is not painted yet.
       flushSync(() => setErrors(found))
@@ -133,8 +135,9 @@ function Form({
     onSubmit({
       title: title.trim(),
       detail: detail.trim() || null,
-      departmentKey: department,
+      departmentKey: department || null,
       ownerId: owner || null,
+      startsOn: start || null,
       dueDate: due,
       milestoneKey: milestone || null,
       clauseKeys: keys,
@@ -156,12 +159,12 @@ function Form({
       <h2 id={titleId} className="text-base font-semibold text-balance text-slate-900">
         New task
       </h2>
-      <p className="text-xs text-slate-600">Made directly, without a proposal. It starts in To do, today.</p>
+      <p className="text-xs text-slate-600">Made directly, without a proposal. It starts in To do.</p>
 
       <fieldset disabled={pending} className="grid gap-3 sm:grid-cols-2">
         <legend className="sr-only">New task</legend>
         <div className="sm:col-span-2">
-          <label htmlFor={fid('title')} className={LABEL}>
+          <label htmlFor={fid('title')} className={`${LABEL} ${REQUIRED}`}>
             Title
           </label>
           <input
@@ -207,7 +210,22 @@ function Form({
           </select>
         </div>
         <div>
-          <label htmlFor={fid('due')} className={LABEL}>
+          <label htmlFor={fid('start')} className={LABEL}>
+            Start date
+          </label>
+          <input
+            id={fid('start')}
+            type="date"
+            value={start}
+            onChange={(e) => setStart(e.target.value)}
+            aria-invalid={errors.start ? true : undefined}
+            aria-describedby={errors.start ? fid('start-error') : undefined}
+            className={FIELD}
+          />
+          {err('start', errors.start)}
+        </div>
+        <div>
+          <label htmlFor={fid('due')} className={`${LABEL} ${REQUIRED}`}>
             Deadline
           </label>
           <input
@@ -267,24 +285,21 @@ function Form({
             id={fid('department')}
             value={department}
             onChange={(e) => setDepartment(e.target.value)}
-            aria-invalid={errors.department ? true : undefined}
-            aria-describedby={errors.department ? fid('department-error') : undefined}
             className={FIELD}
           >
-            <option value="">Choose a department…</option>
+            <option value="">No department yet</option>
             {departments.map((d) => (
               <option key={d.key} value={d.key}>
                 {d.name}
               </option>
             ))}
           </select>
-          {err('department', errors.department)}
         </div>
       </fieldset>
 
       <ActionError error={error} />
 
-      <div className="sticky bottom-0 z-10 -mx-1 flex flex-col gap-2 border-t border-slate-100 bg-white px-1 py-2 sm:flex-row sm:justify-end">
+      <div className="sticky bottom-0 z-10 -mx-1 flex flex-col gap-2 border-t border-slate-100 bg-surface px-1 py-2 sm:flex-row sm:justify-end">
         <button type="button" className={buttonSecondary} disabled={pending} onClick={onCancel}>
           Cancel
         </button>

@@ -158,7 +158,7 @@ export default function PdfScrollView({
               slots.current[index - 1] = el
             }}
             data-page={index}
-            className="mx-auto mb-2 w-full bg-white"
+            className="mx-auto mb-2 w-full bg-surface"
             style={{ aspectRatio: `1 / ${ratio}` }}
           >
             {width > 0 && near.has(index) && <PageCanvas doc={doc} index={index} width={width} label={`${label}, PDF page ${index}`} onError={fail} />}
@@ -202,5 +202,5 @@ function PageCanvas({ doc, index, width, label, onError }: { doc: PDFDocumentPro
       }
     }
   }, [doc, index, width, onError])
-  return <canvas ref={canvasRef} role="img" aria-label={label} className="block w-full bg-white" />
+  return <canvas ref={canvasRef} role="img" aria-label={label} className="block w-full bg-surface" />
 }

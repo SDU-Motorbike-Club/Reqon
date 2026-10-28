@@ -17,7 +17,7 @@ export default function NotFound() {
         Pick a screen from the menu above, or{' '}
         <Link
           to="/"
-          className="rounded font-medium text-slate-900 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+          className="rounded font-medium text-slate-900 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
         >
           go to Now
         </Link>

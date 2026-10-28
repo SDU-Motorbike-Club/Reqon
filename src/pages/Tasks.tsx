@@ -29,7 +29,7 @@ import { PageHeader } from '../ui/PageHeader.tsx'
 import { EmptyState, ErrorState, LoadingState } from '../ui/states.tsx'
 
 const FIELD =
-  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0'
+  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0'
 const LABEL = 'block text-xs font-medium text-slate-600'
 
 // Every active task of the season in one list, sortable by any column. The sort, the filters and the
@@ -55,14 +55,14 @@ export default function Tasks() {
   const choices = (departments.data ?? []).filter((d) => d.archived_at === null || d.key === list.department)
 
   return (
-    <main id="main-content" tabIndex={-1} className={`${pageMain('wide')} *:mx-auto`}>
+    <main id="main-content" tabIndex={-1} className={pageMain('wide')}>
       <PageHeader
         title="Tasks"
         description="Every active task in one list. Click a column heading to sort the whole list by it; the search and filters keep the sort."
         tutorialId="tasks-overview"
       />
 
-      <div className="mb-3 grid gap-3 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr]" data-testid="tasks-filters">
+      <div className="mb-3 grid gap-3 rounded-lg border border-slate-200 bg-surface p-3 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr]" data-testid="tasks-filters">
         <div>
           <label htmlFor="tasks-search" className={LABEL}>
             Search tasks
@@ -147,7 +147,7 @@ export default function Tasks() {
           )}
         </EmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white" data-testid="tasks-table-wrap">
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-surface" data-testid="tasks-table-wrap">
           <table className="block w-full text-left text-sm sm:table" data-testid="tasks-table">
             <thead className="hidden bg-slate-50 sm:table-header-group">
               <tr>
@@ -174,7 +174,7 @@ export default function Tasks() {
                     </td>
                     <td className={`inline-block pr-3 text-xs sm:table-cell sm:px-3 sm:py-2 sm:text-sm ${overdue ? 'font-medium text-red-800' : 'text-slate-700'}`}>
                       {row.due_date ? <time dateTime={row.due_date}>{formatDay(row.due_date)}</time> : <span className="text-slate-500 italic">no deadline</span>}
-                      {overdue && <span className="sr-only"> (overdue)</span>}
+                      {overdue && <span className="block text-xs font-normal"> (overdue)</span>}
                     </td>
                     <td className="inline-block text-xs text-slate-700 sm:table-cell sm:px-3 sm:py-2 sm:text-sm">{row.milestone_name ?? <span className="text-slate-500 italic">none</span>}</td>
                   </tr>
@@ -212,7 +212,7 @@ function HeadingCell({ column, list, onSort }: { column: SortColumn; list: TaskL
       <button
         type="button"
         onClick={onSort}
-        className="inline-flex min-h-8 items-center gap-1 rounded text-left hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:outline-none"
+        className="inline-flex min-h-8 items-center gap-1 rounded text-left hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-accent-ring focus-visible:outline-none"
         data-testid={`sort-${column}`}
       >
         {COLUMN_LABEL[column]}

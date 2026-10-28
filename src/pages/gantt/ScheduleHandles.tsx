@@ -1,12 +1,11 @@
 import { useRef, type PointerEvent as ReactPointerEvent } from 'react'
-import { placeBar, placeDay, rangeDays, shiftDay, type Span } from './ganttModel.ts'
+import { placeDay, rangeDays, shiftDay, type Span } from './ganttModel.ts'
 
 export type ScheduleDates = { start: string | null; due: string | null }
 type Part = 'move' | 'start' | 'end'
 
-// Pointer handles laid over one task's mark on the timeline: drag the body of a
-// period to move both dates, drag either end to change that date alone, drag a
-// single-date marker to move it. Nothing is written while dragging — the row
+// A pointer handle laid over one task's dot on the timeline: drag it to move the
+// deadline (or the start, for a task that has only a start). Nothing is written while dragging — the row
 // draws a preview; on release the change goes through the ordinary, authorized
 // task date update (useUpdateTask → guard_task_edit), which rolls back and
 // reports if the database refuses it.
@@ -82,17 +81,8 @@ export function ScheduleHandles({
   })
   const handle = 'absolute inset-y-0 z-[2] touch-none'
 
-  if (dates.start && dates.due) {
-    const box = placeBar({ from: dates.start, to: dates.due }, range)
-    if (!box) return null
-    return (
-      <>
-        <span aria-hidden="true" title={`Drag to move ${title}`} className={`${handle} cursor-grab active:cursor-grabbing`} style={{ left: `${box.left}%`, width: `${box.width}%` }} {...handlers('move')} data-schedule-part="move" />
-        <span aria-hidden="true" title={`Drag to change the start of ${title}`} className={`${handle} w-2 -translate-x-1/2 cursor-ew-resize rounded bg-slate-900/20 hover:bg-slate-900/40`} style={{ left: `${box.left}%` }} {...handlers('start')} data-schedule-part="start" />
-        <span aria-hidden="true" title={`Drag to change the deadline of ${title}`} className={`${handle} w-2 -translate-x-1/2 cursor-ew-resize rounded bg-slate-900/20 hover:bg-slate-900/40`} style={{ left: `${box.left + box.width}%` }} {...handlers('end')} data-schedule-part="end" />
-      </>
-    )
-  }
+  // A task is one dot on its deadline, so dragging it changes the deadline (the start never moves by this).
+  const part: Part = dates.due ? 'end' : 'move'
   const day = dates.due ?? dates.start
   if (!day) return null
   const left = placeDay(day, range)
@@ -103,8 +93,8 @@ export function ScheduleHandles({
       title={`Drag to move the ${dates.due ? 'deadline' : 'start'} of ${title}`}
       className={`${handle} w-4 -translate-x-1/2 cursor-ew-resize rounded hover:bg-slate-900/10`}
       style={{ left: `${left}%` }}
-      {...handlers('move')}
-      data-schedule-part="move"
+      {...handlers(part)}
+      data-schedule-part={part}
     />
   )
 }

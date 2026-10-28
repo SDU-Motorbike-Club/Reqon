@@ -146,7 +146,7 @@ export default function Milestones() {
         </EmptyState>
       )}
 
-      <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+      <ul className="space-y-3">
         {ordered.map((milestone, index) => {
           const window = submissionWindow(milestone, new Date())
           const mySections = sectionsFor(sections.data ?? [], milestone.key)
@@ -158,7 +158,7 @@ export default function Milestones() {
           return (
             <li
               key={milestone.key}
-              className="px-3 py-2"
+              className="rounded-lg border border-slate-200 bg-surface px-3 py-2"
               data-testid={`milestone-${milestone.key}`}
               data-tutorial={index === 0 ? 'milestone-card' : undefined}
             >
@@ -168,7 +168,7 @@ export default function Milestones() {
                   aria-expanded={isOpen}
                   aria-controls={panelId}
                   onClick={() => toggle(milestone.key)}
-                  className="flex min-h-11 items-center gap-1.5 text-left text-sm font-semibold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+                  className="flex min-h-11 items-center gap-1.5 text-left text-sm font-semibold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
                 >
                   <span aria-hidden="true" className="w-3 text-slate-500">
                     {isOpen ? '▾' : '▸'}
@@ -182,7 +182,7 @@ export default function Milestones() {
                     {/* Linked tasks only: with none linked the bar stays empty — the
                         drafting checklist below is a separate count, never progress. */}
                     <span
-                      className="block h-full bg-slate-800"
+                      className="block h-full bg-accent-hover"
                       style={{ width: `${view?.basis === 'tasks' ? (view.percent ?? 0) : 0}%` }}
                     />
                   </span>
@@ -224,7 +224,7 @@ export default function Milestones() {
                     </>
                   )}
                   {milestone.is_blocking && (
-                    <span className="rounded bg-red-700 px-2 py-0.5 font-bold text-white" title="Missing this bars the team from on-track activity">
+                    <span className="rounded bg-danger px-2 py-0.5 font-bold text-white" title="Missing this bars the team from on-track activity">
                       BLOCKING
                     </span>
                   )}
@@ -259,7 +259,7 @@ export default function Milestones() {
                       const sectionRow = (sec: typeof section, nested: boolean) => {
                         const under = progress.data ? tasksUnderSection(progress.data, sec.id) : []
                         return (
-                          <li key={sec.id} className={`rounded border border-slate-200 bg-white p-2 ${nested ? 'ml-6' : ''}`} data-testid={`milestone-section-${sec.id}`}>
+                          <li key={sec.id} className={`rounded border border-slate-200 bg-surface p-2 ${nested ? 'ml-6' : ''}`} data-testid={`milestone-section-${sec.id}`}>
                             <p className="flex min-h-11 items-center gap-2 font-medium text-slate-900 sm:min-h-0">
                               {nested && <span aria-hidden="true" className="text-slate-400">↳</span>}
                               {sec.name}

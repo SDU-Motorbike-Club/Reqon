@@ -66,7 +66,7 @@ export function BlockReasonForm({
         maxLength={MAX_BLOCKER_REASON}
         autoFocus
         onChange={(e) => setReason(e.target.value)}
-        className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:outline-none"
+        className="w-full rounded border border-slate-300 bg-surface px-2 py-1 text-sm focus-visible:ring-2 focus-visible:ring-accent-ring focus-visible:outline-none"
       />
       <p className="text-[11px] text-amber-900">
         Name what is being waited for. To block on another task instead, link it under Details → Waits for.

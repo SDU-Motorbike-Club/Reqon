@@ -58,15 +58,15 @@ export function DepartmentNav({
                   replace
                   aria-current={active ? 'page' : undefined}
                   title={entry.label}
-                  className={`inline-flex max-w-[16rem] items-center gap-1.5 rounded-full border px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 ${
+                  className={`inline-flex max-w-[16rem] items-center gap-1.5 rounded-full border px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring focus-visible:ring-offset-1 ${
                     active
-                      ? 'border-slate-900 bg-slate-900 font-medium text-white'
-                      : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
+                      ? 'border-slate-400 bg-slate-200 font-medium text-slate-950'
+                      : 'border-slate-300 bg-surface text-slate-700 hover:border-slate-400 hover:bg-slate-50'
                   }`}
                 >
                   <span className="truncate">{entry.label}</span>
                   {n !== null && (
-                    <span className={`shrink-0 tabular-nums text-xs ${active ? 'text-slate-200' : 'text-slate-500'}`}>
+                    <span className={`shrink-0 tabular-nums text-xs ${active ? 'text-slate-700' : 'text-slate-500'}`}>
                       {n}
                     </span>
                   )}
@@ -85,7 +85,7 @@ export function DepartmentNav({
           id={selectId}
           value={value}
           onChange={(e) => navigate(hrefFor(e.target.value), { replace: true })}
-          className="mt-1 min-h-11 w-full max-w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+          className="mt-1 min-h-11 w-full max-w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
         >
           {entries.map((entry) => {
             const n = count(entry.key)

@@ -44,7 +44,7 @@ describe('BackupsGuide', () => {
     // 3 shared + 1 for the leaders tab
     expect(figures).toHaveLength(4)
     expect(screen.getByText('1 · Every night at 03:17 UTC')).toBeInTheDocument()
-    expect(screen.getByText('2 · Every Sunday, and on the 1st')).toBeInTheDocument()
+    expect(screen.getByText('2 · Mondays, Thursdays and the 1st')).toBeInTheDocument()
     expect(screen.getByText('3 · Who can open a backup')).toBeInTheDocument()
     for (const f of figures) expect(f.querySelector('figcaption')?.textContent?.length).toBeGreaterThan(10)
   })

@@ -31,7 +31,7 @@ export function LinkTaskTool({
 
   if (direct.length === 0 && moves.length === 0) {
     return (
-      <p className="sticky left-12 z-10 my-1 ml-12 w-fit max-w-md bg-white text-[11px] text-slate-600" data-testid="link-none">
+      <p className="sticky left-12 z-10 my-1 ml-12 w-fit max-w-md bg-surface text-[11px] text-slate-600" data-testid="link-none">
         No task to link here. You can link tasks you own, or that belong to a department you head.
       </p>
     )
@@ -84,14 +84,14 @@ export function LinkTaskTool({
                 onMove(pending.id)
                 setPending(null)
               }}
-              className="min-h-11 rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+              className="min-h-11 rounded bg-accent px-2 py-1 text-xs font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
             >
               Move task
             </button>
             <button
               type="button"
               onClick={() => setPending(null)}
-              className="min-h-11 rounded border border-slate-300 bg-white px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+              className="min-h-11 rounded border border-slate-300 bg-surface px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
             >
               Cancel
             </button>

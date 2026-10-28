@@ -22,7 +22,7 @@ export function ActivityHistory({
     <div className="mt-2 border-t border-slate-100 pt-2">
       <button
         type="button"
-        className="inline-flex min-h-11 items-center text-xs font-medium text-slate-700 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0"
+        className="inline-flex min-h-11 items-center text-xs font-medium text-slate-700 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >

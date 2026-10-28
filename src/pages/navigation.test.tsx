@@ -149,7 +149,7 @@ describe('Now dashboard', () => {
     expect(screen.getByTestId('tile-overdue')).toHaveTextContent('1')
     const list = screen.getByTestId('now-overdue')
     expect(list).toHaveTextContent('Late fairing drawing')
-    expect(list).toHaveTextContent('Ada Rider · Design Envelope · due 1 Jan 2020')
+    expect(list).toHaveTextContent('Ada Rider · Design Envelope · due 01/01/20')
     expect(within(list).getByRole('link', { name: 'Late fairing drawing' })).toHaveAttribute('href', '/board?task=t-late')
   })
 
@@ -196,10 +196,10 @@ describe('Now dashboard', () => {
     expect(screen.getByTestId('book-sub-B.1')).toBeVisible()
   })
 
-  it('has no proposal form on the dashboard, only a way to the Proposals screen', () => {
+  it('has no proposal form on the dashboard, only a way to propose on the Board', () => {
     renderApp()
     expect(screen.queryByLabelText(/^Title/)).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Raise a proposal' })).toHaveAttribute('href', '/proposals')
+    expect(screen.getByRole('link', { name: 'Propose a task' })).toHaveAttribute('href', '/board?proposals=1&propose=1')
   })
 
   it('keeps milestone points secondary, with a way to Milestones', () => {

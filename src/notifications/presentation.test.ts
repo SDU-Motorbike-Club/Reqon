@@ -11,10 +11,10 @@ describe('describeNotification', () => {
     })
     expect(describeNotification(n('review_requested'), 'Bo Wrench')).toEqual({
       text: '“Lighter subframe” waits for your review.',
-      to: '/proposals',
+      to: '/board?proposals=1',
     })
     expect(describeNotification(n('changes_requested'), 'Cy Head').text).toBe('Cy Head asked for changes to your proposal “Lighter subframe”.')
-    expect(describeNotification(n('proposal_approved'), 'Cy Head').to).toBe('/proposals?scope=mine')
+    expect(describeNotification(n('proposal_approved'), 'Cy Head').to).toBe('/board?proposals=1&pscope=mine')
     expect(describeNotification(n('proposal_promoted'), 'Cy Head').text).toBe('Your proposal “Lighter subframe” is now a task on the Board.')
     expect(describeNotification(n('task_blocked'), 'Di Coder').text).toBe('“Lighter subframe” is blocked (marked by Di Coder).')
     expect(describeNotification(n('proposal_comment'), 'Ada Rider').text).toBe('Ada Rider commented on the proposal “Lighter subframe”.')
@@ -34,11 +34,19 @@ describe('describeNotification', () => {
     expect(describeNotification(n('role_granted', null, 'm1'), null).text).toBe('Someone gave you a new role.')
   })
 
-  it('tells a department about a meeting called for it', () => {
+  it('tells about a meeting without claiming whom it is for, since it may be a department or the whole club', () => {
     expect(describeNotification(n('meeting_called', 'Chassis sync', 'mt1'), 'Ada Rider')).toEqual({
-      text: 'Ada Rider called a meeting for your department: “Chassis sync”.', to: '/meetings',
+      text: 'Ada Rider called a meeting: “Chassis sync”.', to: '/meetings',
     })
-    expect(describeNotification(n('meeting_called', null, 'mt1'), null).text).toBe('Someone called a meeting for your department.')
+  })
+
+  it('reads sensibly for the weekly meeting the system makes, which no person called', () => {
+    expect(describeNotification(n('meeting_called', 'Club meeting', 'mt1'), null).text).toBe('A meeting was called: “Club meeting”.')
+    expect(describeNotification(n('meeting_called', null, 'mt1'), null).text).toBe('A meeting was called.')
+    expect(describeNotification(n('tasks_unassigned', '57 open tasks are not assigned to anyone yet', 'unassigned'), null)).toEqual({
+      text: '57 open tasks are not assigned to anyone yet.',
+      to: '/tasks',
+    })
   })
 
   it('does not break on a kind this client does not know yet', () => {

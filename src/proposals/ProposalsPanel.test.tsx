@@ -60,6 +60,9 @@ function p(id: string, over: Partial<Proposal> = {}): Proposal {
 }
 
 let rows: Proposal[]
+// The proposal form also has a Department field now that it is always offered, so the filter is the one that is not inside the form.
+const deptFilter = () => screen.getAllByLabelText('Department').find((el) => !el.closest('form')) as HTMLElement
+
 function renderPanel(mode: 'queue' | 'full' = 'full', url = '/proposals') {
   const qc = new QueryClient()
   return render(
@@ -112,7 +115,7 @@ describe('Scope x Department', () => {
     const user = userEvent.setup()
     renderPanel()
     await user.click(within(screen.getByTestId('proposal-scope')).getByRole('button', { name: new RegExp(scope) }))
-    if (dept) await user.selectOptions(screen.getByLabelText('Department'), dept)
+    if (dept) await user.selectOptions(deptFilter(), dept)
     expect(shownIds()).toEqual([...expected])
   })
 
@@ -137,7 +140,7 @@ describe('Scope x Department', () => {
 
   it('lists at most the active departments in the queue', () => {
     renderPanel()
-    const options = within(screen.getByLabelText('Department')).getAllByRole('option').map((o) => o.textContent)
+    const options = within(deptFilter()).getAllByRole('option').map((o) => o.textContent)
     expect(options).toEqual(['All departments', 'Aerodynamics', 'Bodywork'])
   })
 })
@@ -148,9 +151,9 @@ describe('the History path', () => {
     renderPanel()
     await user.click(within(screen.getByTestId('proposal-views')).getByRole('button', { name: /History/ }))
     expect(shownIds()).toEqual(['rejected'])
-    const options = within(screen.getByLabelText('Department')).getAllByRole('option').map((o) => o.textContent)
+    const options = within(deptFilter()).getAllByRole('option').map((o) => o.textContent)
     expect(options).toContain('Retired dept (archived)')
-    await user.selectOptions(screen.getByLabelText('Department'), 'OLD')
+    await user.selectOptions(deptFilter(), 'OLD')
     expect(shownIds()).toEqual(['rejected'])
   })
 
@@ -218,7 +221,7 @@ describe('who sees review controls (resource-aware)', () => {
     renderPanel()
     expect(screen.getByTestId('review-open-no-dept')).toHaveTextContent('Discussion')
     expect(screen.getByTestId('proposal-hint-no-dept')).toHaveTextContent('The missing details must be completed')
-    expect(screen.getByTestId('proposal-legacy-no-dept')).toHaveTextContent(/needs a department, a deadline, a milestone and at least one requirement/)
+    expect(screen.getByTestId('proposal-legacy-no-dept')).toHaveTextContent(/needs a deadline before it can become a task/)
   })
 
   it('opens the review dialog as a labelled modal (real focus behaviour is checked in a browser)', async () => {

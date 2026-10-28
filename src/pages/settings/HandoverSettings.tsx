@@ -35,7 +35,7 @@ export function HandoverSettings() {
         {(subteams.data ?? []).map((s) => {
           const note = (notes.data ?? []).find((n) => n.subteam_key === s.key)
           return (
-            <li key={s.key} className="rounded-lg border border-slate-200 bg-white p-3">
+            <li key={s.key} className="rounded-lg border border-slate-200 bg-surface p-3">
               <label className="block text-xs font-medium text-slate-700" htmlFor={`note-${s.key}`}>
                 {s.name}
               </label>
@@ -51,7 +51,7 @@ export function HandoverSettings() {
                     setNote.mutate({ subteamKey: s.key, body: e.target.value, memberId: myId })
                   }
                 }}
-                className="mt-1 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+                className="mt-1 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
               />
             </li>
           )

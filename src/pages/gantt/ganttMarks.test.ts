@@ -58,14 +58,14 @@ describe('taskMark: which shape a task draws as', () => {
 
 describe('taskSummary: the same fact in words', () => {
   it('says each shape, and never states an invented date', () => {
-    expect(taskSummary(t({ title: 'A', starts_on: '2026-11-20', due_date: '2026-11-25', state: 'wip' }), TODAY)).toBe('A: 20 Nov 2026 to 25 Nov 2026, In progress')
-    expect(taskSummary(t({ title: 'B', due_date: '2026-11-25' }), TODAY)).toBe('B: deadline 25 Nov 2026 (no start date), To do')
-    expect(taskSummary(t({ title: 'C', starts_on: '2026-11-20' }), TODAY)).toBe('C: starts 20 Nov 2026 (no deadline), To do')
+    expect(taskSummary(t({ title: 'A', starts_on: '2026-11-20', due_date: '2026-11-25', state: 'wip' }), TODAY)).toBe('A: 20/11/26 to 25/11/26, In progress')
+    expect(taskSummary(t({ title: 'B', due_date: '2026-11-25' }), TODAY)).toBe('B: deadline 25/11/26 (no start date), To do')
+    expect(taskSummary(t({ title: 'C', starts_on: '2026-11-20' }), TODAY)).toBe('C: starts 20/11/26 (no deadline), To do')
     expect(taskSummary(t({ title: 'D' }), TODAY)).toBe('D: no dates set, To do')
   })
 
   it('says overdue in words', () => {
-    expect(taskSummary(t({ title: 'E', due_date: '2026-11-01' }), TODAY)).toBe('E: deadline 1 Nov 2026 (no start date), To do, overdue')
+    expect(taskSummary(t({ title: 'E', due_date: '2026-11-01' }), TODAY)).toBe('E: deadline 01/11/26 (no start date), To do, overdue')
   })
 })
 
@@ -100,16 +100,16 @@ describe('milestoneSummary', () => {
   const m = { key: 'MS1-1', name: 'Team Plan' }
   it('describes every case in words', () => {
     expect(milestoneSummary({ ...m, opens_on: '2026-11-01', due_on: '2026-11-30' }, TODAY, '1 of 2 tasks done')).toBe(
-      'MS1-1 Team Plan: submission window 1 Nov 2026 to 30 Nov 2026, deadline 30 Nov 2026, 1 of 2 tasks done',
+      'MS1-1 Team Plan: submission window 01/11/26 to 30/11/26, deadline 30/11/26, 1 of 2 tasks done',
     )
     expect(milestoneSummary({ ...m, opens_on: null, due_on: '2026-11-30' }, TODAY, 'No linked work')).toBe(
-      'MS1-1 Team Plan: no opening date published, deadline 30 Nov 2026, No linked work',
+      'MS1-1 Team Plan: no opening date published, deadline 30/11/26, No linked work',
     )
     expect(milestoneSummary({ ...m, opens_on: null, due_on: null }, TODAY, 'No linked work')).toBe(
       'MS1-1 Team Plan: deadline TBC (not yet published), No linked work',
     )
-    expect(milestoneSummary({ ...m, opens_on: '2026-11-01', due_on: null }, TODAY, 'x')).toContain('opens 1 Nov 2026, deadline TBC')
-    expect(milestoneSummary({ ...m, opens_on: null, due_on: '2026-11-01' }, TODAY, 'x')).toContain('deadline 1 Nov 2026 (passed)')
+    expect(milestoneSummary({ ...m, opens_on: '2026-11-01', due_on: null }, TODAY, 'x')).toContain('opens 01/11/26, deadline TBC')
+    expect(milestoneSummary({ ...m, opens_on: null, due_on: '2026-11-01' }, TODAY, 'x')).toContain('deadline 01/11/26 (passed)')
   })
 })
 

@@ -204,3 +204,38 @@ export function useSaveMeetingTemplate() {
     },
   })
 }
+
+// Who came to each meeting: meeting id -> the ids of the members present. The checklist (20260144000000);
+// the free text meetings.attendees is the older record and stays on the row.
+export type MeetingAttendance = ReadonlyMap<string, readonly string[]>
+
+export function useMeetingAttendance(): UseQueryResult<MeetingAttendance, Error> {
+  return useQuery({
+    queryKey: queryKeys.meetingAttendance,
+    queryFn: async () => {
+      const rows = await fetchAllRows<{ meeting_id: string; member_id: string }>(
+        'load who came to the meetings',
+        (row) => `${row.meeting_id}:${row.member_id}`,
+        (from, to) =>
+          supabase.from('meeting_attendees').select('meeting_id, member_id').order('meeting_id').order('member_id').range(from, to),
+      )
+      const byMeeting = new Map<string, string[]>()
+      for (const row of rows) byMeeting.set(row.meeting_id, [...(byMeeting.get(row.meeting_id) ?? []), row.member_id])
+      return byMeeting
+    },
+  })
+}
+
+// Replaces the whole list in one database call (set_meeting_attendees), so two editors never leave half of each.
+export function useSetMeetingAttendees() {
+  const queryClient = useQueryClient()
+  return useMutation<void, Error, { meetingId: string; memberIds: readonly string[] }>({
+    mutationFn: async ({ meetingId, memberIds }) => {
+      const { error } = await supabase.rpc('set_meeting_attendees', { p_meeting: meetingId, p_members: [...memberIds] })
+      if (error) throw new DataError('record who came', error)
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.meetingAttendance })
+    },
+  })
+}

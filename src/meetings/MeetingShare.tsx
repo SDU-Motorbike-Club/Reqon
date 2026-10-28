@@ -35,7 +35,7 @@ export function MeetingShare({ meeting, department }: { meeting: ShareableMeetin
   }
 
   const box =
-    'mt-1 w-full rounded border border-slate-300 bg-slate-50 px-2 py-1.5 font-mono text-xs text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500'
+    'mt-1 w-full rounded border border-slate-300 bg-slate-50 px-2 py-1.5 font-mono text-xs text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring'
   return (
     <details className="mt-3 border-t border-slate-100 pt-2">
       <summary className="cursor-pointer py-3 text-xs font-medium text-slate-700 underline-offset-2 hover:underline sm:py-0">

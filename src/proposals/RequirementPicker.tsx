@@ -2,7 +2,7 @@ import { useId, useMemo, useState } from 'react'
 import { searchRequirements, type RequirementOption } from './requirementOptions.ts'
 
 const FIELD =
-  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0'
+  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0'
 
 // A searchable multi-select built from native controls: a search box, a list of
 // checkboxes for the matches, and a removable chip for everything chosen. Native
@@ -67,7 +67,7 @@ export function RequirementPicker({
                 disabled={disabled}
                 onClick={() => toggle(key)}
                 aria-label={`Remove requirement ${option?.ref ?? key}${option?.duplicate ? ` (key ${key})` : ''}`}
-                className="min-h-6 min-w-6 rounded text-slate-600 hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+                className="min-h-6 min-w-6 rounded text-slate-600 hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
               >
                 ×
               </button>

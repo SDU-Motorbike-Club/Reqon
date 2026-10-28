@@ -1,8 +1,9 @@
 # Daily encrypted backup (docs/ultraplan Phase 4; requirements BAK-01…12).
 #
 # dump (backup_reader, read-only) → manifest → age-encrypt to every key in ops/backup/recipients.txt →
-#   R2 daily/ (+ weekly/ on Sundays, monthly/ on the 1st) → weekly: private GitHub repo + Google Drive copy
-#   + encrypted media mirror → attachment purge → status record for Settings → Backups.
+#   R2 daily/ (+ weekly/ on Mondays, monthly/ on the 1st) → offsite copies, staggered so one bad run cannot
+#   cost both: private GitHub repo on Mondays, Google Drive copy + encrypted media mirror on Thursdays
+#   → attachment purge → status record for Settings → Backups.
 #
 # The repository is public, so logs are public: every script prints counts and sizes only, nothing runs with
 # `set -x`, and the plaintext dump exists only inside the runner's temporary directory (wiped on exit).
@@ -23,7 +24,7 @@ on:
   workflow_dispatch:
     inputs:
       force_weekly:
-        description: 'Also run the weekly steps (GitHub repo, Drive, media mirror)'
+        description: 'Also run the offsite steps today (GitHub repo, Drive, media mirror)'
         type: boolean
         default: false
 
@@ -55,9 +56,15 @@ jobs:
       - name: When are we?
         id: when
         run: |
-          weekly=false
-          if [ "$(date -u +%u)" = "7" ] || [ "${{ github.event.inputs.force_weekly }}" = "true" ]; then weekly=true; fi
-          echo "weekly=$weekly" >> "$GITHUB_OUTPUT"
+          # Each offsite destination is still copied once every 7 days, but on different days: GitHub on
+          # Mondays (1), Drive and the media mirror on Thursdays (4). The newest offsite copy is then never
+          # more than 4 days old, and a failed run costs 3-4 extra days of one destination, not a week of both.
+          day="$(date -u +%u)"; force="${{ github.event.inputs.force_weekly }}"
+          github=false; drive=false
+          if [ "$day" = "1" ] || [ "$force" = "true" ]; then github=true; fi
+          if [ "$day" = "4" ] || [ "$force" = "true" ]; then drive=true; fi
+          echo "github=$github" >> "$GITHUB_OUTPUT"
+          echo "drive=$drive" >> "$GITHUB_OUTPUT"
 
       - name: Dump, check and encrypt
         id: backup
@@ -93,9 +100,9 @@ jobs:
           OUTCOME: ${{ steps.publish.outcome }}
         run: ops/backup/record.sh r2 "$([ "$OUTCOME" = success ] && echo ok || echo fail)"
 
-      - name: Push to the private GitHub repository (weekly)
+      - name: Push to the private GitHub repository (Mondays)
         id: github
-        if: ${{ steps.when.outputs.weekly == 'true' && steps.publish.outcome == 'success' }}
+        if: ${{ steps.when.outputs.github == 'true' && steps.publish.outcome == 'success' }}
         env:
           BACKUP_OUT_DIR: ${{ runner.temp }}/backup-out
           BACKUP_GIT_URL: ${{ secrets.BACKUP_GIT_URL }}
@@ -117,9 +124,9 @@ jobs:
           OUTCOME: ${{ steps.github.outcome }}
         run: ops/backup/record.sh github "$([ "$OUTCOME" = success ] && echo ok || echo fail)" "$([ "$OUTCOME" = success ] || echo push_failed)"
 
-      - name: Copy to Google Drive (weekly)
+      - name: Copy to Google Drive (Thursdays)
         id: drive
-        if: ${{ steps.when.outputs.weekly == 'true' && steps.publish.outcome == 'success' }}
+        if: ${{ steps.when.outputs.drive == 'true' && steps.publish.outcome == 'success' }}
         env:
           BACKUP_OUT_DIR: ${{ runner.temp }}/backup-out
           BACKUP_DRIVE_REMOTE: bkdrive:${{ secrets.DRIVE_FOLDER }}
@@ -130,9 +137,9 @@ jobs:
           RCLONE_CONFIG_BKDRIVE_TOKEN: ${{ secrets.DRIVE_TOKEN }}
         run: ops/backup/push-drive.sh
 
-      - name: Mirror new media to Google Drive, encrypted (weekly)
+      - name: Mirror new media to Google Drive, encrypted (Thursdays)
         id: media
-        if: ${{ steps.when.outputs.weekly == 'true' && steps.drive.outcome == 'success' }}
+        if: ${{ steps.when.outputs.drive == 'true' && steps.drive.outcome == 'success' }}
         env:
           BACKUP_MEDIA_SRC: bkatt:${{ secrets.ATTACHMENTS_R2_BUCKET }}
           BACKUP_MEDIA_DEST: bkdrive:${{ secrets.DRIVE_FOLDER }}/media

@@ -128,7 +128,7 @@ export default function Finances() {
               : 'The Treasurer records the season’s income and expenses here.'}
           </EmptyState>
         ) : (
-          <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+          <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-surface">
             {rows.map((entry) => (
               <EntryRow
                 key={entry.id}
@@ -194,7 +194,7 @@ export default function Finances() {
 
 function Total({ label, value, tone = 'text-slate-900' }: { label: string; value: string; tone?: string }) {
   return (
-    <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-2.5 sm:p-3">
+    <div className="min-w-0 rounded-lg border border-slate-200 bg-surface p-2.5 sm:p-3">
       <p className="text-xs font-medium tracking-wide text-slate-600 uppercase">{label}</p>
       <p className={`mt-0.5 text-sm font-semibold break-words tabular-nums sm:text-xl ${tone}`}>{value}</p>
     </div>

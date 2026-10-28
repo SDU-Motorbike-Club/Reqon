@@ -13,7 +13,7 @@ import { PageHeader } from '../ui/PageHeader.tsx'
 import { EmptyState, ErrorState, LoadingState } from '../ui/states.tsx'
 
 const FIELD =
-  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0'
+  'mt-1 min-h-11 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0'
 
 // Viewing from here never changes a file: deleting and captions stay on the task, where the right to do it is
 // worked out for that task.
@@ -88,7 +88,7 @@ function FilesLibrary() {
                   aria-pressed={kind === f.id}
                   onClick={() => set({ kind: f.id })}
                   className={`min-h-11 rounded border px-3 py-1.5 text-sm sm:min-h-0 ${
-                    kind === f.id ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
+                    kind === f.id ? 'border-slate-400 bg-slate-200 text-slate-950' : 'border-slate-300 bg-surface text-slate-800 hover:bg-slate-50'
                   }`}
                 >
                   {f.label} <span className="tabular-nums opacity-70">{counts[f.id]}</span>

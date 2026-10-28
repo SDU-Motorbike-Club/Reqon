@@ -57,6 +57,30 @@ export function taskSummary(task: TaskDates & Pick<Task, 'title'>, today: string
   }
 }
 
+// Whole calendar days from today to a day (negative once it has passed), compared as UTC dates so a clock change
+// never moves the answer by one.
+export function daysUntil(day: string, today: string): number {
+  const utc = (iso: string) => Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)))
+  return Math.round((utc(day) - utc(today)) / 86_400_000)
+}
+
+export type DeadlineNote = { text: string; tone: 'late' | 'soon' | 'calm' }
+
+// The one line a submission shows without being opened: how long is left, in words ("Due in 12 days",
+// "3 days overdue"), so the chart answers "what is urgent?" before anyone reads a bar. A finished submission
+// says so; one with no published deadline says that, and invents nothing.
+export function deadlineNote(deadline: string | null, today: string, complete: boolean): DeadlineNote {
+  if (complete) return { text: 'Complete', tone: 'calm' }
+  if (deadline === null) return { text: 'Deadline not published yet', tone: 'calm' }
+  const days = daysUntil(deadline, today)
+  const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`
+  if (days < 0) return { text: `${plural(-days, 'day')} overdue`, tone: 'late' }
+  if (days === 0) return { text: 'Due today', tone: 'soon' }
+  if (days <= 14) return { text: `Due in ${plural(days, 'day')}`, tone: 'soon' }
+  if (days <= 60) return { text: `Due in ${plural(Math.round(days / 7), 'week')}`, tone: 'calm' }
+  return { text: `Due in ${plural(Math.round(days / 30), 'month')}`, tone: 'calm' }
+}
+
 export type MilestoneMarks = {
   // The published submission window. Only when BOTH ends are known: with no
   // opens_on there is no window, and none is invented from the deadline.

@@ -19,7 +19,7 @@ const ROLE_CARDS: Record<PrivilegedRole, Omit<AccessCard, 'id' | 'title'>> = {
     who: 'Runs the club.',
     can: [
       'Everything a Head can do, in every department',
-      'Roster, departments, milestones, rulebook',
+      'Roster, departments, milestones, rulebook, weekly meeting',
       'Add members and reset their passwords',
       'Give and take away roles, except Developer',
       'Create and switch seasons',
@@ -32,7 +32,7 @@ const ROLE_CARDS: Record<PrivilegedRole, Omit<AccessCard, 'id' | 'title'>> = {
     who: 'Runs the club with the President.',
     can: [
       'Everything a Head can do, in every department',
-      'Roster, departments, milestones, rulebook',
+      'Roster, departments, milestones, rulebook, weekly meeting',
       'Add members and reset their passwords',
       'Give and take away Treasurer and Documentation',
       'See finances',
@@ -46,7 +46,7 @@ const ROLE_CARDS: Record<PrivilegedRole, Omit<AccessCard, 'id' | 'title'>> = {
   },
   documentation: {
     who: 'Keeps the record.',
-    can: ['Call meetings; write agenda and minutes', 'Edit the default agenda', 'Create, rename and delete milestone sections'],
+    can: ['Call meetings; write agenda and minutes; tick who came', 'Edit the default agenda', 'Create, rename and delete milestone sections'],
     cannot: ['See finances'],
   },
   developer: {

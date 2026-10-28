@@ -229,7 +229,7 @@ export function criticalityBadge(
     label: info.label,
     title: info.summary,
     info,
-    className: criticality === 'blocking' ? 'bg-red-700 text-white' : 'bg-amber-500 text-amber-950',
+    className: criticality === 'blocking' ? 'bg-danger text-white' : 'bg-amber-500 text-amber-950',
   }
 }
 

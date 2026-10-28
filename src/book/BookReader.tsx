@@ -12,7 +12,7 @@ const PdfPageView = lazy(() => import('./PdfPageView.tsx'))
 const PdfScrollView = lazy(() => import('./PdfScrollView.tsx'))
 
 const linkButton =
-  'inline-flex min-h-11 items-center rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:min-h-0'
+  'inline-flex min-h-11 items-center rounded border border-slate-300 bg-surface px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0'
 
 // THE Requirements Book reader: one implementation for the /book screen and the
 // reader pane inside the Register. It resolves the season's edition to its

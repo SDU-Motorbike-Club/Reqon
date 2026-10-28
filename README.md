@@ -497,7 +497,8 @@ status table) and `20260134000000` (the private `restore` schema and delete trac
 | When | What | Where the result goes |
 |---|---|---|
 | daily 03:17 UTC (`backup.yml`) | dump, check, encrypt | R2 `daily/` (kept 35 days) |
-| Sundays | the same file, plus an encrypted copy of new attachment files | R2 `weekly/` (26 weeks), the private repository (newest 26), Google Drive (newest 8) |
+| Mondays | the same file | R2 `weekly/` (26 weeks), the private repository (newest 26) |
+| Thursdays | the same file, plus an encrypted copy of new attachment files | Google Drive (newest 8) |
 | the 1st of the month | the same file | R2 `monthly/` (24 months) |
 | every run | records the result; removes attachment files whose 30 days after delete are over | Settings → Backups |
 | daily 09:47 UTC (`backup-freshness.yml`) | fails and emails the owners if the newest backup is older than 48 hours | GitHub notification |
@@ -740,7 +741,7 @@ The key point this table makes on purpose: **holding President or Vice
 President, by itself, grants no task or proposal power** — see §7a. Those two
 roles configure departments; a department's day-to-day work is its Head's.
 
-**Proposals** (`/proposals`) are suggested work. Any active member suggests
+**Proposals** are suggested work, an overlay on the **Board** for the department in view (the **Propose a task** and **Proposals (n)** buttons next to **New task**; the old `/proposals` address redirects there). Any active member suggests
 one, into exactly one active department — the database pins `raised_by` to
 the caller, so nobody suggests in someone else's name, and requires a title,
 deadline, milestone and at least one requirement link
@@ -765,13 +766,15 @@ returns the same task the second time (`created: false`) — nothing is
 duplicated. The task keeps `source_proposal`, so the Board can always answer
 "where did this come from?".
 
-**Nothing is deleted.** A finished or rejected task/proposal is *archived*,
-never removed — the Archive screen (`/archive`) lists it, still readable,
-still linked to its provenance, and a Head/Developer can restore it. A
-finished (Done) task also archives itself automatically 24 hours after
-completion, through a server-side scheduler — see §7d. There is no delete
-control anywhere in this workflow; the "delete" behaviour described in older
-docs no longer exists.
+**Archive first, delete second.** A finished or rejected task/proposal is
+*archived* — the Archive screen (`/archive`) lists it, still readable, still
+linked to its provenance, and a Head/Developer can restore it. A finished
+(Done) task also archives itself automatically 24 hours after completion,
+through a server-side scheduler — see §7d. Only an *archived* task can be
+deleted for good, and only by the President, Vice President or a Developer
+(`delete_archived_task`, the "Delete permanently…" button on the Archive page);
+that erases its dependencies and attachment records, and records who did it in
+the activity log. Proposals are never deleted by the app.
 
 **Meetings** (`/meetings`) are unaffected by the redesign above: a required
 date, optional start/end times, a place, an agenda and minutes. A new
@@ -902,7 +905,7 @@ drawn as they come near the screen and freed when far away, and the page in the
 middle is kept in `?page=`. The Register's reader beside a rule still shows one
 page at a time.
 
-**Tools: Team.** `/team` is the club's tool list (migration
+**Tools.** `/tools` (formerly `/team`, which redirects) is the club's tool list (migration
 `20260141000000_team_tools.sql`). A tool has three separate facts: **whose** it
 is (the owner, never changes), **where** it is (workshop, home, university,
 somewhere else) and **who has it** right now (a member, or nobody: it just

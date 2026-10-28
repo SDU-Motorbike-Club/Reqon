@@ -15,7 +15,7 @@ export function BackupsGuide({ defaultAudience = 'leaders' }: { defaultAudience?
   const [audience, setAudience] = useState<Audience>(defaultAudience)
 
   return (
-    <details className="rounded border border-slate-200 bg-white" data-testid="backups-guide" data-tutorial="backups-guide">
+    <details className="rounded border border-slate-200 bg-surface" data-testid="backups-guide" data-tutorial="backups-guide">
       <summary className="cursor-pointer p-3 text-sm font-medium text-slate-900">How backups work — step by step</summary>
       <div className="space-y-4 border-t border-slate-200 p-3">
         <Overview />
@@ -30,8 +30,8 @@ export function BackupsGuide({ defaultAudience = 'leaders' }: { defaultAudience?
               aria-selected={audience === t.id}
               aria-controls={`guide-panel-${t.id}`}
               onClick={() => setAudience(t.id)}
-              className={`min-h-11 rounded border px-3 py-1.5 text-sm focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:outline-none sm:min-h-0 ${
-                audience === t.id ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
+              className={`min-h-11 rounded border px-3 py-1.5 text-sm focus-visible:ring-2 focus-visible:ring-accent-ring focus-visible:outline-none sm:min-h-0 ${
+                audience === t.id ? 'border-slate-900 bg-accent text-white' : 'border-slate-300 bg-surface text-slate-800 hover:bg-slate-50'
               }`}
             >
               {t.label}
@@ -64,7 +64,7 @@ function Overview() {
         <ul className={LIST}>
           <li>Everything in the database: tasks, requirements, roster, departments, seasons, meetings, activity.</li>
           <li>Logins and password hashes, so people can sign in again after a restore.</li>
-          <li>Not the attached files themselves. Photos, documents and videos are in file storage. A locked copy of them goes to Google Drive every Sunday.</li>
+          <li>Not the attached files themselves. Photos, documents and videos are in file storage. A locked copy of them goes to Google Drive every Thursday.</li>
           <li>Not the Supabase settings or secrets. Those are set again by hand if the project is ever rebuilt.</li>
         </ul>
       </Block>
@@ -81,13 +81,13 @@ function Overview() {
         />
       </Diagram>
 
-      <Diagram title="2 · Every Sunday, and on the 1st" caption="More copies, in different places, so one failure cannot lose everything.">
+      <Diagram title="2 · Mondays, Thursdays and the 1st" caption="More copies, in different places and on different days, so one failure cannot lose everything.">
         <Fork
           from="The night's locked backup"
           branches={[
-            { title: 'R2 weekly/', detail: 'Kept 26 weeks.' },
-            { title: 'Private GitHub repository', detail: 'Newest 26 kept.' },
-            { title: 'Google Drive', detail: 'Newest 8 kept, plus a locked copy of all attached files.' },
+            { title: 'R2 weekly/ (Mondays)', detail: 'Kept 26 weeks.' },
+            { title: 'Private GitHub repository (Mondays)', detail: 'Newest 26 kept.' },
+            { title: 'Google Drive (Thursdays)', detail: 'Newest 8 kept, plus a locked copy of all attached files.' },
             { title: 'R2 monthly/ (on the 1st)', detail: 'Kept 24 months.' },
           ]}
         />
@@ -176,7 +176,7 @@ function DeveloperGuide() {
     <div className="space-y-4" data-testid="guide-developer">
       <Block title="What runs where">
         <ul className={LIST}>
-          <li><strong>Backup</strong> (GitHub Actions, <code>backup.yml</code>): daily 03:17 UTC. Run it by hand from the Actions tab; tick <em>force_weekly</em> to run the Sunday steps too.</li>
+          <li><strong>Backup</strong> (GitHub Actions, <code>backup.yml</code>): daily 03:17 UTC. Run it by hand from the Actions tab; tick <em>force_weekly</em> to run the Monday and Thursday steps too.</li>
           <li><strong>Backup freshness</strong> (<code>backup-freshness.yml</code>): daily 09:47 UTC. Fails and emails the owners if the newest daily backup is older than 48 hours.</li>
           <li><strong>Restore drill</strong> (<code>restore-drill.yml</code>): Mondays 05:17 UTC. Restores the newest backup into a fresh project and compares it.</li>
           <li>This page is the independent signal: it turns red at 48 hours even if GitHub is silent.</li>
@@ -190,8 +190,8 @@ function DeveloperGuide() {
           <li>Refuse if the database is over 400 MB or the dump over 100 MB.</li>
           <li>Write a manifest (rows and md5 per table), dump <code>public</code> and <code>auth</code> separately, write the manifest again. If before and after differ, retry up to 3 times.</li>
           <li>Pack manifest and both dumps into one tar. Encrypt it with age to every key in <code>ops/backup/recipients.txt</code>.</li>
-          <li>Upload to R2 <code>daily/</code> and compare the size. Sundays also <code>weekly/</code>, the 1st also <code>monthly/</code>.</li>
-          <li>Sundays: push to the private repository, copy to Drive, mirror new attachment files to Drive encrypted.</li>
+          <li>Upload to R2 <code>daily/</code> and compare the size. Mondays also <code>weekly/</code>, the 1st also <code>monthly/</code>.</li>
+          <li>Mondays: push to the private repository. Thursdays: copy to Drive and mirror new attachment files to Drive encrypted. Each is still once a week, on different days, so a failed run costs 3 to 4 extra days of one copy, not a week of both.</li>
           <li>Call <code>backup-record</code> with the result, then <code>attachment-purge</code>.</li>
         </ol>
       </Block>
@@ -311,7 +311,7 @@ function Diagram({ title, caption, children }: { title: string; caption: string;
 
 type Step = { title: string; detail?: string }
 
-const BOX = 'rounded border border-slate-300 bg-white px-3 py-2'
+const BOX = 'rounded border border-slate-300 bg-surface px-3 py-2'
 
 function Box({ step }: { step: Step }) {
   return (

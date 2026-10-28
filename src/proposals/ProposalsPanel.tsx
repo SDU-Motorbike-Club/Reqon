@@ -52,6 +52,7 @@ export function ProposalsPanel({
   mode = 'full',
   emptyHint,
   layout = 'stack',
+  embedded = false,
   proposals,
   realtime,
 }: {
@@ -59,6 +60,10 @@ export function ProposalsPanel({
   mode?: 'queue' | 'full'
   emptyHint: string
   layout?: 'stack' | 'wide'
+  // Inside the Board's proposals overlay: the Board already owns the department
+  // navigation (the same ?dept= address), so the panel does not draw its own, and
+  // the form opens at once when the overlay was asked for to propose something.
+  embedded?: boolean
   proposals: UseQueryResult<Proposal[], Error>
   realtime: RealtimeState
 }) {
@@ -84,7 +89,7 @@ export function ProposalsPanel({
   // The filter, read from the address. An unknown department falls back to all
   // departments with a notice, like the Board.
   const { filter, notice } = useMemo(() => {
-    const scope: ProposalFilter['scope'] = params.get('scope') === 'mine' ? 'mine' : 'all'
+    const scope: ProposalFilter['scope'] = params.get('pscope') === 'mine' ? 'mine' : 'all'
     const view: ProposalFilter['view'] = mode === 'queue' ? 'queue' : params.get('view') === 'history' ? 'history' : 'queue'
     const raw = params.get('dept')
     if (!departments.data) return { filter: { scope, view, department: raw ?? ALL_DEPARTMENTS }, notice: null }
@@ -96,7 +101,8 @@ export function ProposalsPanel({
     setParams(
       (current) =>
         mergeSearchParams(current, {
-          scope: next.scope === 'mine' ? 'mine' : null,
+          // Its own key: the Board behind the overlay has a ?scope= of its own (My tasks), and they are not the same choice.
+          pscope: next.scope === 'mine' ? 'mine' : null,
           dept: next.department !== ALL_DEPARTMENTS ? next.department : null,
           view: next.view === 'history' ? 'history' : null,
         }),
@@ -117,7 +123,9 @@ export function ProposalsPanel({
   // phone it starts folded. Either way it stays MOUNTED (hidden) when folded, so
   // a half-written proposal survives closing and reopening it.
   const [formOpen, setFormOpen] = useState(
-    () => wide && typeof window !== 'undefined' && window.matchMedia?.('(min-width: 64rem)').matches === true,
+    () =>
+      (embedded && params.get('propose') === '1') ||
+      (wide && typeof window !== 'undefined' && window.matchMedia?.('(min-width: 64rem)').matches === true),
   )
 
   const tasksByProposal = useMemo(() => {
@@ -259,10 +267,10 @@ export function ProposalsPanel({
   )
 
   const reviewArea = reviewer && mode === 'full' && (
-    <section aria-labelledby={`${formId}-review`} data-tutorial="proposal-review-queue" className="rounded-lg border border-slate-300 bg-white p-3" data-testid="proposal-review-queue">
+    <section aria-labelledby={`${formId}-review`} data-tutorial="proposal-review-queue" className="rounded-lg border border-slate-300 bg-surface p-3" data-testid="proposal-review-queue">
       <h3 id={`${formId}-review`} className="text-sm font-semibold text-slate-900">
         Needs your review{' '}
-        <span className="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-medium text-white tabular-nums" data-testid="proposal-review-count">
+        <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-white tabular-nums" data-testid="proposal-review-count">
           {reviewQueue.length}
         </span>
       </h3>
@@ -275,7 +283,7 @@ export function ProposalsPanel({
         <ul className="mt-2 flex flex-wrap gap-1.5 text-xs" aria-label="Waiting per department">
           {[...queueByDepartment].map(([key, n]) => (
             <li key={key}>
-              <button type="button" onClick={() => setFilter({ ...filter, department: key, view: 'queue' })} className="rounded-full border border-slate-300 bg-white px-2 py-0.5 hover:bg-slate-50">
+              <button type="button" onClick={() => setFilter({ ...filter, department: key, view: 'queue' })} className="rounded-full border border-slate-300 bg-surface px-2 py-0.5 hover:bg-slate-50">
                 {nameOfDepartment(key) ?? key} <span className="tabular-nums text-slate-500">{n}</span>
               </button>
             </li>
@@ -307,7 +315,7 @@ export function ProposalsPanel({
   )
 
   const myStatus = viewerId && mode === 'full' && (
-    <section aria-labelledby={`${formId}-mine`} className="rounded-lg border border-slate-200 bg-white p-3" data-testid="proposal-mine">
+    <section aria-labelledby={`${formId}-mine`} className="rounded-lg border border-slate-200 bg-surface p-3" data-testid="proposal-mine">
       <h3 id={`${formId}-mine`} className="text-sm font-semibold text-slate-900">
         Your proposals
       </h3>
@@ -343,7 +351,7 @@ export function ProposalsPanel({
   )
 
   const form = (
-    <div className="rounded-lg border border-slate-200 bg-white p-3" data-tutorial="proposal-raise">
+    <div className="rounded-lg border border-slate-200 bg-surface p-3" data-tutorial="proposal-raise">
       <button
         type="button"
         className={formOpen ? buttonSecondary : buttonPrimary}
@@ -387,7 +395,7 @@ export function ProposalsPanel({
 
   return (
     <section aria-labelledby="proposals-heading" data-tutorial="proposals-panel">
-      <DepartmentNav choices={choices} value={filter.department} testId="proposal-departments" />
+      {!embedded && <DepartmentNav choices={choices} value={filter.department} testId="proposal-departments" />}
       {notice && (
         <p role="status" className="mb-3 rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-900" data-testid="proposal-filter-notice">
           {notice}
@@ -462,7 +470,7 @@ function ProposalTally({ proposals, promoted }: { proposals: Proposal[]; promote
   const live = proposals.filter((p) => !isHistory(p))
   const count = (state: Proposal['state']) => live.filter((p) => p.state === state).length
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3" data-tutorial="proposal-flow">
+    <div className="rounded-lg border border-slate-200 bg-surface p-3" data-tutorial="proposal-flow">
       <h3 className="text-xs font-medium text-slate-600">How a proposal moves</h3>
       <ol className="mt-2 space-y-1 text-sm">
         {[

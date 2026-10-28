@@ -44,7 +44,7 @@ export function SeasonExport() {
         onClick={() => void doExport()}
         disabled={exporting || !currentSeason.data}
         data-testid="export-button"
-        className="min-h-11 rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 disabled:opacity-60 sm:min-h-0"
+        className="min-h-11 rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring disabled:opacity-60 sm:min-h-0"
       >
         {exporting ? 'Preparing…' : 'Download season JSON'}
       </button>

@@ -52,6 +52,7 @@ declare
   m3    uuid := gen_random_uuid();   -- active member
   alum  uuid := gen_random_uuid();   -- retired member
   t1    uuid;
+  t1b   uuid;
   t2    uuid;
   err   text;
   lines    text[] := '{}';
@@ -81,6 +82,27 @@ begin
   select * into lines, failures from pg_temp.note(lines, failures, 'nobody lists a tool in another member''s name', err = 'refused', err);
   select * into lines, failures from pg_temp.note(lines, failures, 'every member reads the list', (select count(*) from tools) = 1);
 
+  -- --------------------------------------------- own tool or club tool
+  select * into lines, failures from pg_temp.note(lines, failures,
+    'a tool is the owner''s own unless it is listed as a club tool',
+    (select shared from tools where id = t1) = false);
+  perform pg_temp.as_user(m1);
+  insert into tools (item, location, shared) values ('Workshop vise', 'workshop', true) returning id into t1b;
+  perform pg_temp.as_owner();
+  select * into lines, failures from pg_temp.note(lines, failures,
+    'a member lists a club tool, still as its owner',
+    exists (select 1 from tools where id = t1b and shared and owner_id = m1));
+  begin
+    perform pg_temp.as_user(m1);
+    update tools set shared = false where id = t1b;
+    err := 'accepted';
+  exception when insufficient_privilege then err := 'refused';
+  end;
+  perform pg_temp.as_owner();
+  select * into lines, failures from pg_temp.note(lines, failures,
+    'nobody turns a club tool into a personal one, or back, after it is listed', err = 'refused', err);
+  delete from tools where id = t1b;
+
   -- ------------------------------------------------ two separate facts to change
   perform pg_temp.as_user(m1);
   update tools set location = 'home', held_by = m1 where id = t1;
@@ -101,12 +123,17 @@ begin
 
   -- ---------------------------------------------- someone else, while m1 has it
   perform pg_temp.as_user(m2);
-  begin update tools set location = 'workshop' where id = t1; err := 'accepted';
-  exception when insufficient_privilege then err := 'refused'; end;
-  select * into lines, failures from pg_temp.note(lines, failures, 'another member cannot move a tool someone else has', err = 'refused', err);
-  begin update tools set held_by = m2 where id = t1; err := 'accepted';
-  exception when insufficient_privilege then err := 'refused'; end;
-  select * into lines, failures from pg_temp.note(lines, failures, 'nor take it while someone has it', err = 'refused', err);
+  update tools set location = 'workshop' where id = t1;
+  perform pg_temp.as_owner();
+  select * into lines, failures from pg_temp.note(lines, failures, 'any other full member can move a tool someone else has',
+    exists (select 1 from tools where id = t1 and location = 'workshop'));
+  perform pg_temp.as_user(m2);
+  update tools set held_by = m2 where id = t1;
+  perform pg_temp.as_owner();
+  select * into lines, failures from pg_temp.note(lines, failures, 'and hand it to themselves or to anyone else',
+    exists (select 1 from tools where id = t1 and held_by = m2));
+  update tools set held_by = m1, location = 'home' where id = t1;
+  perform pg_temp.as_user(m2);
   delete from tools where id = t1;
   perform pg_temp.as_owner();
   select * into lines, failures from pg_temp.note(lines, failures, 'nor remove it', exists (select 1 from tools where id = t1));
@@ -121,9 +148,11 @@ begin
     'the owner puts it back (nobody has it) and another member takes it',
     exists (select 1 from tools where id = t1 and held_by = m2 and location = 'workshop'));
   perform pg_temp.as_user(m3);
-  begin update tools set held_by = m3 where id = t1; err := 'accepted';
-  exception when insufficient_privilege then err := 'refused'; end;
-  select * into lines, failures from pg_temp.note(lines, failures, 'a third member cannot take what m2 now has', err = 'refused', err);
+  update tools set held_by = m3 where id = t1;
+  perform pg_temp.as_owner();
+  select * into lines, failures from pg_temp.note(lines, failures, 'a third member can take what m2 has, or hand it to someone',
+    exists (select 1 from tools where id = t1 and held_by = m3));
+  update tools set held_by = m2 where id = t1;
   perform pg_temp.as_user(m2);
   update tools set location = 'university', held_by = m3 where id = t1;
   perform pg_temp.as_owner();
@@ -131,9 +160,10 @@ begin
     'whoever has it says where it is and hands it on',
     exists (select 1 from tools where id = t1 and location = 'university' and held_by = m3));
   perform pg_temp.as_user(m3);
-  begin update tools set item = 'Renamed by the holder' where id = t1; err := 'accepted';
-  exception when insufficient_privilege then err := 'refused'; end;
-  select * into lines, failures from pg_temp.note(lines, failures, 'the holder cannot rename it', err = 'refused', err);
+  update tools set item = 'Renamed by the holder' where id = t1;
+  perform pg_temp.as_owner();
+  select * into lines, failures from pg_temp.note(lines, failures, 'any full member can correct a tool''s name',
+    exists (select 1 from tools where id = t1 and item = 'Renamed by the holder'));
   perform pg_temp.as_user(m1);
   update tools set item = 'Torque wrench 3/8' where id = t1;
   perform pg_temp.as_owner();

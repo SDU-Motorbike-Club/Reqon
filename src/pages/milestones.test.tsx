@@ -131,8 +131,8 @@ describe('Milestones: work, submission and acceptance are three facts', () => {
     progress.data = []
     extra.submissions = { M1: { submitted_on: '2099-11-20', submitted_by: 'm1', accepted_on: '2099-11-25', accepted_by: 'm1' } }
     renderPage()
-    expect(screen.getByTestId('submitted-M1')).toHaveTextContent('20 Nov 2099 · Ada Rider')
-    expect(screen.getByTestId('accepted-M1')).toHaveTextContent('25 Nov 2099 · Ada Rider')
+    expect(screen.getByTestId('submitted-M1')).toHaveTextContent('20/11/99 · Ada Rider')
+    expect(screen.getByTestId('accepted-M1')).toHaveTextContent('25/11/99 · Ada Rider')
     expect(screen.getByTestId('submitted-M2')).toHaveTextContent('Not recorded')
     extra.submissions = {}
   })

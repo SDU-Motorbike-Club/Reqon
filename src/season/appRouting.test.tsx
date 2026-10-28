@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Proves the WIRING in App.tsx itself: every season-scoped route (Board, Now,
-// Priorities, Register, Milestones, Gantt, Proposals, Meetings, Specs,
+// Priorities, Register, Milestones, Gantt, Meetings, Specs,
 // Finances) is actually behind SeasonGate, and /settings is deliberately not
 // — it is how a club with no current season gets one. SeasonGate's own
 // rendering logic (loading/failed/no-current-season/ready) is proven once,
@@ -64,7 +64,6 @@ vi.mock('../pages/Register.tsx', () => ({ default: () => 'REGISTER PAGE' }))
 vi.mock('../pages/Milestones.tsx', () => ({ default: () => 'MILESTONES PAGE' }))
 vi.mock('../pages/Gantt.tsx', () => ({ default: () => 'GANTT PAGE' }))
 vi.mock('../pages/Board.tsx', () => ({ default: () => 'BOARD PAGE' }))
-vi.mock('../pages/Proposals.tsx', () => ({ default: () => 'PROPOSALS PAGE' }))
 vi.mock('../pages/Meetings.tsx', () => ({ default: () => 'MEETINGS PAGE' }))
 vi.mock('../pages/SpecSheet.tsx', () => ({ default: () => 'SPECS PAGE' }))
 vi.mock('../pages/Finances.tsx', () => ({ default: () => 'FINANCES PAGE' }))
@@ -83,7 +82,6 @@ const SEASON_SCOPED_ROUTES: [string, string][] = [
   ['/milestones', 'MILESTONES PAGE'],
   ['/gantt', 'GANTT PAGE'],
   ['/board', 'BOARD PAGE'],
-  ['/proposals', 'PROPOSALS PAGE'],
   ['/meetings', 'MEETINGS PAGE'],
   ['/specs', 'SPECS PAGE'],
   ['/finances', 'FINANCES PAGE'],
@@ -109,6 +107,43 @@ describe('every season-scoped route renders normally once the season is ready', 
   it.each(SEASON_SCOPED_ROUTES)('%s shows its page', async (path, marker) => {
     renderAt(path)
     await waitFor(() => expect(screen.getByText(marker)).toBeInTheDocument())
+  })
+})
+
+// Proposals are an overlay on the Board now. The old address, and the inbox links from before, land there.
+describe('/proposals redirects to the Board overlay', () => {
+  function Where() {
+    const location = useLocation()
+    return <output data-testid="where">{location.pathname + location.search}</output>
+  }
+  function renderWithProbe(path: string) {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    return render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={[path]}>
+          <App />
+          <Where />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+  }
+
+  it('opens the overlay on the Board and keeps the department', async () => {
+    renderWithProbe('/proposals?dept=AERO')
+    await waitFor(() => expect(screen.getByText('BOARD PAGE')).toBeInTheDocument())
+    const where = new URL(screen.getByTestId('where').textContent!, 'http://x')
+    expect(where.pathname).toBe('/board')
+    expect(where.searchParams.get('proposals')).toBe('1')
+    expect(where.searchParams.get('dept')).toBe('AERO')
+  })
+
+  it('turns an old ?scope=mine into the panel\'s own pscope, so the Board behind it is not filtered', async () => {
+    renderWithProbe('/proposals?scope=mine&view=history')
+    await waitFor(() => expect(screen.getByText('BOARD PAGE')).toBeInTheDocument())
+    const where = new URL(screen.getByTestId('where').textContent!, 'http://x')
+    expect(where.searchParams.get('pscope')).toBe('mine')
+    expect(where.searchParams.get('view')).toBe('history')
+    expect(where.searchParams.has('scope')).toBe(false)
   })
 })
 
@@ -139,8 +174,8 @@ describe('no current season: every season-scoped route shows the gate, never its
   })
 
   // Your first steps and the club's tools do not belong to a season.
-  it('/team renders regardless — it is not season-scoped', async () => {
-    renderAt('/team')
+  it('/tools renders regardless — it is not season-scoped', async () => {
+    renderAt('/tools')
     await waitFor(() => expect(screen.getByText('TEAM PAGE')).toBeInTheDocument())
     expect(screen.queryByText('No current season')).not.toBeInTheDocument()
   })

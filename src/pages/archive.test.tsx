@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -13,6 +13,7 @@ let total = 0
 let queries: { kind: string; q: Record<string, unknown> }[]
 let restoreError: Error | null
 const restored: Record<string, unknown>[] = []
+const deleted: Record<string, unknown>[] = []
 
 vi.mock('../auth/context.ts', () => ({
   useAuth: () => ({ status: 'member', user: { id: session.id }, member: { id: session.id, status: session.status }, roles: session.roles }),
@@ -36,6 +37,14 @@ vi.mock('../data/useTaskHistory.ts', () => ({
   useTasksBySource: () => ({ data: new Map([['prop-1', { id: 'task-x', title: 'Resulting task', source_proposal: 'prop-1', archived_at: null }]]) }),
 }))
 vi.mock('../data/useTasks.ts', () => ({
+  useDeleteArchivedTask: () => ({
+    mutateAsync: async (v: Record<string, unknown>) => {
+      deleted.push(v)
+    },
+    isPending: false,
+    error: null,
+    reset: () => {},
+  }),
   useRestoreTask: () => ({
     mutateAsync: async (v: Record<string, unknown>) => {
       if (restoreError) throw restoreError
@@ -94,6 +103,7 @@ beforeEach(() => {
   queries = []
   restoreError = null
   restored.length = 0
+  deleted.length = 0
 })
 
 const last = (kind: string) => queries.filter((x) => x.kind === kind).at(-1)!
@@ -123,6 +133,39 @@ describe('archived tasks', () => {
     renderArchive()
     expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/Move .* to another lane/)).not.toBeInTheDocument()
+  })
+})
+
+describe('deleting an archived task for good', () => {
+  it('is offered to the President, Vice President and Developer, and to nobody else', () => {
+    departments = departments.map((d) => ({ ...d, lead_id: null }))
+    renderArchive()
+    expect(screen.queryByTestId('delete-a1')).not.toBeInTheDocument()
+    cleanup()
+    session.roles = ['president']
+    renderArchive()
+    expect(screen.getByTestId('delete-a1')).toBeInTheDocument()
+    expect(screen.getByTestId('delete-a2')).toBeInTheDocument()
+  })
+
+  it('a department Head can restore but not delete', () => {
+    renderArchive()
+    expect(screen.getByTestId('restore-a1')).toBeInTheDocument()
+    expect(screen.queryByTestId('delete-a1')).not.toBeInTheDocument()
+  })
+
+  it('asks first, says it is for good, and deletes only on confirm', async () => {
+    const user = userEvent.setup()
+    session.roles = ['developer']
+    renderArchive()
+    await user.click(screen.getByTestId('delete-a1'))
+    expect(screen.getByText(/for good\?/)).toBeInTheDocument()
+    expect(deleted).toEqual([])
+    await user.click(screen.getByRole('button', { name: 'Keep it' }))
+    expect(deleted).toEqual([])
+    await user.click(screen.getByTestId('delete-a1'))
+    await user.click(screen.getByTestId('delete-confirm'))
+    await waitFor(() => expect(deleted).toEqual([{ id: 'a1' }]))
   })
 })
 

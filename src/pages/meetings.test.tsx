@@ -17,6 +17,9 @@ const state = vi.hoisted(() => ({
   updated: [] as Record<string, unknown>[],
   deleted: [] as string[],
   writeError: null as Error | null,
+  // meeting id -> member ids that came; and what the dialog asked to be saved.
+  attendance: {} as Record<string, string[]>,
+  attendanceWrites: [] as { meetingId: string; memberIds: readonly string[] }[],
 }))
 
 vi.mock('../data/useSubteams.ts', () => ({
@@ -27,11 +30,35 @@ vi.mock('../data/useSubteams.ts', () => ({
     ],
   }),
 }))
+vi.mock('../data/useMembers.ts', () => ({
+  useMembers: () => ({
+    data: [
+      { id: 'u1', full_name: 'Ada Rider', status: 'active' },
+      { id: 'u2', full_name: 'Bo Wrench', status: 'active' },
+      { id: 'u3', full_name: 'Cy Old', status: 'alumni' },
+    ],
+  }),
+}))
 vi.mock('../auth/usePermissions.ts', () => ({ usePermissions: () => state.can }))
+// jsdom cannot drive a contenteditable, so the document editor is stood in for by a textarea holding the same
+// Markdown. The real editor, and that it writes back exactly what it was given, is meetings/editorMarkdown.test.ts.
+vi.mock('../meetings/RichTextField.tsx', () => ({
+  RichTextField: ({ id, label, value, onChange, disabled, placeholder }: { id: string; label: string; value: string; onChange: (v: string) => void; disabled?: boolean; placeholder?: string }) => (
+    <div>
+      <label htmlFor={id}>{label}</label>
+      <textarea id={id} value={value} disabled={disabled} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  ),
+}))
 vi.mock('../data/useMeetings.ts', async () => {
   const { useState } = await import('react')
   return {
   useMeetings: () => ({ data: state.meetings, error: null, isPending: false, refetch: vi.fn() }),
+  useMeetingAttendance: () => ({ data: new Map(Object.entries(state.attendance)), isPending: false, error: null }),
+  useSetMeetingAttendees: () => ({
+    mutateAsync: async (v: { meetingId: string; memberIds: readonly string[] }) => { state.attendanceWrites.push(v) },
+    reset: vi.fn(), isPending: false, error: null,
+  }),
   useMeetingTemplate: () => ({ data: state.template, error: null, isPending: false }),
   useDeleteMeeting: () => ({ mutateAsync: async (id: string) => { state.deleted.push(id) }, reset: vi.fn(), isPending: false, error: null }),
   useCreateMeeting: () => {
@@ -83,6 +110,8 @@ beforeEach(() => {
   state.updated = []
   state.deleted = []
   state.writeError = null
+  state.attendance = {}
+  state.attendanceWrites = []
 })
 
 describe('sharing a meeting', () => {
@@ -95,13 +124,13 @@ describe('sharing a meeting', () => {
     expect(screen.getByText(/For Chassis/)).toBeInTheDocument()
     await user.click(screen.getByText('Share this meeting'))
     expect(screen.getByLabelText('WhatsApp message')).toHaveValue(
-      '*Weekly build*\nWhen: Thu, 10 Sept 2026, 18:00\nWhere: Workshop\nFor: Chassis\n\n*Agenda*\n\n- Frame',
+      '*Weekly build*\nWhen: Thu, 10/09/26, 18:00\nWhere: Workshop\nFor: Chassis\n\n*Agenda*\n\n- Frame',
     )
     await user.click(screen.getByRole('button', { name: 'Copy WhatsApp text' }))
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining('*Weekly build*'))
     expect(await screen.findByText('WhatsApp text copied.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Copy email text' }))
-    expect(writeText).toHaveBeenLastCalledWith(expect.stringMatching(/^Subject: Weekly build, Thu, 10 Sept 2026, 18:00\n\nHi all,/))
+    expect(writeText).toHaveBeenLastCalledWith(expect.stringMatching(/^Subject: Weekly build, Thu, 10\/09\/26, 18:00\n\nHi all,/))
   })
 
   it('says so when the browser will not copy, and selects the text instead', async () => {
@@ -155,7 +184,7 @@ describe('the default agenda', () => {
     expect(await within(screen.getByTestId('template-view')).findByRole('heading', { name: 'Agenda' })).toBeInTheDocument()
   })
 
-  it('opens in a dialog only when asked, previews as it will read, and saves', async () => {
+  it('opens in a dialog only when asked, and saves what was written', async () => {
     state.can = { canCreateMeeting: true, canDeleteMeeting: true, canEditMeetingTemplate: true }
     renderPage()
     // No editor on the page itself.
@@ -165,8 +194,6 @@ describe('the default agenda', () => {
     const box = within(dialog).getByLabelText('Default agenda')
     await userEvent.clear(box)
     await userEvent.type(box, '## Safety{enter}{enter}- helmets')
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Preview' }))
-    expect(await within(dialog).findByRole('heading', { name: 'Safety' })).toBeInTheDocument()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save default agenda' }))
     await waitFor(() => expect(state.saved).toEqual(['## Safety\n\n- helmets']))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -219,7 +246,7 @@ describe('calling and editing a meeting', () => {
     expect(state.created).toEqual([])
   })
 
-  it('starts the agenda from the default agenda, previews it, and sends exactly what was typed', async () => {
+  it('starts the agenda from the default agenda and sends exactly what was typed', async () => {
     admin()
     const user = userEvent.setup()
     renderPage()
@@ -229,8 +256,6 @@ describe('calling and editing a meeting', () => {
     await user.type(dialog.getByLabelText('Name'), '  Weekly build  ')
     await user.type(dialog.getByLabelText('Date'), '2026-10-01')
     await user.type(dialog.getByLabelText('Agenda'), 'tyres')
-    await user.click(dialog.getAllByRole('button', { name: 'Preview' })[0])
-    expect(await dialog.findByRole('heading', { name: 'Agenda' })).toBeInTheDocument()
     await user.click(dialog.getByRole('button', { name: 'Add meeting' }))
     await waitFor(() => expect(state.created).toHaveLength(1))
     expect(state.created[0]).toEqual({
@@ -317,6 +342,61 @@ describe('calling and editing a meeting', () => {
     expect(screen.getByText('Meeting deleted.')).toBeInTheDocument()
   })
 
+  it('shows who came by name, and the old free text only for a meeting with no tick list', () => {
+    state.meetings = [meeting({ id: 'a' }), meeting({ id: 'b', title: 'Older', attendees: 'Ada and Bo' })]
+    state.attendance = { a: ['u2', 'u1', 'u3'] }
+    renderPage()
+    expect(screen.getByTestId('meeting-who-a')).toHaveTextContent('Who came (3): Ada Rider, Bo Wrench, Cy Old')
+    expect(screen.queryByTestId('meeting-who-b')).not.toBeInTheDocument()
+    expect(screen.getByText('Who came: Ada and Bo')).toBeInTheDocument()
+  })
+
+  it('ticks who came when editing, and saves the list with the meeting', async () => {
+    admin()
+    state.meetings = [meeting({ id: 'a' })]
+    state.attendance = { a: ['u1'] }
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(screen.getByRole('button', { name: 'Edit Weekly build' }))
+    const dialog = within(screen.getByRole('dialog'))
+    expect(dialog.getByRole('checkbox', { name: 'Ada Rider' })).toBeChecked()
+    expect(dialog.getByRole('checkbox', { name: 'Bo Wrench' })).not.toBeChecked()
+    // Retired members are not offered, unless they were already ticked.
+    expect(dialog.queryByRole('checkbox', { name: /Cy Old/ })).not.toBeInTheDocument()
+    await user.click(dialog.getByRole('checkbox', { name: 'Bo Wrench' }))
+    expect(dialog.getByTestId('attendance-count')).toHaveTextContent('2 of 2 came')
+    await user.click(dialog.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(state.attendanceWrites).toHaveLength(1))
+    expect(state.attendanceWrites[0].meetingId).toBe('a')
+    expect([...state.attendanceWrites[0].memberIds].sort()).toEqual(['u1', 'u2'])
+    expect(state.updated).toHaveLength(1)
+  })
+
+  it('leaves the saved list alone when nothing was ticked or unticked', async () => {
+    admin()
+    state.meetings = [meeting({ id: 'a' })]
+    state.attendance = { a: ['u1'] }
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(screen.getByRole('button', { name: 'Edit Weekly build' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(state.updated).toHaveLength(1))
+    expect(state.attendanceWrites).toEqual([])
+  })
+
+  it('keeps the old free-text line visible, unchanged, beside the tick list', async () => {
+    admin()
+    state.meetings = [meeting({ id: 'a', attendees: 'Ada and Bo' })]
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(screen.getByRole('button', { name: 'Edit Weekly build' }))
+    const dialog = within(screen.getByRole('dialog'))
+    expect(dialog.getByTestId('legacy-attendees')).toHaveTextContent('Written before the tick list: Ada and Bo')
+    await user.click(dialog.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(state.updated).toHaveLength(1))
+    expect(state.updated[0]).toMatchObject({ attendees: 'Ada and Bo' })
+  })
+
   it('draws every element meeting notes use: sub-headings, numbered lists, code, quotes and emphasis', async () => {
     state.meetings = [meeting({ notes: '### Sub\n\n1. first\n2. second\n\n> quoted\n\n`code` and *soft* ~~gone~~\n\n---' })]
     renderPage()
@@ -327,37 +407,5 @@ describe('calling and editing a meeting', () => {
     expect(notes.querySelector('code')).toHaveTextContent('code')
     expect(notes.querySelector('em')).toHaveTextContent('soft')
     expect(notes.querySelector('hr')).not.toBeNull()
-  })
-})
-
-describe('formatting controls', () => {
-  it('writes the Markdown a person would type: a heading, points and sub-points on the current line, bold around the selection', async () => {
-    state.can = { canCreateMeeting: true, canDeleteMeeting: false, canEditMeetingTemplate: false }
-    const user = userEvent.setup()
-    renderPage()
-    await user.click(screen.getByRole('button', { name: 'New meeting' }))
-    const dialog = within(screen.getByRole('dialog'))
-    const minutes = dialog.getByLabelText('Minutes (optional)') as HTMLTextAreaElement
-    const tools = within(dialog.getByRole('toolbar', { name: 'Format Minutes (optional)' }))
-    // Each button puts the caret back a frame later, as in a browser.
-    const frame = () => new Promise((resolve) => requestAnimationFrame(resolve))
-    await user.type(minutes, 'Safety')
-    await user.click(tools.getByRole('button', { name: 'Heading' }))
-    expect(minutes).toHaveValue('## Safety')
-    await frame()
-    await user.type(minutes, '{End}{enter}helmets')
-    await frame()
-    minutes.setSelectionRange(minutes.value.length, minutes.value.length)
-    await user.click(tools.getByRole('button', { name: /Sub-point/ }))
-    expect(minutes).toHaveValue('## Safety\n  - helmets')
-    // A point replaces the sub-point marker instead of stacking another one.
-    await frame()
-    minutes.setSelectionRange(minutes.value.length, minutes.value.length)
-    await user.click(tools.getByRole('button', { name: /• Point/ }))
-    expect(minutes).toHaveValue('## Safety\n- helmets')
-    await frame()
-    minutes.setSelectionRange(12, 19)
-    await user.click(tools.getByRole('button', { name: 'Bold' }))
-    expect(minutes).toHaveValue('## Safety\n- **helmets**')
   })
 })

@@ -87,7 +87,7 @@ describe('Inbox', () => {
     renderInbox()
     await user.click(screen.getByTestId('notification-8'))
     expect(state.marked).toEqual([])
-    expect(screen.getByTestId('where')).toHaveTextContent('/proposals?scope=mine&view=history')
+    expect(screen.getByTestId('where')).toHaveTextContent('/board?proposals=1&pscope=mine&view=history')
   })
 
   it('marks everything read at once', async () => {

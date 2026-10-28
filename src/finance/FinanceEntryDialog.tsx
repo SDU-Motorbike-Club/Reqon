@@ -19,7 +19,7 @@ type Field = 'date' | 'description' | 'amount'
 
 // 16px on a phone, so iOS does not zoom the page when a field is tapped.
 const input =
-  'block min-h-11 w-full rounded border border-slate-300 bg-white px-2.5 text-base text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 aria-invalid:border-red-600 sm:min-h-9 sm:text-sm'
+  'block min-h-11 w-full rounded border border-slate-300 bg-surface px-2.5 text-base text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring aria-invalid:border-red-600 sm:min-h-9 sm:text-sm'
 const label = 'block text-sm font-medium text-slate-900'
 
 // Adding or editing one ledger entry. Only the Treasurer is ever shown this;
@@ -148,7 +148,7 @@ function EntryForm({
           {(['expense', 'income'] as const).map((value) => (
             <label
               key={value}
-              className="flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-800 has-checked:border-slate-900 has-checked:bg-slate-900 has-checked:text-white has-focus-visible:ring-2 has-focus-visible:ring-slate-500 has-focus-visible:ring-offset-2"
+              className="flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-800 has-checked:border-slate-900 has-checked:bg-accent has-checked:text-white has-focus-visible:ring-2 has-focus-visible:ring-accent-ring has-focus-visible:ring-offset-2"
             >
               <input
                 type="radio"

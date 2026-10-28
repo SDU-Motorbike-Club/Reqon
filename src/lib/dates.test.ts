@@ -77,7 +77,7 @@ describe('formatDay', () => {
     // suffix on purpose (`${iso}T00:00:00`, no Z) so a plain YYYY-MM-DD never
     // shifts a day backwards for a reader west of UTC.
     withTZ('Etc/GMT+12', () => {
-      expect(formatDay('2026-09-09')).toBe('9 Sept 2026')
+      expect(formatDay('2026-09-09')).toBe('09/09/26')
     })
   })
 
