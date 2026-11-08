@@ -30,6 +30,7 @@ vi.mock('../data/useSubteams.ts', () => ({
     ],
   }),
 }))
+vi.mock('../data/useTasks.ts', () => ({ useTasks: () => ({ data: [] }) }))
 vi.mock('../data/useMembers.ts', () => ({
   useMembers: () => ({
     data: [
@@ -72,6 +73,8 @@ vi.mock('../data/useMeetings.ts', async () => {
     }
   },
   useUpdateMeeting: () => ({ mutateAsync: async (draft: Record<string, unknown>) => { state.updated.push(draft) }, reset: vi.fn(), isPending: false, error: null }),
+  // The model call is the Edge Function's (supabase/functions/summarize-meeting); here it answers at once.
+  useSummarizeMeeting: () => ({ mutate: (_input: unknown, options?: { onSuccess?: (s: string) => void }) => options?.onSuccess?.('Drafted.'), reset: vi.fn(), isPending: false, error: null }),
   useSaveMeetingTemplate: () => {
     const [error, setError] = useState<Error | null>(null)
     return {
@@ -122,6 +125,7 @@ describe('sharing a meeting', () => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     renderPage()
     expect(screen.getByText(/For Chassis/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Weekly build' }))
     await user.click(screen.getByText('Share this meeting'))
     expect(screen.getByLabelText('WhatsApp message')).toHaveValue(
       '*Weekly build*\nWhen: Thu, 10/09/26, 18:00\nWhere: Workshop\nFor: Chassis\n\n*Agenda*\n\n- Frame',
@@ -138,6 +142,7 @@ describe('sharing a meeting', () => {
     const user = userEvent.setup()
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) }, configurable: true })
     renderPage()
+    await user.click(screen.getByRole('button', { name: 'Weekly build' }))
     await user.click(screen.getByText('Share this meeting'))
     await user.click(screen.getByRole('button', { name: 'Copy WhatsApp text' }))
     expect(await screen.findByText(/Could not copy on its own/)).toBeInTheDocument()
@@ -148,6 +153,7 @@ describe('reading a meeting', () => {
   it('draws stored Markdown as headings, paragraphs and nested lists', async () => {
     state.meetings = [meeting({ agenda: '## Build status\n\nWhere we are.\n\n- Frame\n  - welds checked\n  - jig ordered\n- Fairing', notes: '**Decided:** order tyres.' })]
     renderPage()
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Weekly build' }))
     const agenda = await screen.findByTestId('meeting-agenda-m1')
     // A heading one level below the meeting's own title.
     expect(await within(agenda).findByRole('heading', { level: 4, name: 'Build status' })).toBeInTheDocument()
@@ -161,6 +167,7 @@ describe('reading a meeting', () => {
   it('never renders raw HTML or a script link from the stored text', async () => {
     state.meetings = [meeting({ agenda: 'Hi <img src="x" onerror="alert(1)"> <script>alert(2)</script>\n\n[click](javascript:alert(3)) and [site](https://example.org)' })]
     renderPage()
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Weekly build' }))
     const agenda = await screen.findByTestId('meeting-agenda-m1')
     await within(agenda).findByRole('link', { name: /site/ })
     expect(agenda.querySelector('img, script')).toBeNull()
@@ -260,7 +267,7 @@ describe('calling and editing a meeting', () => {
     await waitFor(() => expect(state.created).toHaveLength(1))
     expect(state.created[0]).toEqual({
       title: 'Weekly build', heldOn: '2026-10-01', startsAt: null, endsAt: null, location: null, subteamKey: null,
-      agenda: '## Agenda\n\n- tyres', notes: null, attendees: null,
+      agenda: '## Agenda\n\n- tyres', notes: null, summary: null, attendees: null,
     })
     expect(screen.getByText('Meeting added.')).toBeInTheDocument()
   })
@@ -302,8 +309,58 @@ describe('calling and editing a meeting', () => {
     state.meetings = [meeting({ held_on: '2020-01-01' })]
     const user = userEvent.setup()
     renderPage()
-    await user.click(screen.getByRole('button', { name: 'Edit Weekly build' }))
+    await user.click(screen.getByRole('button', { name: 'Weekly build' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit Weekly build' }))
     expect(within(screen.getByRole('dialog')).queryByTestId('past-date-warning')).not.toBeInTheDocument()
+  })
+
+  it('splits meetings into Upcoming (soonest first) and Past (newest first)', () => {
+    state.meetings = [
+      meeting({ id: 'far', title: 'Far', held_on: '2099-12-01' }),
+      meeting({ id: 'soon', title: 'Soon', held_on: '2099-01-01' }),
+      meeting({ id: 'old', title: 'Old', held_on: '2020-01-01' }),
+    ]
+    renderPage()
+    const upcoming = screen.getByRole('region', { name: 'Upcoming (2)' })
+    expect(within(upcoming).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Soon', 'Far'])
+    expect(within(screen.getByRole('region', { name: 'Past (1)' })).getByText('Old')).toBeInTheDocument()
+  })
+
+  it('fills the agenda with the task sections once a date is chosen, and keeps what was written', async () => {
+    admin()
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(screen.getByRole('button', { name: 'New meeting' }))
+    const dialog = within(screen.getByRole('dialog'))
+    const generate = dialog.getByRole('button', { name: 'Generate agenda from tasks' })
+    expect(generate).toBeDisabled()
+    await user.type(dialog.getByLabelText('Date'), '2026-10-01')
+    await user.click(generate)
+    const agenda = dialog.getByLabelText('Agenda') as HTMLTextAreaElement
+    expect(agenda.value).toContain('## Agenda')
+    expect(agenda.value).toContain('## Tasks to review')
+    expect(agenda.value).toContain('### Blocked and cancelled')
+  })
+
+  it('shows the 8 most recent past meetings, and the older ones on request', async () => {
+    const user = userEvent.setup()
+    state.meetings = Array.from({ length: 11 }, (_, i) =>
+      meeting({ id: `p${i}`, title: `Past ${i}`, held_on: `2020-01-${String(20 - i).padStart(2, '0')}` }),
+    )
+    renderPage()
+    const past = screen.getByRole('region', { name: 'Past (11)' })
+    expect(within(past).getAllByRole('heading', { level: 3 })).toHaveLength(8)
+    await user.click(screen.getByRole('button', { name: 'Show 3 older meetings' }))
+    expect(within(past).getAllByRole('heading', { level: 3 })).toHaveLength(11)
+    await user.click(screen.getByRole('button', { name: 'Show fewer' }))
+    expect(within(past).getAllByRole('heading', { level: 3 })).toHaveLength(8)
+  })
+
+  it('shows no heading for an empty group', () => {
+    state.meetings = [meeting({ held_on: '2020-01-01' })]
+    renderPage()
+    expect(screen.queryByRole('region', { name: /^Upcoming/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Past (1)' })).toBeInTheDocument()
   })
 
   it('keeps what was typed when the save is refused', async () => {
@@ -325,7 +382,8 @@ describe('calling and editing a meeting', () => {
     state.meetings = [meeting({ agenda: '## Old', notes: 'Decided things', attendees: 'Ada' })]
     const user = userEvent.setup()
     renderPage()
-    await user.click(screen.getByRole('button', { name: 'Edit Weekly build' }))
+    await user.click(screen.getByRole('button', { name: 'Weekly build' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit Weekly build' }))
     const dialog = within(screen.getByRole('dialog'))
     expect(dialog.getByLabelText('Name')).toHaveValue('Weekly build')
     expect(dialog.getByLabelText('Starts (optional)')).toHaveValue('18:00')
@@ -335,41 +393,132 @@ describe('calling and editing a meeting', () => {
     await waitFor(() => expect(state.updated).toHaveLength(1))
     expect(state.updated[0]).toMatchObject({ id: 'm1', title: 'Weekly build', location: null, notes: 'Decided things' })
 
-    await user.click(screen.getByRole('button', { name: 'Delete Weekly build' }))
+    await user.click(screen.getByRole('button', { name: 'Weekly build' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete Weekly build' }))
     expect(state.deleted).toEqual([])
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete meeting' }))
     await waitFor(() => expect(state.deleted).toEqual(['m1']))
     expect(screen.getByText('Meeting deleted.')).toBeInTheDocument()
   })
 
-  it('shows who came by name, and the old free text only for a meeting with no tick list', () => {
+  it('shows who came by name, and the old free text only for a meeting with no tick list', async () => {
+    const user = userEvent.setup()
     state.meetings = [meeting({ id: 'a' }), meeting({ id: 'b', title: 'Older', attendees: 'Ada and Bo' })]
     state.attendance = { a: ['u2', 'u1', 'u3'] }
     renderPage()
+    await user.click(screen.getByRole('button', { name: 'Weekly build' }))
     expect(screen.getByTestId('meeting-who-a')).toHaveTextContent('Who came (3): Ada Rider, Bo Wrench, Cy Old')
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    await user.click(screen.getByRole('button', { name: 'Older' }))
     expect(screen.queryByTestId('meeting-who-b')).not.toBeInTheDocument()
     expect(screen.getByText('Who came: Ada and Bo')).toBeInTheDocument()
   })
 
-  it('ticks who came when editing, and saves the list with the meeting', async () => {
+  it('shows a written summary on the card, a placeholder for a meeting still to come, and opens the detail on a click', async () => {
+    const user = userEvent.setup()
+    state.meetings = [
+      meeting({ id: 'f', title: 'Future one', held_on: '2999-01-01' }),
+      meeting({ id: 'p', title: 'Past one', held_on: '2020-01-01', summary: 'Agreed the budget.', agenda: '- Budget' }),
+      meeting({ id: 'q', title: 'Quiet one', held_on: '2020-01-02' }),
+    ]
+    renderPage()
+    expect(screen.getByTestId('meeting-summary-f')).toHaveTextContent('Summary will appear after the meeting.')
+    expect(screen.getByTestId('meeting-summary-p')).toHaveTextContent('Agreed the budget.')
+    expect(screen.getByTestId('meeting-summary-q')).toHaveTextContent('No summary yet.')
+    await user.click(screen.getByRole('button', { name: 'Past one' }))
+    const dialog = within(screen.getByRole('dialog'))
+    expect(dialog.getByRole('heading', { name: 'Past one' })).toBeInTheDocument()
+    expect(dialog.getByTestId('meeting-summary-p')).toHaveTextContent('Agreed the budget.')
+  })
+
+  it('drafts a summary into the form and saves exactly what is in the box', async () => {
+    const user = userEvent.setup()
+    state.can = { canCreateMeeting: true, canDeleteMeeting: false, canEditMeetingTemplate: false }
+    state.meetings = [meeting({ notes: 'Decided things' })]
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Weekly build' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit Weekly build' }))
+    const dialog = within(screen.getByRole('dialog'))
+    await user.click(dialog.getByRole('button', { name: 'Write a summary' }))
+    expect(dialog.getByLabelText('Summary (optional)')).toHaveValue('Drafted.')
+    await user.click(dialog.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(state.updated).toHaveLength(1))
+    expect(state.updated[0]).toMatchObject({ id: 'm1', summary: 'Drafted.' })
+  })
+
+  it('lists who did not come, and taking someone off the list saves them as having come', async () => {
     admin()
     state.meetings = [meeting({ id: 'a' })]
     state.attendance = { a: ['u1'] }
     const user = userEvent.setup()
     renderPage()
-    await user.click(screen.getByRole('button', { name: 'Edit Weekly build' }))
+    await user.click(screen.getByRole('button', { name: 'Weekly build' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit Weekly build' }))
     const dialog = within(screen.getByRole('dialog'))
-    expect(dialog.getByRole('checkbox', { name: 'Ada Rider' })).toBeChecked()
-    expect(dialog.getByRole('checkbox', { name: 'Bo Wrench' })).not.toBeChecked()
-    // Retired members are not offered, unless they were already ticked.
-    expect(dialog.queryByRole('checkbox', { name: /Cy Old/ })).not.toBeInTheDocument()
-    await user.click(dialog.getByRole('checkbox', { name: 'Bo Wrench' }))
+    // Only Bo was away; Ada came. Retired members are not offered unless they were already recorded.
+    expect(within(dialog.getByTestId('absent-list')).getByText('Bo Wrench')).toBeInTheDocument()
+    expect(dialog.queryByText(/Cy Old/)).not.toBeInTheDocument()
+    expect(dialog.getByTestId('attendance-count')).toHaveTextContent('1 of 2 came')
+    await user.click(dialog.getByRole('button', { name: /Remove Bo Wrench from the list/ }))
     expect(dialog.getByTestId('attendance-count')).toHaveTextContent('2 of 2 came')
+    expect(dialog.queryByTestId('absent-list')).not.toBeInTheDocument()
     await user.click(dialog.getByRole('button', { name: 'Save changes' }))
     await waitFor(() => expect(state.attendanceWrites).toHaveLength(1))
     expect(state.attendanceWrites[0].meetingId).toBe('a')
     expect([...state.attendanceWrites[0].memberIds].sort()).toEqual(['u1', 'u2'])
     expect(state.updated).toHaveLength(1)
+  })
+
+  it('finds an absentee by searching, adds them to the list, and saves everyone else as present', async () => {
+    admin()
+    state.meetings = [meeting({ id: 'a' })]
+    state.attendance = { a: ['u1', 'u2'] }
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(screen.getByRole('button', { name: 'Weekly build' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit Weekly build' }))
+    const dialog = within(screen.getByRole('dialog'))
+    expect(dialog.getByTestId('attendance-count')).toHaveTextContent('2 of 2 came')
+    await user.type(dialog.getByRole('combobox', { name: /didn’t come/ }), 'wre')
+    // Only people still counted as present match, and picking one adds them to the list.
+    expect(within(dialog.getByRole('listbox', { name: 'People who came' })).getAllByRole('option')).toHaveLength(1)
+    await user.click(dialog.getByRole('option', { name: 'Bo Wrench' }))
+    expect(within(dialog.getByTestId('absent-list')).getByText('Bo Wrench')).toBeInTheDocument()
+    expect(dialog.getByTestId('attendance-count')).toHaveTextContent('1 of 2 came')
+    await user.click(dialog.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(state.attendanceWrites).toHaveLength(1))
+    expect([...state.attendanceWrites[0].memberIds]).toEqual(['u1'])
+  })
+
+  it('picks with the keyboard, and Enter in the search never submits the meeting', async () => {
+    admin()
+    state.meetings = [meeting({ id: 'a' })]
+    state.attendance = { a: ['u1', 'u2'] }
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(screen.getByRole('button', { name: 'Weekly build' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit Weekly build' }))
+    const dialog = within(screen.getByRole('dialog'))
+    await user.type(dialog.getByRole('combobox', { name: /didn’t come/ }), '{ArrowDown}{Enter}')
+    expect(within(dialog.getByTestId('absent-list')).getByText('Bo Wrench')).toBeInTheDocument()
+    expect(state.updated).toEqual([])
+  })
+
+  it('says a new meeting has no attendance yet, and the first absentee records it with everyone else present', async () => {
+    admin()
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(screen.getByRole('button', { name: 'New meeting' }))
+    const dialog = within(screen.getByRole('dialog'))
+    expect(dialog.getByTestId('attendance-count')).toHaveTextContent('Not recorded yet')
+    expect(dialog.queryByTestId('absent-list')).not.toBeInTheDocument()
+    await user.click(dialog.getByRole('combobox', { name: /didn’t come/ }))
+    await user.click(dialog.getByRole('option', { name: 'Bo Wrench' }))
+    expect(dialog.getByTestId('attendance-count')).toHaveTextContent('1 of 2 came')
+    expect(within(dialog.getByTestId('absent-list')).getByText('Bo Wrench')).toBeInTheDocument()
+    await user.click(dialog.getByRole('button', { name: 'Everyone came' }))
+    expect(dialog.getByTestId('attendance-count')).toHaveTextContent('2 of 2 came')
+    expect(dialog.queryByTestId('absent-list')).not.toBeInTheDocument()
   })
 
   it('leaves the saved list alone when nothing was ticked or unticked', async () => {
@@ -378,20 +527,22 @@ describe('calling and editing a meeting', () => {
     state.attendance = { a: ['u1'] }
     const user = userEvent.setup()
     renderPage()
-    await user.click(screen.getByRole('button', { name: 'Edit Weekly build' }))
+    await user.click(screen.getByRole('button', { name: 'Weekly build' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit Weekly build' }))
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save changes' }))
     await waitFor(() => expect(state.updated).toHaveLength(1))
     expect(state.attendanceWrites).toEqual([])
   })
 
-  it('keeps the old free-text line visible, unchanged, beside the tick list', async () => {
+  it('keeps the old free-text line visible, unchanged, beside the attendance list', async () => {
     admin()
     state.meetings = [meeting({ id: 'a', attendees: 'Ada and Bo' })]
     const user = userEvent.setup()
     renderPage()
-    await user.click(screen.getByRole('button', { name: 'Edit Weekly build' }))
+    await user.click(screen.getByRole('button', { name: 'Weekly build' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit Weekly build' }))
     const dialog = within(screen.getByRole('dialog'))
-    expect(dialog.getByTestId('legacy-attendees')).toHaveTextContent('Written before the tick list: Ada and Bo')
+    expect(dialog.getByTestId('legacy-attendees')).toHaveTextContent('Written before attendance was recorded here: Ada and Bo')
     await user.click(dialog.getByRole('button', { name: 'Save changes' }))
     await waitFor(() => expect(state.updated).toHaveLength(1))
     expect(state.updated[0]).toMatchObject({ attendees: 'Ada and Bo' })
@@ -400,6 +551,7 @@ describe('calling and editing a meeting', () => {
   it('draws every element meeting notes use: sub-headings, numbered lists, code, quotes and emphasis', async () => {
     state.meetings = [meeting({ notes: '### Sub\n\n1. first\n2. second\n\n> quoted\n\n`code` and *soft* ~~gone~~\n\n---' })]
     renderPage()
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Weekly build' }))
     const notes = await screen.findByTestId('meeting-notes-m1')
     expect(await within(notes).findByRole('heading', { level: 5, name: 'Sub' })).toBeInTheDocument()
     expect(notes.querySelector('ol')?.children).toHaveLength(2)

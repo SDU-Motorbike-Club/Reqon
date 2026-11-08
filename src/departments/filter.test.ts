@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { ALL_DEPARTMENTS, departmentChoices, resolveDepartmentParam } from './filter.ts'
+import { ALL_DEPARTMENTS, departmentChoices, resolveDepartmentParam, splitDepartmentName } from './filter.ts'
+
+describe('splitDepartmentName', () => {
+  it.each([
+    ['Software & Data Acquisition', 'Software', '& Data Acquisition'],
+    ['Mechanical Design & Testing', 'Mechanical Design', '& Testing'],
+    ['Manufacturing and Assembly', 'Manufacturing', 'and Assembly'],
+    ['Aerodynamics', 'Aerodynamics', ''],
+    ['All departments', 'All departments', ''],
+    ['Brakes & Wheels (archived)', 'Brakes', '& Wheels (archived)'],
+    ['Sandwiches', 'Sandwiches', ''],
+  ])('%s → "%s" + "%s"', (name, head, rest) => {
+    expect(splitDepartmentName(name)).toEqual({ head, rest })
+  })
+})
 
 const departments = [
   { key: 'AERO', name: 'Aerodynamics', archived_at: null },

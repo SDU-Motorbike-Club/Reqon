@@ -16,6 +16,7 @@ import { AttachmentsSection } from '../../attachments/AttachmentsSection.tsx'
 import { buttonDanger, buttonPrimary, buttonSecondary } from '../../ui/buttons.ts'
 import { ActionError } from '../../ui/states.tsx'
 import { DepartmentMove, FIRST_ASSIGNMENT_REASON } from './DepartmentMove.tsx'
+import { ParentSelect } from './ParentSelect.tsx'
 import { TaskPicker } from './TaskPicker.tsx'
 import { MAX_BLOCKER_REASON, planTaskEdit, type EditPlan } from './taskEditPlan.ts'
 
@@ -505,6 +506,7 @@ export function TaskDetails(props: Props) {
         </h4>
         {perms.canEdit ? (
           <div className="mt-1 space-y-3">
+            <ParentSelect task={task} />
             <div>
               <label htmlFor={fid('milestone')} className={LABEL}>
                 Milestone

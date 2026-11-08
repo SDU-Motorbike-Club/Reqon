@@ -6,8 +6,8 @@ const RichTextEditor = lazy(() => import('./RichTextEditor.tsx'))
 
 // How tall the writing area is. Written out in full so Tailwind sees the classes.
 const HEIGHT = {
-  large: 'min-h-[22rem] max-h-[60dvh]',
-  medium: 'min-h-[12rem] max-h-[40dvh]',
+  large: 'min-h-[14rem] max-h-[50dvh] sm:min-h-[22rem] sm:max-h-[60dvh]',
+  medium: 'min-h-[10rem] max-h-[40dvh] sm:min-h-[12rem]',
 } as const
 
 export function RichTextField({

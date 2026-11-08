@@ -117,7 +117,7 @@ function ActionList({
   testId: string
 }) {
   return (
-    <section aria-label={title} className="rounded-lg border border-slate-200 bg-surface p-3" data-testid={testId}>
+    <section aria-label={title} className="rounded-lg border border-slate-200 bg-surface p-4" data-testid={testId}>
       <h2 className="flex items-baseline justify-between gap-2 text-sm font-semibold text-slate-900">
         <span>
           {title} {!source.isLoading && !source.error && <span className="font-normal text-slate-500 tabular-nums">({count})</span>}
@@ -154,7 +154,7 @@ function ActionList({
 // so the eye lands on the reason and not on the whole sentence.
 function Row({ to, title, meta, flag, tone }: { to: string; title: string; meta: string; flag?: string; tone?: 'bad' | 'warn' }) {
   return (
-    <li className="py-2">
+    <li className="py-2.5">
       <Link to={to} className="rounded text-[0.9375rem] font-medium leading-snug text-slate-950 underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring">
         {title}
       </Link>
@@ -385,8 +385,16 @@ export default function Now() {
   return (
     <main id="main-content" tabIndex={-1} className={pageMain()}>
       <PageHeader title="Now" description="What needs attention today — overdue and blocked work, the next deadlines, your own tasks, and how the requirements stand, chapter by chapter." />
+      {/* Raising work is a first-screen action, not something to find after five lists. */}
+      <p className="mb-4 text-sm text-slate-700">
+        Something needs deciding?{' '}
+        <Link to="/board?proposals=1&propose=1" className="font-medium underline underline-offset-2">
+          Propose a task
+        </Link>
+        .
+      </p>
 
-      <section aria-label="Instruments" data-tutorial="now-instruments" className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+      <section aria-label="Instruments" data-tutorial="now-instruments" className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
         <Tile testId="tile-overdue" to="/tasks?sort=due&dir=asc" label="Overdue" source={taskSource}
           value={valueOf(taskSource, () => String(overdue.length))} sub="Tasks past their deadline" tone={overdue.length > 0 ? 'bad' : 'plain'} />
         <Tile testId="tile-blocked" to="/tasks?state=blocked" label="Blocked" source={attention}
@@ -402,8 +410,22 @@ export default function Now() {
       </section>
 
       {/* What needs you comes first in reading order (and first on a phone); the long-term progress follows. */}
-      <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <div className="space-y-3" data-tutorial="now-actions">
+      <div className="mt-8 grid items-start gap-8 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <div className="space-y-4" data-tutorial="now-actions">
+          {/* "What do I do next?" is the commonest question, so a member's own tasks lead. The deadline is the row's
+              flag (red when late), the same as the Overdue list, instead of a word inside a grey sentence. */}
+          {myId && (
+            <ActionList title="My tasks" testId="now-mine" source={tasks} count={mine.length} empty="Nothing open is assigned to you."
+              more={{ to: '/board?scope=mine', label: 'Open my tasks' }}>
+              {mine.slice(0, 5).map((t) => (
+                <Row key={t.id} to={`/board?task=${encodeURIComponent(t.id)}`} title={t.title}
+                  meta={`${TASK_STATE_LABEL[t.state]} · ${dept(t.subteam_key)}`}
+                  flag={t.due_date ? `due ${formatDay(t.due_date)}` : 'no deadline'}
+                  tone={t.due_date && t.due_date < today ? 'bad' : undefined} />
+              ))}
+            </ActionList>
+          )}
+
           <ActionList title="Overdue" testId="now-overdue" source={taskSource} count={overdue.length} empty="Nothing is past its deadline."
             more={{ to: '/tasks?sort=due&dir=asc', label: 'All overdue' }}>
             {overdue.slice(0, 5).map((a) => (
@@ -429,16 +451,6 @@ export default function Now() {
             ))}
           </ActionList>
 
-          {myId && (
-            <ActionList title="My tasks" testId="now-mine" source={tasks} count={mine.length} empty="Nothing open is assigned to you."
-              more={{ to: '/board?scope=mine', label: 'Open my tasks' }}>
-              {mine.slice(0, 5).map((t) => (
-                <Row key={t.id} to={`/board?task=${encodeURIComponent(t.id)}`} title={t.title}
-                  meta={`${TASK_STATE_LABEL[t.state]} · ${dept(t.subteam_key)}${t.due_date ? ` · due ${formatDay(t.due_date)}` : ' · no deadline'}`} />
-              ))}
-            </ActionList>
-          )}
-
           {isReviewer ? (
             <ActionList title="Proposals needing your review" testId="now-review" source={proposals} count={reviewQueue.length}
               empty="Nothing waits for your decision." more={{ to: '/board?proposals=1', label: 'Review on the Board' }}>
@@ -455,14 +467,6 @@ export default function Now() {
               ))}
             </ActionList>
           )}
-          <p className="text-xs text-slate-600">
-            Something needs deciding?{' '}
-            <Link to="/board?proposals=1&propose=1" className="font-medium underline underline-offset-2">
-              Propose a task
-            </Link>
-            .
-          </p>
-
           <section aria-label="Milestone scoring" className="rounded-lg border border-dashed border-slate-300 p-3 text-xs text-slate-600" data-testid="now-points">
             <p>
               <span className="font-medium text-slate-800">Milestone scoring:</span>{' '}

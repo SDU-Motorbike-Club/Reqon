@@ -1,15 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import type { Milestone, MilestoneSection } from '../../data/useMilestones.ts'
+import type { Milestone } from '../../data/useMilestones.ts'
 import type { Task, TaskState } from '../../data/useTasks.ts'
 import {
-  milestonePercent,
   milestoneSpan,
   monthTicks,
   placeBar,
   placeDay,
   progressOf,
   rangeDays,
-  sectionPercent,
   sectionSpan,
   shiftDay,
   spanOfDates,
@@ -25,11 +23,6 @@ function ms(over: Partial<Milestone> & { key: string }): Milestone {
     article_ref: null, opens_on: over.opens_on ?? null, due_on: over.due_on ?? null,
     max_points: 0, is_blocking: false, notes: null,
   } as Milestone
-}
-
-function section(id: string, drafted = false): MilestoneSection {
-  return { id, milestone_key: 'MS1-1', ordinal: 1, name: id, is_drafted: drafted,
-    owner_id: null, updated_at: '' } as MilestoneSection
 }
 
 function task(id: string, state: TaskState, sectionId: string | null, due: string | null = null): Task {
@@ -141,53 +134,6 @@ describe('progress', () => {
   it('says "nothing to count" with null, which is not the same as 0%', () => {
     expect(progressOf([]).percent).toBeNull()
     expect(progressOf([task('a', 'cancelled', 's1')]).percent).toBeNull()
-  })
-})
-
-describe('rolling up to sections and submissions', () => {
-  const sections = [section('s1'), section('s2', true)]
-  const tasks = [
-    task('a', 'done', 's1'),
-    task('b', 'todo', 's1'),
-    task('c', 'todo', null), // a board task belonging to no section
-  ]
-
-  it('takes a section’s percentage from its own subtasks', () => {
-    expect(sectionPercent(sections[0], tasks)).toBe(50)
-  })
-
-  it('falls back to the drafted tick where a section has no subtasks', () => {
-    expect(sectionPercent(sections[1], tasks)).toBe(100)
-    expect(sectionPercent(section('s3'), tasks)).toBe(0)
-  })
-
-  it('rolls a submission up from every subtask beneath it, ignoring loose tasks', () => {
-    // 1 of 2 done under s1; task 'c' is on the Board but under no section.
-    expect(milestonePercent(sections, tasks)).toBe(50)
-  })
-
-  it('counts an ARCHIVED Done task as complete and keeps an archived unfinished one in the denominator', () => {
-    const progress = [
-      { id: 'a', state: 'done', archived_at: '2026-09-01T00:00:00Z', section_id: null, milestone_key: 'MS1' },
-      { id: 'b', state: 'wip', archived_at: '2026-09-01T00:00:00Z', section_id: null, milestone_key: 'MS1' },
-      { id: 'c', state: 'done', archived_at: null, section_id: null, milestone_key: 'MS1' },
-      { id: 'd', state: 'cancelled', archived_at: null, section_id: null, milestone_key: 'MS1' },
-    ] as never[]
-    // done: a, c of 3 counted (b unfinished; cancelled d leaves entirely)
-    expect(milestonePercent([], progress, 'MS1')).toBe(67)
-  })
-
-  it('counts an unsectioned task attached to the milestone once, and a sectioned one once', () => {
-    const progress = [
-      { id: 'x', state: 'done', archived_at: null, section_id: null, milestone_key: 'MS1' },
-      { id: 'y', state: 'todo', archived_at: null, section_id: sections[0].id, milestone_key: 'MS1' },
-    ] as never[]
-    expect(milestonePercent(sections, progress, 'MS1')).toBe(50)
-  })
-
-  it('falls back to sections drafted when no subtask exists anywhere', () => {
-    expect(milestonePercent(sections, [])).toBe(50) // s2 drafted, s1 not
-    expect(milestonePercent([], [])).toBe(0)
   })
 })
 

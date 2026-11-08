@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { formatDay } from '../../lib/dates.ts'
 import { isUrgent, TASK_PRIORITY_BADGE_TONE, TASK_PRIORITY_LABEL } from '../../tasks/priority.ts'
 import type { Task, TaskState } from '../../tasks/types.ts'
 import { openPrerequisites } from '../../tasks/dependencies.ts'
+import { Avatar } from '../../ui/Avatar.tsx'
+import { TASK_DRAG_TYPE } from '../gantt/ganttDrag.ts'
 import { isOverdue } from './boardModel.ts'
 import type { TaskLinksView, TaskPermissions } from './TaskDetails.tsx'
 import { MoveControl } from './MoveControl.tsx'
@@ -12,6 +14,8 @@ type Props = {
   task: Task
   departmentName: string | null
   ownerName: string | null
+  // The owner's profile picture (a data: URL), or null: initials are drawn instead.
+  ownerImage?: string | null
   milestoneLabel: string | null
   requirementKeys: string[]
   source: { id: string; title: string } | null
@@ -28,6 +32,13 @@ type Props = {
   // while the card changes lane.
   detailsOpen: boolean
   onOpenDetails: () => void
+  // The card was dropped on Blocked without a reason or a prerequisite: ask for the reason (then clear the request).
+  askBlock?: boolean
+  onAskBlockDone?: () => void
+  // A subtask drawn inside its parent's card: no bubble of its own, just a divider above it.
+  nested?: boolean
+  // A parent card holds its subtasks (the toggle and the list) inside the same bubble, below the Details button.
+  children?: ReactNode
 }
 
 // A missing (legacy) value is shown as missing, in muted italics, never filled
@@ -36,10 +47,11 @@ function Missing({ children }: { children: string }) {
   return <span className="text-slate-500 italic">{children}</span>
 }
 
-// One compact card: title, priority badge, department, owner, deadline,
-// milestone and requirement count (the lane already says its state); longer text
-// and the editor open from Details. Movement is a <select> (no drag and drop:
-// unusable by keyboard, awkward on a phone), offered only to someone who may move the task.
+// One card: title, priority badge, dates, owner, department, milestone and
+// requirement count (the lane already says its state); longer text and the
+// editor open from Details. A task moves by dragging the card onto a lane, or with
+// the <select> (the way for a keyboard, a screen reader or a phone, where
+// dragging does not exist). Both are offered only to someone who may move the task.
 export function TaskCard(props: Props) {
   const { task, perms } = props
   const cardRef = useRef<HTMLLIElement>(null)
@@ -58,7 +70,13 @@ export function TaskCard(props: Props) {
     <li
       ref={cardRef}
       tabIndex={focused ? -1 : undefined}
-      className={`pc-lift rounded border bg-surface p-2 ${focused ? 'border-slate-900 ring-2 ring-slate-400' : 'border-slate-200'}`}
+      className={`${props.nested ? 'border-t border-slate-200 pt-3' : `pc-lift rounded border bg-surface p-3 ${focused ? 'border-slate-900 ring-2 ring-slate-400' : 'border-slate-200'}`} ${perms.canEdit ? 'cursor-grab active:cursor-grabbing' : ''} ${props.nested && focused ? 'rounded ring-2 ring-slate-400' : ''}`}
+      draggable={perms.canEdit}
+      onDragStart={(event) => {
+        event.stopPropagation()
+        event.dataTransfer.setData(TASK_DRAG_TYPE, task.id)
+        event.dataTransfer.effectAllowed = 'move'
+      }}
       data-testid={`task-${task.id}`}
       data-task-state={task.state}
       data-source-proposal={task.source_proposal ?? ''}
@@ -73,18 +91,28 @@ export function TaskCard(props: Props) {
         )}
       </p>
 
-      <dl className="mt-1 space-y-0.5 text-xs text-slate-700" data-testid={`task-facts-${task.id}`}>
-        <div className="flex flex-wrap gap-x-2">
-          <dt className="sr-only">Owner</dt>
-          <dd className="font-medium">{props.ownerName ?? <Missing>Unassigned</Missing>}</dd>
-          <dt className="sr-only">Department</dt>
-          <dd className="min-w-0 truncate">{props.departmentName ?? <Missing>No department</Missing>}</dd>
-        </div>
-        <div className="flex flex-wrap gap-x-2">
+      <dl className="mt-1.5 space-y-1.5 text-xs text-slate-700" data-testid={`task-facts-${task.id}`}>
+        {/* The dates come first: when it starts and when it is due is what decides what to pick up next. */}
+        <div className="flex flex-wrap gap-x-3">
+          {task.starts_on && (
+            <>
+              <dt className="sr-only">Start date</dt>
+              <dd className="text-slate-600">Start {formatDay(task.starts_on)}</dd>
+            </>
+          )}
           <dt className="sr-only">Deadline</dt>
-          <dd className={overdue ? 'font-semibold text-red-700' : undefined}>
+          <dd className={overdue ? 'font-semibold text-red-700' : 'font-medium text-slate-900'}>
             {task.due_date ? `${overdue ? '! ' : ''}Due ${formatDay(task.due_date)}${overdue ? ' · overdue' : ''}` : <Missing>No deadline</Missing>}
           </dd>
+        </div>
+        <div className="flex flex-wrap gap-x-2">
+          <dt className="sr-only">Owner</dt>
+          <dd className="inline-flex items-center gap-1.5 font-medium">
+            {props.ownerName ? <Avatar name={props.ownerName} image={props.ownerImage} size="xs" /> : null}
+            {props.ownerName ?? <Missing>Unassigned</Missing>}
+          </dd>
+          <dt className="sr-only">Department</dt>
+          <dd className="min-w-0 truncate">{props.departmentName ?? <Missing>No department</Missing>}</dd>
         </div>
         <div className="flex flex-wrap gap-x-2 text-[11px] text-slate-600">
           <dt className="sr-only">Milestone</dt>
@@ -126,8 +154,8 @@ export function TaskCard(props: Props) {
       )}
 
       {perms.canEdit && (
-        <div className="mt-2">
-          <MoveControl task={task} openPrerequisites={openCount} moving={props.moving} onMove={props.onMove} />
+        <div className="mt-3">
+          <MoveControl task={task} openPrerequisites={openCount} moving={props.moving} onMove={props.onMove} links={props.links} askBlock={props.askBlock} onAskBlockDone={props.onAskBlockDone} />
         </div>
       )}
 
@@ -142,6 +170,7 @@ export function TaskCard(props: Props) {
       >
         {perms.canEdit ? 'Details and edit' : 'Details'}
       </button>
+      {props.children}
     </li>
   )
 }

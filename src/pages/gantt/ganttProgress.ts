@@ -1,7 +1,6 @@
 import type { MilestoneSection } from '../../milestones/types.ts'
 import { taskProgress, tasksInMilestone } from '../../tasks/progress.ts'
 import type { Task } from '../../tasks/types.ts'
-import { draftedCount } from '../milestones/milestoneModel.ts'
 
 // Progress for milestones and sections, on the ONE shared rule (tasks/progress.ts):
 // distinct tasks, cancelled left out, archived Done counted as done, archived
@@ -16,6 +15,8 @@ import { draftedCount } from '../milestones/milestoneModel.ts'
 //
 // Feed the PROGRESS list (active + archived tasks), never the active Board list,
 // or archiving a Done task would make progress fall.
+// A submission with no tasks reports 'none'. Only a SECTION may still show its own
+// drafted tick (labelled as that), because the tick belongs to the section.
 export type ProgressSource = Pick<Task, 'id' | 'state' | 'archived_at' | 'section_id' | 'milestone_key'>
 
 // A progress row that also carries who owns it and which department, so the
@@ -62,18 +63,8 @@ export function milestoneProgress(
   const ids = new Set(sections.map((s) => s.id))
   const mine = tasksInMilestone(tasks, milestoneKey, ids)
   const { counted, ...rest } = fromTasks(mine)
-  if (counted > 0) return { basis: 'tasks', ...rest }
-
-  const { drafted, total } = draftedCount([...sections])
-  if (total === 0) return NOTHING
-  return {
-    basis: 'drafted',
-    percent: Math.round((drafted / total) * 100),
-    done: drafted,
-    total,
-    archivedDone: 0,
-    archivedUnfinished: 0,
-  }
+  // No tasks means no progress figure: a drafted section is not done work, so it no longer stands in for one.
+  return counted > 0 ? { basis: 'tasks', ...rest } : NOTHING
 }
 
 // A section: the tasks linked to it; with none, its own drafted tick.
@@ -117,7 +108,7 @@ export function progressLabel(
   unit: 'submission' | 'section' = 'submission',
   tick: 'drafted' | 'done' = 'drafted',
 ): string {
-  if (view.basis === 'none') return 'No linked work'
+  if (view.basis === 'none') return 'No tasks yet'
   if (view.basis === 'drafted') {
     const word = view.done === 1 ? tick : `not ${tick}`
     return unit === 'section'

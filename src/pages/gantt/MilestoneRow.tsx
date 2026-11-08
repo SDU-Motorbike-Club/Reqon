@@ -54,12 +54,7 @@ export function MilestoneRow({
   const far = !open && marks.deadline !== null && daysUntil(marks.deadline, env.today) > 60
   const unsectionedKey = `unsectioned:${milestone.key}`
 
-  const badge =
-    progress.basis === 'tasks'
-      ? `Overall ${progress.percent}%`
-      : progress.basis === 'drafted'
-        ? `${progress.done}/${progress.total} drafted`
-        : 'No linked work'
+  const badge = progress.basis === 'tasks' ? `Overall ${progress.percent}%` : 'No tasks yet'
 
   return (
     <li className={`border-b border-slate-100 py-2 last:border-0 ${far ? 'opacity-70 transition-opacity focus-within:opacity-100 hover:opacity-100' : ''}`} data-testid={`gantt-milestone-${milestone.key}`}>
@@ -93,7 +88,7 @@ export function MilestoneRow({
                 data-testid={`gantt-lens-${milestone.key}`}
                 className="rounded-full border border-slate-400 bg-surface px-2 py-0.5 text-xs text-slate-800"
               >
-                {lens.basis === 'tasks' ? `${env.lens.name}: ${lens.done} of ${lens.total} done` : `${env.lens.name}: no linked work`}
+                {lens.basis === 'tasks' ? `${env.lens.name}: ${lens.done} of ${lens.total} done` : `${env.lens.name}: no tasks yet`}
               </span>
             )}
           </span>

@@ -8,6 +8,7 @@ import { LinkTaskTool } from './LinkTaskTool.tsx'
 import type { GanttEnv } from './ganttEnv.ts'
 import { currentTargetKey, linkCandidates, relinkFrom } from './ganttLinking.ts'
 import { progressLabel, sectionProgress, tasksUnderSection, type ProgressSource } from './ganttProgress.ts'
+import { nestUnderParents } from '../../tasks/hierarchy.ts'
 
 // One milestone section: its drafted tick, its bar, and — when open — its Board
 // tasks and the tool that links an existing one. Progress comes from ALL linked
@@ -92,12 +93,14 @@ export function SectionRow({
 
       {open && (
         <>
-          {shown.map((task) => {
+          {nestUnderParents(shown, tasks).map(({ task, nested, partOf }) => {
             const perms = env.permsFor(task)
             return (
               <GanttTaskRow
                 key={task.id}
                 task={task}
+                indent={nested ? 'pl-20' : undefined}
+                partOf={partOf}
                 today={env.today}
                 departmentName={task.subteam_key ? (env.departmentNames.get(task.subteam_key) ?? task.subteam_key) : null}
                 ownerName={task.owner_id ? (env.memberNames.get(task.owner_id) ?? 'Unknown member') : null}
@@ -139,7 +142,7 @@ export function SectionRow({
 
           {underAll.length === 0 && (
             <p className="sticky left-0 z-10 w-fit bg-surface pl-12 text-[11px] text-slate-600">
-              No subtasks yet.{env.canManage ? ' Link an existing Board task below.' : ''}
+              No tasks yet.{env.canManage ? ' Link an existing Board task below.' : ''}
             </p>
           )}
           {under.length > 0 && shown.length === 0 && (

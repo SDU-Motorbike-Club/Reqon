@@ -216,6 +216,7 @@ export type ProgressTask = Pick<
   | 'priority'
   | 'owner_id'
   | 'subteam_key'
+  | 'parent_id'
 >
 
 export type ProgressTasks = { data: ProgressTask[] | undefined; isLoading: boolean; error: Error | null }
@@ -233,7 +234,7 @@ export function useTasksForProgress(): ProgressTasks {
         (from, to) =>
           supabase
             .from('tasks')
-            .select('id, state, archived_at, section_id, milestone_key, title, priority, owner_id, subteam_key')
+            .select('id, state, archived_at, section_id, milestone_key, title, priority, owner_id, subteam_key, parent_id')
             .eq('season_id', seasonId as string)
             .not('archived_at', 'is', null)
             .order('id')

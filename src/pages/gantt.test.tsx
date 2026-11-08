@@ -14,7 +14,13 @@ const { updateTask, updateTaskAsync, who, state, deps } = vi.hoisted(() => ({
   updateTask: vi.fn(),
   updateTaskAsync: vi.fn(async () => {}),
   who: { id: 'm1', roles: [] as string[] },
-  state: { loadError: null as Error | null },
+  state: {
+    loadError: null as Error | null,
+    progressLoading: false,
+    anonymous: false,
+    updateError: null as Error | null,
+    updateVars: undefined as { id: string } | undefined,
+  },
   deps: { links: [] as { task_id: string; depends_on_task_id: string }[], extraSections: [] as Record<string, unknown>[] },
 }))
 
@@ -55,7 +61,10 @@ let tasks: ReturnType<typeof task>[]
 let archived: ReturnType<typeof task>[]
 
 vi.mock('../auth/context.ts', () => ({
-  useAuth: () => ({ status: 'member', user: { id: who.id }, member: { id: who.id, status: 'active' }, roles: who.roles }),
+  useAuth: () =>
+    state.anonymous
+      ? { status: 'signedOut', roles: [] }
+      : { status: 'member', user: { id: who.id }, member: { id: who.id, status: 'active' }, roles: who.roles },
 }))
 vi.mock('../season/context.ts', () => ({ useSeasonId: () => 's', useSeason: () => ({ status: 'ready', seasonId: 's' }) }))
 vi.mock('../data/useMembers.ts', () => ({ useMembers: () => ({ data: MEMBERS, isLoading: false, error: null }) }))
@@ -72,11 +81,18 @@ vi.mock('../data/useMilestones.ts', () => ({
 }))
 vi.mock('../data/useTaskHistory.ts', () => ({
   // Active AND archived tasks, for progress only.
-  useTasksForProgress: () => ({ data: [...tasks, ...archived], isLoading: false, error: null }),
+  useTasksForProgress: () => ({ data: state.progressLoading ? undefined : [...tasks, ...archived], isLoading: state.progressLoading, error: null }),
 }))
 vi.mock('../data/useTasks.ts', () => ({
   useTasks: () => ({ data: tasks, isLoading: false, error: null, seasonId: 's', refetch: vi.fn() }),
-  useUpdateTask: () => ({ mutate: updateTask, mutateAsync: updateTaskAsync, isPending: false, error: null }),
+  useUpdateTask: () => ({
+    mutate: updateTask,
+    mutateAsync: updateTaskAsync,
+    isPending: false,
+    error: state.updateError,
+    isError: state.updateError !== null,
+    variables: state.updateVars,
+  }),
 }))
 
 const { default: Gantt } = await import('./Gantt.tsx')
@@ -100,6 +116,10 @@ beforeEach(() => {
   // Plain members (no role, no department) only view — see 'view only'.
   who.roles = ['treasurer']
   state.loadError = null
+  state.progressLoading = false
+  state.anonymous = false
+  state.updateError = null
+  state.updateVars = undefined
   deps.links = []
   deps.extraSections = []
   tasks = [
@@ -125,6 +145,73 @@ afterEach(() => {
 async function open(user: ReturnType<typeof userEvent.setup>, ...names: RegExp[]) {
   for (const name of names) await user.click(screen.getByRole('button', { name }))
 }
+
+describe('honest filters, progress and failures', () => {
+  it('"My tasks" without a roster row says so and shows everything, instead of labelling all tasks as mine', () => {
+    state.anonymous = true
+    renderGantt('/gantt?scope=mine')
+    expect(screen.getByTestId('gantt-filter-notice')).toHaveTextContent('needs a place on the roster')
+    expect(screen.getByTestId('gantt-lens-note')).toHaveTextContent('Showing every linked task')
+  })
+
+  it('counts scope and departments from the same (linked) tasks', () => {
+    renderGantt()
+    const linkedCount = tasks.filter((t) => t.season_id === 's' && (t.milestone_key !== null || t.section_id !== null)).length
+    expect(within(screen.getByTestId('gantt-scope')).getByRole('button', { name: /All tasks/ })).toHaveTextContent(String(linkedCount))
+  })
+
+  it('waits for the archived part of the list instead of drawing progress that then jumps', () => {
+    state.progressLoading = true
+    renderGantt()
+    expect(screen.getByTestId('gantt-progress-loading')).toBeInTheDocument()
+    expect(screen.queryByTestId('gantt-milestone-MS1-1')).not.toBeInTheDocument()
+  })
+
+  it('names the task a failed row action was for', () => {
+    state.updateError = new Error('The change was refused.')
+    state.updateVars = { id: 't1' }
+    renderGantt()
+    expect(screen.getByTestId('gantt-failed-task')).toHaveTextContent('“Draft the cover” was not changed.')
+  })
+})
+
+describe('subtasks on the Gantt', () => {
+  beforeEach(() => {
+    tasks = [
+      ...tasks,
+      task('tp', { title: 'Parent job', section_id: 'sec1', milestone_key: 'MS1-1' }),
+      task('tc', { title: 'Child job', section_id: 'sec1', milestone_key: 'MS1-1', parent_id: 'tp' }),
+      task('te', { title: 'Child elsewhere', section_id: 'sec2', milestone_key: 'MS1-1', parent_id: 'tp' }),
+    ]
+  })
+
+  it('lists a subtask right under its parent when both are in the section', async () => {
+    const user = userEvent.setup()
+    renderGantt()
+    await open(user, /MS1-1/, /Cover sheet/)
+    const parent = screen.getByTestId('gantt-task-tp')
+    const child = screen.getByTestId('gantt-task-tc')
+    expect(parent.compareDocumentPosition(child) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(parent.nextElementSibling).toBe(child)
+    expect(screen.queryByTestId('gantt-part-of-tc')).not.toBeInTheDocument()
+  })
+
+  it('keeps a subtask whose parent is in another section where it is and says what it is part of', async () => {
+    const user = userEvent.setup()
+    renderGantt()
+    await open(user, /MS1-1/, /Budget/)
+    expect(screen.getByTestId('gantt-part-of-te')).toHaveTextContent('Part of Parent job')
+  })
+
+  it('counts a parent and its subtasks in one section as the subtasks', async () => {
+    const user = userEvent.setup()
+    state.updateError = null
+    renderGantt()
+    await open(user, /MS1-1/)
+    // sec1 holds t1, t2, tp, tc, a1, a2; tp has a subtask there, so it is left out: 5 tasks counted.
+    expect(screen.getByTestId('gantt-section-sec1')).toHaveTextContent(/of 5 tasks done/)
+  })
+})
 
 describe('what a first visit shows', () => {
   it('opens the submission due next, and leaves the others closed', () => {
@@ -296,9 +383,9 @@ describe('progress', () => {
   it('a submission with no linked task says so, instead of a percentage', () => {
     tasks = tasks.filter((t) => t.milestone_key !== 'MS1-2')
     renderGantt()
-    // MS1-2 keeps its one section (unticked): the section ticks stand in, and say so.
-    expect(screen.getByTestId('gantt-overall-MS1-2')).toHaveTextContent('0/1 drafted')
-    expect(screen.getByTestId('gantt-overall-MS1-7')).toHaveTextContent('No linked work')
+    // MS1-2 keeps its one section (unticked), but a drafted tick is not progress, so it says the same as a bare submission.
+    expect(screen.getByTestId('gantt-overall-MS1-2')).toHaveTextContent('No tasks yet')
+    expect(screen.getByTestId('gantt-overall-MS1-7')).toHaveTextContent('No tasks yet')
   })
 
   it('an untouched section reads as not drafted, the same word as Milestones — never as done work', async () => {
@@ -451,6 +538,41 @@ describe('linking an existing task (the only work-association command)', () => {
     expect(updateTask).toHaveBeenCalledWith({ id: 't1', sectionId: null })
   })
 
+  it('an unlink says what it did and can be undone, which puts milestone and section back together', async () => {
+    const user = userEvent.setup()
+    renderGantt()
+    await open(user, /MS1-1/, /Cover sheet/)
+    await user.click(screen.getByRole('button', { name: 'Unlink Draft the cover from Cover sheet' }))
+    expect(screen.getByTestId('gantt-unlinked')).toHaveTextContent('Unlinked “Draft the cover” from Cover sheet.')
+    await user.click(screen.getByTestId('gantt-undo-unlink'))
+    expect(updateTask).toHaveBeenLastCalledWith({ id: 't1', sectionId: 'sec1', milestoneKey: 'MS1-1' })
+    expect(screen.queryByTestId('gantt-unlinked')).not.toBeInTheDocument()
+  })
+
+  it('retires the Undo once anything else is done, so it cannot silently revert a later move', async () => {
+    const user = userEvent.setup()
+    renderGantt()
+    await open(user, /MS1-1/, /Cover sheet/)
+    await user.click(screen.getByRole('button', { name: 'Unlink Draft the cover from Cover sheet' }))
+    expect(screen.getByTestId('gantt-unlinked')).toBeInTheDocument()
+    // Any other action on the board is a different change; the Undo must not outlive it.
+    await user.click(screen.getByRole('button', { name: 'Show details of Draft the cover' }))
+    const panel = within(screen.getByTestId('gantt-task-more-t1'))
+    await user.selectOptions(panel.getByLabelText('Move to'), 'MS1-1 · Budget')
+    expect(updateTask).toHaveBeenLastCalledWith(expect.objectContaining({ id: 't1', sectionId: 'sec2' }))
+    expect(screen.queryByTestId('gantt-unlinked')).not.toBeInTheDocument()
+  })
+
+  it('does not offer Undo for an unlink that failed', async () => {
+    const user = userEvent.setup()
+    renderGantt()
+    await open(user, /MS1-1/, /Cover sheet/)
+    state.updateError = new Error('The change was refused.')
+    state.updateVars = { id: 't1' }
+    await user.click(screen.getByRole('button', { name: 'Unlink Draft the cover from Cover sheet' }))
+    expect(screen.queryByTestId('gantt-undo-unlink')).not.toBeInTheDocument()
+  })
+
   it('unlinking from the submission itself is offered, and refused for work that came from a proposal', async () => {
     const user = userEvent.setup()
     renderGantt()
@@ -547,8 +669,8 @@ describe('the department lens', () => {
 
   it('says so, deliberately, when a submission has no work for the chosen department', () => {
     renderGantt('/gantt?dept=BODY')
-    expect(screen.getByTestId('gantt-lens-MS1-2')).toHaveTextContent('Bodywork: no linked work')
-    expect(screen.getByTestId('gantt-lens-MS1-7')).toHaveTextContent('Bodywork: no linked work')
+    expect(screen.getByTestId('gantt-lens-MS1-2')).toHaveTextContent('Bodywork: no tasks yet')
+    expect(screen.getByTestId('gantt-lens-MS1-7')).toHaveTextContent('Bodywork: no tasks yet')
     // The submission itself is still there, with its overall figure.
     expect(screen.getByTestId('gantt-overall-MS1-2')).toBeInTheDocument()
   })

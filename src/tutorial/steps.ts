@@ -175,7 +175,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/',
     target: 'now-actions',
     title: 'What to do next',
-    body: 'Short lists of overdue, blocked and soon-due work, your tasks and your proposals, each with owner, department, date and a link to the card. Proposals are raised on the Proposals screen.',
+    body: 'Your tasks come first, then short lists of overdue, blocked and soon-due work and your proposals, each with owner, department, date (red when late) and a link to the card. “Propose a task” is under the title.',
   },
 
   // --------------------------------------------------------------------- Tasks
@@ -185,7 +185,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/tasks',
     target: 'tasks-overview',
     title: 'Tasks — every task, sortable',
-    body: 'All active tasks in one list. Click a column heading to sort the whole list by it; click again to reverse. Search and the filters keep the sort. Open a task to edit it on the Board.',
+    body: 'All active tasks in one list. Click a column heading to sort the whole list by it; click again to reverse. Search and the filters keep the sort. A subtask sits under its parent. Open a task to edit it on the Board.',
   },
 
   // ------------------------------------------------------------------ Register
@@ -246,7 +246,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/book',
     target: 'book-header',
     title: 'The Requirements Book',
-    body: 'This season’s regulations, drawn page by page. A rule’s link opens its recorded page, else the start; Previous, Next and the page box turn pages. “Open the PDF in a new tab” always works.',
+    body: 'This season’s regulations as one scrolling column. A rule’s link opens its page; “Go to page” jumps. “Whole page” fits a page on screen, “Full width” fills it for small print. “Open the PDF in a new tab” always works.',
   },
 
   // ---------------------------------------------------------------- Milestones
@@ -316,7 +316,15 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/board',
     target: 'board-new-task',
     title: 'New task — start date and deadline',
-    body: 'Heads and the President or Vice President make a task here. Only the title and deadline (marked *) are required; the department, start date and the rest can be added later.',
+    body: 'Heads and the President or Vice President make a task here. Only the title and deadline (marked *) are required. The start date is today unless you change it; the department and the rest can be added later.',
+  },
+  {
+    id: 'board-departments',
+    chapter: 'board',
+    route: '/board',
+    target: 'board-departments',
+    title: 'Departments',
+    body: 'Each pill shows the start of a department’s name; hover or tab to it and the full name opens. The department in view is written under the row with its code. Pick one to see only its tasks. On a phone it is a list.',
   },
   {
     id: 'board',
@@ -324,7 +332,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/board',
     target: 'board-lanes',
     title: 'Board — the team’s tasks',
-    body: 'Five lanes: To do, In progress, Blocked, Done and Cancelled. A red “Urgent” badge marks priority separately from the lane — a task can be Blocked and Urgent. Nothing is dragged, so it works the same on a phone in the workshop.',
+    body: 'Five lanes: To do, In progress, Blocked, Done and Cancelled. Drag a card onto a lane to move it, or use its dropdown — the way on a phone or with a keyboard. A red “Urgent” badge marks priority apart from the lane.',
   },
   {
     id: 'board-card',
@@ -332,7 +340,15 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/board',
     target: 'board-card',
     title: 'A task',
-    body: 'Department, owner, deadline, milestone, requirements. Move it with the dropdown (if you may); Blocked asks why. Details opens the description, blocker, tasks it waits for, links and the editor.',
+    body: 'Dates first, then the owner with their picture (add yours in Settings), department, milestone. Drag it to a lane or use the dropdown (if you may); Blocked asks why, or which task. Details opens the editor.',
+  },
+  {
+    id: 'board-subtasks',
+    chapter: 'board',
+    route: '/board',
+    target: 'board-card',
+    title: 'Subtasks',
+    body: 'Split a big task: in its Details choose “Add subtask”, or set “Part of” on another. Subtasks sit inside the parent’s card and are listed on its page. The parent is done by itself once every subtask is.',
   },
 
   // ------------------------------------------------------------------ Meetings
@@ -454,7 +470,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     target: 'meeting-new',
     audience: 'admins',
     title: 'Calling a meeting',
-    body: 'A name and a date are required. Write the agenda like a document, with the buttons for headings and bullets. It starts from the default agenda. Tick who came. Every member is told when it is called.',
+    body: 'A name and a date are required. Write the agenda like a document, with the buttons for headings and bullets. It starts from the default agenda. Search who didn’t come and add them to the list. Every member is told when it is called.',
   },
   {
     id: 'meeting-template',

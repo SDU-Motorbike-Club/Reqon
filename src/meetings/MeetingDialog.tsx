@@ -4,6 +4,7 @@ import {
   useCreateMeeting,
   useMeetingAttendance,
   useSetMeetingAttendees,
+  useSummarizeMeeting,
   useUpdateMeeting,
   type Meeting,
   type MeetingDraft,
@@ -15,6 +16,7 @@ import { Dialog } from '../ui/Dialog.tsx'
 import { buttonPrimary, buttonSecondary } from '../ui/buttons.ts'
 import { ActionError } from '../ui/states.tsx'
 import { AttendanceChecklist } from './AttendanceChecklist.tsx'
+import { GenerateAgenda } from './GenerateAgenda.tsx'
 import { RichTextField } from './RichTextField.tsx'
 import { isPastDay } from './meetingText.ts'
 
@@ -132,8 +134,11 @@ function Form({
   const pastDate = heldOn !== (meeting?.held_on ?? '') && isPastDay(heldOn)
   const [agenda, setAgenda] = useState(meeting ? (meeting.agenda ?? '') : template)
   const [notes, setNotes] = useState(meeting?.notes ?? '')
-  // Who came is a tick list. What was ticked before is only replaced when the person ticks something here, so
-  // saving before the list has loaded can never wipe it. The old free-text line is kept as it was.
+  // An old summary that is only the minutes again (migration 20260108 copied them) is not shown as a summary.
+  const [summary, setSummary] = useState(meeting?.summary && meeting.summary.trim() !== (meeting.notes ?? '').trim() ? meeting.summary : '')
+  const writing = useSummarizeMeeting()
+  // Who came is recorded by listing who DIDN'T (everyone else came). What was saved before is only replaced when the
+  // person changes the list here, so saving before it has loaded can never wipe it. The old free-text line is kept.
   const members = useMembers().data ?? []
   const attendance = useMeetingAttendance()
   const saved = useMemo(() => new Set(meeting ? (attendance.data?.get(meeting.id) ?? []) : []), [attendance.data, meeting])
@@ -179,15 +184,18 @@ function Form({
         subteamKey: subteamKey || null,
         agenda: agenda.trim() || null,
         notes: notes.trim() || null,
+        summary: summary.trim() || null,
         attendees: meeting?.attendees ?? null,
       },
       ticked ? [...ticked] : null,
     )
   }
 
+  // 16px on a phone: iOS zooms the page when a field under 16px is focused.
   const field =
-    'mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0'
-  const label = 'block text-xs font-medium text-slate-600'
+    'mt-1 min-h-11 w-full rounded border border-slate-300 px-2.5 py-1.5 text-base text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0 sm:px-2 sm:text-sm'
+  const label = 'block text-sm font-medium text-slate-700 sm:text-xs sm:text-slate-600'
+  const heading = 'border-b border-slate-200 pb-1 text-xs font-semibold tracking-wide text-slate-500 uppercase'
 
   return (
     <form onSubmit={submit} noValidate>
@@ -195,9 +203,10 @@ function Form({
         {meeting ? 'Edit meeting' : 'New meeting'}
       </h2>
 
-      <fieldset className="mt-3 grid gap-3" disabled={pending}>
+      <fieldset className="mt-3 grid gap-4" disabled={pending}>
         <legend className="sr-only">Meeting details</legend>
 
+        <h3 className={heading}>When and where</h3>
         <div>
           <label className={label} htmlFor={fieldId('title')}>
             Name
@@ -219,8 +228,9 @@ function Form({
           )}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div>
+        {/* Date on its own line on a phone, with start and end side by side under it. */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="col-span-2 sm:col-span-1">
             <label className={label} htmlFor={fieldId('held-on')}>
               Date
             </label>
@@ -241,7 +251,7 @@ function Form({
             )}
             {pastDate && !errors.heldOn && (
               <p role="status" data-testid="past-date-warning" className="mt-1 text-xs text-amber-900">
-                That day has already passed. You can still save it, for example to record a meeting that took place. Nobody is notified for a past date.
+                That day has already passed. You can still save it to record a meeting that took place. Nobody is notified.
               </p>
             )}
           </div>
@@ -315,9 +325,12 @@ function Form({
             ))}
           </select>
           <p id={fieldId('subteam-note')} className="mt-1 text-xs text-slate-600">
-            A department is told in its inbox, together with its Head. On the whole club, every member is told.
+            A department and its Head get a notice in their inbox. For the whole club, every member does.
           </p>
         </div>
+
+        <h3 className={heading}>Agenda and minutes</h3>
+        <GenerateAgenda heldOn={heldOn} meetingId={meeting?.id ?? null} agenda={agenda} onGenerate={setAgenda} disabled={pending} />
 
         <RichTextField
           id={fieldId('agenda')}
@@ -339,23 +352,58 @@ function Form({
           placeholder="What was decided, and who took what away."
         />
 
+        <div>
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <label className={label} htmlFor={fieldId('summary')}>
+              Summary (optional)
+            </label>
+            <button
+              type="button"
+              className={`${buttonSecondary} text-xs`}
+              disabled={pending || writing.isPending || (!agenda.trim() && !notes.trim())}
+              onClick={() => {
+                writing.reset()
+                writing.mutate({ title: title.trim(), agenda, notes }, { onSuccess: setSummary })
+              }}
+            >
+              {writing.isPending ? 'Writing…' : summary.trim() ? 'Write it again' : 'Write a summary'}
+            </button>
+          </div>
+          <textarea
+            id={fieldId('summary')}
+            name="summary"
+            rows={3}
+            maxLength={2000}
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+            placeholder="Two or three sentences on what was decided."
+            className={field}
+          />
+          <p className="mt-1 text-xs text-slate-600">
+            The button drafts one from the agenda and minutes. Read it and fix it before you save; nothing is saved until you do.
+          </p>
+          <ActionError error={writing.error} className="mt-1" />
+        </div>
+
+        <h3 className={heading}>Who came</h3>
         {attendanceLoading ? (
           <p role="status" className="text-xs text-slate-600">
             Loading who came…
           </p>
         ) : (
-          <AttendanceChecklist people={people} present={present} onChange={setTicked} />
+          <AttendanceChecklist people={people} present={present} recorded={ticked !== null || saved.size > 0} onChange={setTicked} />
         )}
         {meeting?.attendees && (
           <p className="text-xs text-slate-600" data-testid="legacy-attendees">
-            Written before the tick list: {meeting.attendees}
+            Written before attendance was recorded here: {meeting.attendees}
           </p>
         )}
       </fieldset>
 
       <ActionError error={error} className="mt-3" />
 
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+      {/* Pinned to the bottom of the sheet on a phone, so Save is always under the thumb however long the agenda is. */}
+      <div className="sticky bottom-0 -mx-4 mt-4 flex flex-col-reverse gap-2 border-t border-slate-200 bg-surface px-4 py-3 sm:static sm:mx-0 sm:flex-row sm:justify-end sm:border-0 sm:p-0 sm:pt-0">
         <button type="button" className={buttonSecondary} disabled={pending} onClick={onCancel}>
           Cancel
         </button>

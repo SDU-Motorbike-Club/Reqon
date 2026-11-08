@@ -10,6 +10,7 @@ import {
   type ContactCategory,
 } from '../data/useContacts.ts'
 import { useTaskActor } from '../data/useTaskActor.ts'
+import { splitDepartmentName } from '../departments/filter.ts'
 import { mergeSearchParams } from '../lib/searchParams.ts'
 import { useUrlParams } from '../lib/useUrlParams.ts'
 import { Dialog } from '../ui/Dialog.tsx'
@@ -125,13 +126,25 @@ export default function Contacts() {
                     All <span className="opacity-70">({contacts.length})</span>
                   </button>
                 </li>
-                {categories.map((category) => (
-                  <li key={category.id}>
-                    <button type="button" aria-pressed={selected === category.id} onClick={() => choose(category.id)} className={chip(selected === category.id)}>
-                      {category.name} <span className="opacity-70">({byCategory.get(category.id)?.length ?? 0})</span>
-                    </button>
-                  </li>
-                ))}
+                {categories.map((category) => {
+                  // The start of the name stays; hovering or focusing the chip slides the rest open (same as the department pills).
+                  const { head, rest } = splitDepartmentName(category.name)
+                  return (
+                    <li key={category.id}>
+                      <button type="button" aria-pressed={selected === category.id} onClick={() => choose(category.id)} className={`group ${chip(selected === category.id)}`}>
+                        <span className="whitespace-nowrap">{head}</span>{' '}
+                        {rest && (
+                          <>
+                            <span className="grid grid-cols-[0fr] opacity-0 transition-[grid-template-columns,opacity] duration-300 ease-out group-hover:grid-cols-[1fr] group-hover:opacity-100 group-focus-visible:grid-cols-[1fr] group-focus-visible:opacity-100 motion-reduce:transition-none">
+                              <span className="overflow-hidden whitespace-nowrap">{rest}</span>
+                            </span>{' '}
+                          </>
+                        )}
+                        <span className="opacity-70">({byCategory.get(category.id)?.length ?? 0})</span>
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             </nav>
           )}

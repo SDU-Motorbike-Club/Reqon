@@ -3,6 +3,7 @@ import { initialsOf } from './initials.ts'
 // A person's picture, or their initials when they have none. Decorative on its own: the name always sits beside
 // it, so a screen reader hears the name once, not "image" and then the name.
 const SIZE = {
+  xs: 'size-5 text-[9px]',
   sm: 'size-7 text-[11px]',
   md: 'size-10 text-sm',
   lg: 'size-24 text-3xl',

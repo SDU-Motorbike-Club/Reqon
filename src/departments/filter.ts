@@ -14,6 +14,15 @@ export function departmentChoices(departments: readonly Dept[], alsoInclude: Rea
     .map((d) => ({ key: d.key, label: d.archived_at === null ? d.name : `${d.name} (archived)` }))
 }
 
+// A name split for a compact pill: the part before the first " & " / " and " is what stays visible
+// ("Software"), the rest ("& Data Acquisition") is what a hover opens. Names with no such word stay whole.
+// head + (rest ? ' ' : '') + rest is always the original name.
+export function splitDepartmentName(name: string): { head: string; rest: string } {
+  const at = name.search(/\s(?:&|and)\s/)
+  if (at <= 0) return { head: name, rest: '' }
+  return { head: name.slice(0, at), rest: name.slice(at).trim() }
+}
+
 // A department value from an address (?dept=...). Anything that is not a known
 // department is NOT silently honoured or silently dropped: it falls back to "all
 // departments" and says so.

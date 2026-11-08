@@ -271,10 +271,16 @@ html:has(dialog[open]) {
 .pc-doc {
   min-height: 100%;
   padding: 0.75rem 1rem;
-  font-size: 0.9375rem;
+  /* 16px on a phone, or iOS zooms the page when the writing area is tapped. */
+  font-size: 1rem;
   line-height: 1.6;
   color: var(--color-slate-900, #0f172a);
   outline: none;
+}
+@media (min-width: 640px) {
+  .pc-doc {
+    font-size: 0.9375rem;
+  }
 }
 .pc-doc > * + * {
   margin-top: 0.5rem;
@@ -366,6 +372,15 @@ main#main-content {
   transition-property: border-color, background-color;
   transition-duration: 140ms;
   transition-timing-function: var(--pc-ease);
+}
+/* iOS zooms the whole page into any field under 16px when it is tapped. Touch devices get 16px fields; the compact
+   sizes the screens use (text-xs, text-sm) stay for mouse and keyboard. Unlayered, so it beats the utility classes. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 @media (hover: hover) and (pointer: fine) {
   .pc-lift:hover {

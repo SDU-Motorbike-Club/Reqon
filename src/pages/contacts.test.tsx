@@ -24,11 +24,12 @@ vi.mock('../data/useContacts.ts', () => {
       isPending: false,
       error: null,
       data: {
-        categories: [category('admin', 'Administration'), category('mech', 'Mechanical design')],
+        categories: [category('admin', 'Administration'), category('mech', 'Mechanical design'), category('sw', 'Software & data')],
         contacts: [
           contact({ id: 'studieliv', category_id: 'admin', name: 'Studieliv', help: 'Student administration', website: 'studieliv.sdu.dk' }),
           contact({ id: 'andrei', category_id: 'mech', name: 'Andrei Popa', title: 'Lecturer', help: 'NX software design', email: 'andrei@sdu.dk' }),
           contact({ id: 'evil', category_id: 'mech', name: 'Evil', help: 'x', website: 'javascript:alert(1)' }),
+          contact({ id: 'dev', category_id: 'sw', name: 'Dev Person', help: 'Telemetry' }),
         ],
       },
     }),
@@ -56,6 +57,21 @@ beforeEach(() => {
 })
 
 describe('Contacts', () => {
+  it('shows the start of a long category name on its chip and keeps the full name as its accessible name', async () => {
+    renderPage()
+    const chip = screen.getByRole('button', { name: 'Software & data (1)' })
+    // "Software" stays on the chip; "& data" is in the DOM but hidden until hover or focus slides it open.
+    expect(chip).toHaveTextContent('Software & data (1)')
+    expect(within(chip).getByText('& data')).toHaveClass('overflow-hidden', 'whitespace-nowrap')
+    expect(chip.querySelector('.grid-cols-\\[0fr\\]')).not.toBeNull()
+    // A name with no "&" / "and" is just the name.
+    expect(screen.getByRole('button', { name: 'Administration (1)' }).querySelector('.grid-cols-\\[0fr\\]')).toBeNull()
+    await userEvent.click(chip)
+    expect(chip).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('contact-dev')).toBeInTheDocument()
+    expect(screen.queryByTestId('contact-andrei')).not.toBeInTheDocument()
+  })
+
   it('lists people by category, with working ways to reach them, and no editing for a member', async () => {
     renderPage()
     const andrei = screen.getByTestId('contact-andrei')

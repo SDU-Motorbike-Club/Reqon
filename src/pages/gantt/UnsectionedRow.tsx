@@ -9,6 +9,7 @@ import { LinkTaskTool } from './LinkTaskTool.tsx'
 import type { GanttEnv } from './ganttEnv.ts'
 import { canUnlinkMilestone, currentTargetKey, linkCandidates, relinkFrom } from './ganttLinking.ts'
 import { lensProgress, progressLabel, unsectionedFor, type ProgressSource } from './ganttProgress.ts'
+import { nestUnderParents } from '../../tasks/hierarchy.ts'
 
 // Work linked to a submission before any section is chosen. It is a group in the
 // UI only: there is no section record behind it, and a task in it still belongs
@@ -75,12 +76,14 @@ export function UnsectionedRow({
 
       {open && (
         <>
-          {shown.map((task) => {
+          {nestUnderParents(shown, tasks).map(({ task, nested, partOf }) => {
             const perms = env.permsFor(task)
             return (
               <GanttTaskRow
                 key={task.id}
                 task={task}
+                indent={nested ? 'pl-20' : undefined}
+                partOf={partOf}
                 today={env.today}
                 departmentName={task.subteam_key ? (env.departmentNames.get(task.subteam_key) ?? task.subteam_key) : null}
                 ownerName={task.owner_id ? (env.memberNames.get(task.owner_id) ?? 'Unknown member') : null}

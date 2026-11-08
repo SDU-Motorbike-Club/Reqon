@@ -1,9 +1,7 @@
 import { formatDay } from '../../lib/dates.ts'
-import type { Milestone, MilestoneSection } from '../../milestones/types.ts'
-import { taskProgress, tasksInMilestone } from '../../tasks/progress.ts'
+import type { Milestone } from '../../milestones/types.ts'
+import { taskProgress } from '../../tasks/progress.ts'
 import type { Task } from '../../tasks/types.ts'
-import { draftedCount } from '../milestones/milestoneModel.ts'
-import { milestoneProgress } from './ganttProgress.ts'
 
 // The arithmetic behind the Gantt: where a bar sits and how far along it is.
 // Kept out of the screen so both can be tested without rendering a chart, and
@@ -154,37 +152,6 @@ export const progressOf = taskProgress
 
 export function tasksInSection(tasks: Task[], sectionId: string): Task[] {
   return tasks.filter((t) => t.section_id === sectionId)
-}
-
-// Subtasks decide a section's progress. With none, it falls back to the drafted
-// tick the section has always had on the Milestones screen, so a team that has
-// not started using subtasks sees exactly what it saw before.
-export function sectionPercent(section: MilestoneSection, tasks: Task[]): number {
-  return progressOf(tasksInSection(tasks, section.id)).percent ?? (section.is_drafted ? 100 : 0)
-}
-
-// Same rule one level up: every subtask under the milestone, or its sections
-// drafted out of total when there are none.
-type ProgressSource = Pick<Task, 'id' | 'state' | 'archived_at' | 'section_id' | 'milestone_key'>
-
-// `tasks` here is the PROGRESS list (active and archived), so an archived Done
-// task still counts as complete and an archived unfinished one stays in the
-// denominator (ADR-0006) — unlike the active list a row's own bar is drawn from.
-export function milestonePercent(sections: MilestoneSection[], tasks: ProgressSource[], milestoneKey?: string): number {
-  // With a milestone key this IS ganttProgress.milestoneProgress (the one rule);
-  // the number alone is kept for callers that only want a percentage.
-  if (milestoneKey !== undefined) return milestoneProgress(sections, tasks, milestoneKey).percent ?? 0
-  const ids = new Set(sections.map((s) => s.id))
-  // With the milestone's key, unsectioned tasks attached to it count too (each
-  // task once); without it, only sectioned tasks, as before.
-  const mine =
-    milestoneKey === undefined
-      ? tasks.filter((t) => t.section_id !== null && ids.has(t.section_id))
-      : tasksInMilestone(tasks, milestoneKey, ids)
-  const percent = progressOf(mine).percent
-  if (percent !== null) return percent
-  const { drafted, total } = draftedCount(sections)
-  return total === 0 ? 0 : Math.round((drafted / total) * 100)
 }
 
 // A milestone's own bar: the published submission window. Null means TBC, which

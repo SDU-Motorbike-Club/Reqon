@@ -57,6 +57,7 @@ export function GanttTaskRow({
   perms,
   unlink,
   indent = 'pl-12',
+  partOf = null,
   expanded,
   onToggle,
   moveTargets,
@@ -77,6 +78,8 @@ export function GanttTaskRow({
   perms: GanttTaskPerms
   unlink: UnlinkOption | null
   indent?: string
+  // The parent task's title when this is a subtask whose parent is not listed beside it.
+  partOf?: string | null
   expanded: boolean
   onToggle: () => void
   moveTargets: MoveTarget[]
@@ -160,6 +163,11 @@ export function GanttTaskRow({
             {isUrgent(task.priority) && (
               <span className={`rounded px-1 py-0.5 text-[10px] font-bold uppercase ${TASK_PRIORITY_BADGE_TONE.urgent}`}>
                 {TASK_PRIORITY_LABEL.urgent}
+              </span>
+            )}
+            {partOf && (
+              <span className="rounded bg-slate-100 px-1 text-[10px] text-slate-700" data-testid={`gantt-part-of-${task.id}`}>
+                Part of {partOf}
               </span>
             )}
             <StatusCue task={task} overdue={overdue} />

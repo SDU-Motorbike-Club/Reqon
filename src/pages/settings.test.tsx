@@ -29,6 +29,7 @@ let functionCalls: { name: string; body: Record<string, unknown> }[] = []
 // Every role write the fake accepted, in order.
 let writes: string[] = []
 let caller: Member = PRES
+// true = the create-member that was first deployed (v3): needs a password sent, answers without one.
 
 function reset() {
   habits.usage = new Map()
@@ -314,11 +315,14 @@ const emails = new Set<string>()
     if (name !== 'create-member') return functionError(404, 'No such function.')
     if (!isAdmin(caller)) return functionError(403, 'Only an active President, Vice President or Developer may add people to the roster. Nothing was changed.')
     const email = String(body.email).toLowerCase()
-    if (emails.has(email)) return functionError(409, `A login already exists for ${email}. If they are not on the roster yet, link it by UUID instead.`)
+    if (typeof body.password !== 'string' || body.password.length < 8) return functionError(400, 'The password must be at least 8 characters.')
+    // A login that already exists is linked by its UUID; a new one gets a fresh id.
+    const linked = emails.has(email)
     emails.add(email)
-    const id = `login-${emails.size}`
-    db.members.push({ id, full_name: body.fullName, role: body.jobTitle, status: 'active', must_change_password: true })
-    return { data: { id, password: `Temp-${emails.size}-pass` }, error: null }
+    const id = linked ? `login-${[...emails].indexOf(email) + 1}` : `login-${emails.size}`
+    if (db.members.some((m) => m.id === id)) return functionError(409, `${email} is already on the roster. Nothing was changed.`)
+    db.members.push({ id, full_name: body.fullName, role: body.jobTitle, status: 'active', must_change_password: !linked })
+    return { data: { id, linked }, error: null }
   },
 }
 vi.mock('../lib/supabase.ts', () => ({ get supabase() { return supabase } }))
@@ -356,7 +360,7 @@ vi.mock('../auth/context.ts', () => ({
 
 const { default: Settings } = await import('./Settings.tsx')
 const { buildSeasonExport } = await import('../data/exportSeason.ts')
-const { useAddMember, useCreateMember, useResetPassword, useUpdateMember } = await import('../data/useMembers.ts')
+const { useCreateMember, useResetPassword, useUpdateMember } = await import('../data/useMembers.ts')
 const { useUpdateSubteam } = await import('../data/useSubteams.ts')
 const { useUpdateMilestone } = await import('../data/useMilestones.ts')
 const { useSetCurrentSeason } = await import('../data/useSeasons.ts')
@@ -704,16 +708,6 @@ describe('role management', () => {
 // --- Database backstops for administration -----------------------------------
 
 describe('administration is enforced by the database', () => {
-  it('refuses a roster write from a non-admin even if the UI is bypassed', async () => {
-    caller = CREW
-    const before = db.members.length
-    const add = hook(() => useAddMember())
-    await expect(
-      add.current.mutateAsync({ id: 'x', fullName: 'Sneaky', role: 'r' }),
-    ).rejects.toThrow(/don't have permission to add people to the roster/)
-    expect(db.members).toHaveLength(before)
-  })
-
   it('allows the season switch for a developer', async () => {
     caller = DEV
     const setCurrent = hook(() => useSetCurrentSeason())
@@ -762,30 +756,24 @@ describe('roster', () => {
 
     await user.type(screen.getByLabelText('Full name'), 'Cam Newbie')
     await user.type(screen.getByLabelText('Email they sign in with'), 'Cam@Club.test')
-    // Nobody types the first password any more: the function generates it.
-    expect(within(screen.getByRole('form', { name: 'Add someone to the roster' })).queryByLabelText(/password/i)).not.toBeInTheDocument()
+    await user.type(screen.getByLabelText('Password you give them'), 'hand-over-1')
     await user.click(screen.getByRole('button', { name: 'Add to roster' }))
 
     await waitFor(() => expect(db.members).toHaveLength(before + 1))
     // Only the Edge Function is asked; the browser never writes auth or roles.
     expect(functionCalls).toEqual([
-      { name: 'create-member', body: { email: 'Cam@Club.test', fullName: 'Cam Newbie', jobTitle: 'Member' } },
+      { name: 'create-member', body: { email: 'Cam@Club.test', fullName: 'Cam Newbie', jobTitle: 'Member', password: 'hand-over-1' } },
     ])
     const added = db.members.find((m) => m.full_name === 'Cam Newbie')!
     expect(rolesOf(String(added.id))).toEqual([])
     expect(writes).toEqual([])
     expect(await screen.findByText('Cam Newbie is on the roster.')).toBeInTheDocument()
-    // The generated password is shown once, with who it is for.
-    const panel = screen.getByRole('group', { name: 'Temporary password for Cam Newbie' })
-    expect(within(panel).getByTestId('issued-password')).toHaveTextContent('Temp-1-pass')
-    expect(within(panel).getByText('Cam@Club.test')).toBeInTheDocument()
+    // The admin chose the password, so it is never shown back; the form is cleared.
+    expect(screen.queryByTestId('issued-password')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Password you give them')).toHaveValue('')
     // The new row says they still have to choose their own.
     const row = await screen.findByTestId(`member-${String(added.id)}`)
     expect(within(row).getByText('temporary password')).toBeInTheDocument()
-    // "Done" drops it; nothing keeps it.
-    await user.click(within(panel).getByRole('button', { name: 'Done' }))
-    expect(screen.queryByTestId('issued-password')).not.toBeInTheDocument()
-    expect(screen.queryByText('Temp-1-pass')).not.toBeInTheDocument()
   })
 
   it('lets the President add someone too', async () => {
@@ -794,12 +782,27 @@ describe('roster', () => {
     await screen.findByText('Add someone to the roster')
     await user.type(screen.getByLabelText('Full name'), 'Dee New')
     await user.type(screen.getByLabelText('Email they sign in with'), 'dee@club.test')
+    await user.type(screen.getByLabelText('Password you give them'), 'hand-over-2')
     await user.click(screen.getByRole('button', { name: 'Add to roster' }))
     await waitFor(() => expect(db.members.some((m) => m.full_name === 'Dee New')).toBe(true))
   })
 
-  it('shows the server\'s reason when the login already exists, and keeps what was typed', async () => {
+  it('links the login that already exists instead of failing, and leaves its roster state alone', async () => {
     const user = userEvent.setup()
+    emails.add('known@club.test') // login made earlier in the dashboard; its id is login-1
+    renderSettings()
+    await screen.findByText('Add someone to the roster')
+    await user.type(screen.getByLabelText('Full name'), 'Known Person')
+    await user.type(screen.getByLabelText('Email they sign in with'), 'known@club.test')
+    await user.type(screen.getByLabelText('Password you give them'), 'ignored-pass')
+    await user.click(screen.getByRole('button', { name: 'Add to roster' }))
+    expect(await screen.findByText('Known Person is on the roster, linked to the login that already existed.')).toBeInTheDocument()
+    expect(db.members.find((m) => m.id === 'login-1')).toMatchObject({ full_name: 'Known Person', must_change_password: false })
+  })
+
+  it('shows the server\'s reason when they are already on the roster, and keeps what was typed', async () => {
+    const user = userEvent.setup()
+    emails.add('same@club.test')
     renderSettings()
     await screen.findByText('Add someone to the roster')
     for (const name of ['First Try', 'Second Try']) {
@@ -807,10 +810,12 @@ describe('roster', () => {
       await user.type(screen.getByLabelText('Full name'), name)
       await user.clear(screen.getByLabelText('Email they sign in with'))
       await user.type(screen.getByLabelText('Email they sign in with'), 'same@club.test')
+      await user.clear(screen.getByLabelText('Password you give them'))
+      await user.type(screen.getByLabelText('Password you give them'), 'hand-over-3')
       await user.click(screen.getByRole('button', { name: 'Add to roster' }))
       await waitFor(() => expect(functionCalls.at(-1)?.body.fullName).toBe(name))
     }
-    expect(await screen.findByText(/A login already exists for same@club.test/)).toBeInTheDocument()
+    expect(await screen.findByText(/same@club.test is already on the roster/)).toBeInTheDocument()
     expect(screen.getByLabelText('Full name')).toHaveValue('Second Try')
     expect(db.members.filter((m) => m.full_name === 'Second Try')).toHaveLength(0)
   })
@@ -867,26 +872,9 @@ describe('roster', () => {
     const before = db.members.length
     const create = hook(() => useCreateMember())
     await expect(
-      create.current.mutateAsync({ email: 'x@club.test', fullName: 'Sneaky', jobTitle: 'Member' }),
+      create.current.mutateAsync({ email: 'x@club.test', fullName: 'Sneaky', jobTitle: 'Member', password: 'whatever-1' }),
     ).rejects.toThrow(/don't have permission to add people to the roster/)
     expect(db.members).toHaveLength(before)
-  })
-
-  it('still links an existing login by pasting its Auth UUID', async () => {
-    const user = userEvent.setup()
-    const before = db.members.length
-    renderSettings()
-    await screen.findByText('Add someone to the roster')
-    await user.click(screen.getByText('Their login already exists? Link it by UUID'))
-
-    await user.type(screen.getByLabelText('Auth user UUID'), 'uuid-123')
-    await user.type(screen.getByLabelText('Full name of the linked person'), 'Cam Newbie')
-    await user.click(screen.getByRole('button', { name: 'Link to roster' }))
-    await waitFor(() => expect(db.members).toHaveLength(before + 1))
-    expect(db.members.find((m) => m.id === 'uuid-123')).toMatchObject({ full_name: 'Cam Newbie' })
-    // Linking someone gives them no privileged role, and calls no function.
-    expect(rolesOf('uuid-123')).toEqual([])
-    expect(functionCalls).toEqual([])
   })
 
   it('offers the job titles the club already uses instead of a blank text box', async () => {

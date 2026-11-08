@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { todayIso } from '../lib/dates.ts'
 
 // The Board composed for real (filters, lanes, cards, details editor) over mocked
 // DATA hooks. Who may do what is decided by the real permission functions from the
@@ -20,8 +21,11 @@ const state = {
   links: [] as { task_id: string; depends_on_task_id: string }[],
   linkWrites: [] as Record<string, unknown>[],
   linkError: null as Error | null,
+  avatars: new Map<string, string>(),
   moves: [] as Record<string, unknown>[],
   created: [] as Record<string, unknown>[],
+  parentSet: [] as Record<string, unknown>[],
+  parentError: null as Error | null,
   proposals: [] as Record<string, unknown>[],
 }
 type Dept = { key: string; name: string; lead_id: string | null; archived_at: string | null }
@@ -40,6 +44,7 @@ vi.mock('../data/useMembers.ts', () => ({
     isLoading: false, error: null, refetch: () => {},
   }),
 }))
+vi.mock('../data/useAvatars.ts', () => ({ useAvatars: () => ({ data: state.avatars }) }))
 vi.mock('../data/useSubteams.ts', () => ({ useSubteams: () => ({ data: departments, isLoading: false, error: null, refetch: () => {} }) }))
 vi.mock('../data/useMilestones.ts', () => ({ useMilestones: () => ({ data: [{ key: 'MS1', name: 'Plan' }], isLoading: false, error: null }) }))
 vi.mock('../data/useClauses.ts', () => ({
@@ -66,6 +71,17 @@ vi.mock('../data/useTaskHistory.ts', () => ({
   // Archived tasks (for naming a finished prerequisite): one archived task that a link points at.
   useTasksForProgress: () => ({ data: [{ id: 'gone-task', title: 'Finished weeks ago', state: 'done', archived_at: '2026-09-01', subteam_key: 'MECH' }], isLoading: false, error: null }),
   useSourceProposals: () => ({ data: new Map([['prop-archived', { id: 'prop-archived', title: 'Old proposal', state: 'decided', outcome: 'approved', archived_at: '2026-09-01' }]]) }),
+}))
+vi.mock('../data/useTaskParent.ts', () => ({
+  useSetTaskParent: () => ({
+    mutate: vi.fn(),
+    mutateAsync: async (v: Record<string, unknown>) => {
+      if (state.parentError) throw state.parentError
+      state.parentSet.push(v)
+    },
+    isPending: false,
+    error: null,
+  }),
 }))
 vi.mock('../data/useTasks.ts', () => ({
   useTasks: () => ({ data: state.tasks, isLoading: state.loading, error: state.loadError, refetch: () => {}, seasonId: 's' }),
@@ -143,8 +159,11 @@ beforeEach(() => {
   state.links = []
   state.linkWrites = []
   state.linkError = null
+  state.avatars = new Map()
   state.moves = []
   state.created = []
+  state.parentSet = []
+  state.parentError = null
   state.proposals = []
   state.tasks = [
     task('aero-mine', { owner_id: 'me', title: 'Aero mine' }),
@@ -260,6 +279,82 @@ describe('lanes, priority and card facts', () => {
     renderBoard()
     const facts = screen.getByTestId('task-facts-legacy')
     for (const text of ['No department', 'Unassigned', 'No deadline', 'No milestone', 'No requirements linked']) expect(facts).toHaveTextContent(text)
+  })
+
+  it('hides deadlines after the date range, keeps overdue and undated tasks, and Clear filters resets it', async () => {
+    const user = userEvent.setup()
+    state.tasks = [
+      task('inside', { due_date: '2099-05-10' }),
+      task('later', { due_date: '2099-07-01' }),
+      task('missed', { due_date: '2020-01-01' }),
+      task('undated', { due_date: null }),
+    ]
+    renderBoard('/board?from=2099-05-01&to=2099-06-01')
+    expect(shown().sort()).toEqual(['inside', 'missed', 'undated'])
+    expect(screen.getByLabelText('Due to')).toHaveValue('2099-06-01')
+    await user.click(within(screen.getByTestId('board-filter-summary')).getByRole('button', { name: 'Clear filters' }))
+    expect(shown().sort()).toEqual(['inside', 'later', 'missed', 'undated'])
+    expect(screen.getByLabelText('Due to')).toHaveValue('')
+  })
+
+  it('shows a parent task with its subtasks tucked under a toggle, and opens them on request', async () => {
+    const user = userEvent.setup()
+    state.tasks = [
+      task('shirts'),
+      task('design', { parent_id: 'shirts' }),
+      task('funds', { parent_id: 'shirts', state: 'done' }),
+      task('website'),
+    ]
+    renderBoard()
+    expect(shown()).toEqual(['shirts', 'website'])
+    const toggle = within(screen.getByTestId('subtasks-shirts')).getByRole('button', { name: /2 subtasks · 1 done/ })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(shown()).toEqual(['design', 'funds', 'shirts', 'website'])
+    // One bubble: the toggle and both subtasks are inside the parent's own card, and a task with no subtasks has none.
+    const parentCard = screen.getByTestId('task-shirts')
+    expect(parentCard).toContainElement(screen.getByTestId('subtasks-shirts'))
+    expect(parentCard).toContainElement(screen.getByTestId('task-design'))
+    expect(parentCard).toContainElement(screen.getByTestId('task-funds'))
+    expect(screen.getByTestId('task-website')).not.toContainElement(screen.getByTestId('task-design'))
+    expect(screen.queryByTestId('subtasks-website')).not.toBeInTheDocument()
+  })
+
+  it("lists a task's subtasks on its own page, indented with their state and deadline, and opens one on click", async () => {
+    const user = userEvent.setup()
+    state.tasks = [
+      task('shirts'),
+      task('design', { parent_id: 'shirts', title: 'Design the print', due_date: '2026-12-02' }),
+      task('funds', { parent_id: 'shirts', title: 'Find funds', state: 'done', due_date: null }),
+      task('website', { title: 'Website' }),
+    ]
+    renderBoard()
+    await user.click(within(screen.getByTestId('task-more-shirts')).getByText(/^Details/))
+    const list = within(await screen.findByTestId('task-dialog-subtasks'))
+    expect(list.getByRole('heading', { name: /Subtasks \(1 of 2 done\)/ })).toBeInTheDocument()
+    expect(list.getByRole('list')).toHaveClass('list-none', 'pl-5')
+    expect(screen.getByTestId('task-dialog-subtask-design')).toHaveTextContent('Design the print')
+    expect(screen.getByTestId('task-dialog-subtask-design')).toHaveTextContent('To do · due 02/12/26')
+    expect(screen.getByTestId('task-dialog-subtask-funds')).toHaveTextContent('Done')
+    // A task with no subtasks shows no such section; opening a subtask opens that task's own page.
+    await user.click(list.getByRole('button', { name: 'Design the print' }))
+    expect(await screen.findByTestId('task-details-design')).toBeInTheDocument()
+    expect(screen.queryByTestId('task-dialog-subtasks')).not.toBeInTheDocument()
+  })
+
+  it('keeps My tasks flat: the subtask is its own card, not nested', () => {
+    state.tasks = [task('shirts'), task('design', { parent_id: 'shirts', owner_id: 'me' })]
+    renderBoard('/board?scope=mine')
+    expect(shown()).toEqual(['design'])
+    expect(screen.queryByTestId('subtasks-shirts')).not.toBeInTheDocument()
+  })
+
+  it('opens the parent when the address names one of its subtasks', () => {
+    state.tasks = [task('shirts'), task('design', { parent_id: 'shirts' })]
+    renderBoard('/board?task=design')
+    expect(shown()).toEqual(['design', 'shirts'])
+    expect(screen.queryByTestId('board-task-hidden')).not.toBeInTheDocument()
   })
 
   it('marks an overdue open task, but not a finished one', () => {
@@ -511,6 +606,77 @@ describe('the details editor', () => {
   })
 })
 
+// Everyone's profile picture is visible where the work is: the owner on the card, and under the title of the open task.
+describe('owner pictures', () => {
+  const PICTURE = 'data:image/png;base64,AAAA'
+
+  it("shows the owner's picture beside their name on the card, and nothing for an unassigned task", () => {
+    state.avatars = new Map([['m2', PICTURE]])
+    state.tasks = [task('t-owned', { owner_id: 'm2', title: 'Owned' }), task('t-loose', { owner_id: null, title: 'Loose' })]
+    renderBoard('/board?dept=AERO')
+    const owned = within(screen.getByTestId('task-facts-t-owned'))
+    expect(owned.getByTestId('avatar-image')).toHaveAttribute('src', PICTURE)
+    expect(owned.getByText('Bo Wrench')).toBeInTheDocument()
+    const loose = within(screen.getByTestId('task-facts-t-loose'))
+    expect(loose.queryByTestId('avatar-image')).not.toBeInTheDocument()
+    expect(loose.queryByTestId('avatar-initials')).not.toBeInTheDocument()
+  })
+
+  it('draws initials for an owner who has no picture yet', () => {
+    state.tasks = [task('t-owned', { owner_id: 'm2', title: 'Owned' })]
+    renderBoard('/board?dept=AERO')
+    expect(within(screen.getByTestId('task-facts-t-owned')).getByTestId('avatar-initials')).toHaveTextContent('BW')
+  })
+
+  it("shows the owner's face and name under the title when the task is opened", async () => {
+    const user = userEvent.setup()
+    state.avatars = new Map([['m2', PICTURE]])
+    state.tasks = [task('t-owned', { owner_id: 'm2', title: 'Owned' })]
+    renderBoard('/board?dept=AERO')
+    await user.click(within(screen.getByTestId('task-more-t-owned')).getByText(/^Details/))
+    const owner = await screen.findByTestId('task-dialog-owner')
+    expect(owner).toHaveTextContent('Bo Wrench')
+    expect(within(owner).getByTestId('avatar-image')).toHaveAttribute('src', PICTURE)
+  })
+})
+
+// A card is dragged onto a lane, the same rules as the lane <select> (the way for a keyboard and a phone).
+describe('dragging a card onto a lane', () => {
+  const drop = (lane: string, id: string) =>
+    fireEvent.drop(screen.getByTestId(`lane-${lane}`), {
+      dataTransfer: { types: ['application/x-reqon-task'], getData: () => id, dropEffect: '' },
+    })
+
+  it('makes a card draggable only for someone who may edit it', () => {
+    renderBoard('/board?dept=AERO')
+    expect(screen.getByTestId('task-aero-mine')).toHaveAttribute('draggable', 'true')
+  })
+
+  it('moves the card to the lane it is dropped on, sending only the state', () => {
+    renderBoard('/board?dept=AERO')
+    drop('wip', 'aero-theirs')
+    expect(state.writes).toEqual([{ id: 'aero-theirs', state: 'wip' }])
+  })
+
+  it('does nothing when it is dropped on the lane it is already in, or when it is not a known task', () => {
+    renderBoard('/board?dept=AERO')
+    drop('todo', 'aero-theirs')
+    drop('wip', 'no-such-task')
+    expect(state.writes).toEqual([])
+  })
+
+  it('asks why first when it is dropped on Blocked, and sends nothing until it is answered', async () => {
+    const user = userEvent.setup()
+    renderBoard('/board?dept=AERO')
+    drop('blocked', 'aero-theirs')
+    const form = within(await screen.findByTestId('task-block-form-aero-theirs'))
+    expect(state.writes).toEqual([])
+    await user.type(form.getByLabelText(/Why is/), 'Waiting for the quote')
+    await user.click(form.getByRole('button', { name: 'Block task' }))
+    expect(state.writes).toEqual([{ id: 'aero-theirs', state: 'blocked', blockedReason: 'Waiting for the quote' }])
+  })
+})
+
 describe('blockers and prerequisites', () => {
   async function open(id: string, user = userEvent.setup()) {
     await user.click(within(screen.getByTestId(`task-more-${id}`)).getByText(/^Details/))
@@ -527,6 +693,31 @@ describe('blockers and prerequisites', () => {
     await user.type(form.getByLabelText(/Why is/), '  Waiting for the sponsor quote ')
     await user.click(form.getByRole('button', { name: 'Block task' }))
     expect(state.writes).toEqual([{ id: 'aero-theirs', state: 'blocked', blockedReason: 'Waiting for the sponsor quote' }])
+  })
+
+  it('offers a search for the task that blocks it; choosing one links it, then blocks, with no written reason', async () => {
+    const user = userEvent.setup()
+    renderBoard('/board?dept=AERO')
+    await user.selectOptions(screen.getByLabelText('Move Aero theirs to another lane'), 'blocked')
+    const form = within(screen.getByTestId('task-block-form-aero-theirs'))
+    expect(form.getByRole('button', { name: 'Block task' })).toBeDisabled()
+    await user.type(form.getByLabelText(/search the task that blocks it/i), 'mine')
+    // Matches by title, across departments, and never the task itself.
+    expect(await form.findAllByRole('option')).toHaveLength(2)
+    await user.click(await form.findByRole('option', { name: /Aero mine/ }))
+    await user.click(form.getByRole('button', { name: 'Block task' }))
+    expect(state.linkWrites).toEqual([{ add: { taskId: 'aero-theirs', dependsOnTaskId: 'aero-mine' } }])
+    expect(state.writes).toEqual([{ id: 'aero-theirs', state: 'blocked' }])
+  })
+
+  it('never offers a finished task as the blocker', async () => {
+    const user = userEvent.setup()
+    state.tasks = [...state.tasks, task('done-one', { title: 'Done already', state: 'done' })]
+    renderBoard('/board?dept=AERO')
+    await user.selectOptions(screen.getByLabelText('Move Aero theirs to another lane'), 'blocked')
+    const form = within(screen.getByTestId('task-block-form-aero-theirs'))
+    await user.type(form.getByLabelText(/search the task that blocks it/i), 'Done already')
+    expect(form.queryByRole('option', { name: /Done already/ })).not.toBeInTheDocument()
   })
 
   it('cancelling the question sends nothing and leaves the card where it was', async () => {
@@ -793,6 +984,13 @@ describe('F14-04 and F14-05: saving what was changed, and filters that keep the 
     expect(panel.getByLabelText('Start date')).toHaveValue('2027-01-05')
   })
 
+  it('spells out the department in view under the row, with its key', async () => {
+    renderBoard('/board?dept=BODY')
+    const row = within(screen.getByRole('navigation', { name: 'Department navigation' }))
+    expect(row.getByRole('link', { name: /Bodywork/ })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByTestId('board-departments-current')).toHaveTextContent('BODY · Bodywork')
+  })
+
   it('keeps ?task= when the department is changed from the department row', async () => {
     const user = userEvent.setup()
     renderBoard('/board?task=aero-theirs')
@@ -988,6 +1186,55 @@ describe('proposals as an overlay on the Board', () => {
   })
 })
 
+describe('adding a subtask from a task\'s details', () => {
+  const parent = () =>
+    task('shirts', { title: 'Get club t-shirts', subteam_key: 'BODY', milestone_key: 'MS1', section_id: 'sec9', due_date: '2026-12-01' })
+
+  async function startSubtask(user: ReturnType<typeof userEvent.setup>) {
+    state.tasks = [parent()]
+    renderBoard()
+    await user.click(screen.getByTestId('task-more-shirts'))
+    await user.click(screen.getByTestId('board-add-subtask'))
+    const form = within(screen.getByTestId('new-task-form'))
+    await user.type(form.getByLabelText('Title'), 'Design shirts')
+    return form
+  }
+
+  it('prefills department, submission and deadline from the parent, then attaches the new task to it and its section', async () => {
+    const user = userEvent.setup()
+    const form = await startSubtask(user)
+    expect(form.getByRole('heading', { name: 'New subtask' })).toBeInTheDocument()
+    expect(screen.getByTestId('new-task-intro')).toHaveTextContent('Part of “Get club t-shirts”')
+    expect(form.getByLabelText('Deadline')).toHaveValue('2026-12-01')
+    await user.click(form.getByTestId('new-task-submit'))
+    await waitFor(() => expect(state.created).toHaveLength(1))
+    expect(state.created[0]).toMatchObject({ title: 'Design shirts', departmentKey: 'BODY', milestoneKey: 'MS1', dueDate: '2026-12-01' })
+    await waitFor(() => expect(state.parentSet).toEqual([{ id: 'new', parentId: 'shirts', sectionId: 'sec9' }]))
+    expect(screen.queryByTestId('board-subtask-note')).not.toBeInTheDocument()
+  })
+
+  it('says the task was made on its own when it could not be attached to the parent', async () => {
+    const user = userEvent.setup()
+    state.parentError = new Error('Tasks nest one level only.')
+    const form = await startSubtask(user)
+    await user.click(form.getByTestId('new-task-submit'))
+    expect(await screen.findByTestId('board-subtask-note')).toHaveTextContent('could not be made part of “Get club t-shirts”: Tasks nest one level only.')
+    expect(screen.getByTestId('board-task-created')).toHaveTextContent('Created “Design shirts”.')
+  })
+
+  it('is not offered on a subtask', async () => {
+    const user = userEvent.setup()
+    state.tasks = [parent(), task('design', { parent_id: 'shirts' })]
+    renderBoard()
+    await user.click(screen.getByTestId('task-more-shirts'))
+    expect(screen.getByTestId('board-add-subtask')).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await user.click(screen.getByRole('button', { name: /1 subtask/ }))
+    await user.click(screen.getByTestId('task-more-design'))
+    expect(screen.queryByTestId('board-add-subtask')).not.toBeInTheDocument()
+  })
+})
+
 describe('creating a task straight on the Board (task leaders only)', () => {
   it('offers New task to a Head, and not to a plain member', () => {
     renderBoard()
@@ -1015,11 +1262,13 @@ describe('creating a task straight on the Board (task leaders only)', () => {
     expect(state.created).toEqual([])
 
     await user.type(form.getByLabelText('Title'), '  Brake duct  ')
-    await user.type(form.getByLabelText('Deadline'), '2026-12-01')
+    // The start date is filled in with the day the task is made.
+    expect(form.getByLabelText('Start date')).toHaveValue(todayIso())
+    await user.type(form.getByLabelText('Deadline'), '2099-12-01')
     await user.click(form.getByTestId('new-task-submit'))
     await waitFor(() => expect(state.created).toHaveLength(1))
     expect(state.created[0]).toEqual({
-      title: 'Brake duct', detail: null, departmentKey: null, ownerId: null, startsOn: null, dueDate: '2026-12-01',
+      title: 'Brake duct', detail: null, departmentKey: null, ownerId: null, startsOn: todayIso(), dueDate: '2099-12-01',
       milestoneKey: null, clauseKeys: [], priority: 'normal',
     })
     expect(await screen.findByTestId('board-task-created')).toHaveTextContent('Created “Brake duct”.')
@@ -1031,13 +1280,27 @@ describe('creating a task straight on the Board (task leaders only)', () => {
     await user.click(screen.getByTestId('board-new-task'))
     const form = within(screen.getByTestId('new-task-form'))
     await user.type(form.getByLabelText('Title'), 'Brake duct')
-    await user.type(form.getByLabelText('Start date'), '2026-11-20')
-    await user.type(form.getByLabelText('Deadline'), '2026-12-01')
+    await user.clear(form.getByLabelText('Start date'))
+    await user.type(form.getByLabelText('Start date'), '2099-11-20')
+    await user.type(form.getByLabelText('Deadline'), '2099-12-01')
     await user.selectOptions(form.getByLabelText('Department'), 'BODY')
     await user.selectOptions(form.getByLabelText('Owner'), 'me')
     await user.click(form.getByTestId('new-task-submit'))
     await waitFor(() => expect(state.created).toHaveLength(1))
-    expect(state.created[0]).toMatchObject({ departmentKey: 'BODY', ownerId: 'me', startsOn: '2026-11-20', dueDate: '2026-12-01' })
+    expect(state.created[0]).toMatchObject({ departmentKey: 'BODY', ownerId: 'me', startsOn: '2099-11-20', dueDate: '2099-12-01' })
+  })
+
+  it('lets the start date be cleared, and then sends none', async () => {
+    const user = userEvent.setup()
+    renderBoard()
+    await user.click(screen.getByTestId('board-new-task'))
+    const form = within(screen.getByTestId('new-task-form'))
+    await user.type(form.getByLabelText('Title'), 'Open start')
+    await user.clear(form.getByLabelText('Start date'))
+    await user.type(form.getByLabelText('Deadline'), '2099-12-01')
+    await user.click(form.getByTestId('new-task-submit'))
+    await waitFor(() => expect(state.created).toHaveLength(1))
+    expect(state.created[0]).toMatchObject({ startsOn: null })
   })
 
   it('puts the start date on the left and the deadline on the right, and refuses a deadline before the start', async () => {
@@ -1049,6 +1312,7 @@ describe('creating a task straight on the Board (task leaders only)', () => {
     const due = form.getByLabelText('Deadline')
     expect(start.compareDocumentPosition(due) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     await user.type(form.getByLabelText('Title'), 'Backwards')
+    await user.clear(start)
     await user.type(start, '2026-12-05')
     await user.type(due, '2026-12-01')
     await user.click(form.getByTestId('new-task-submit'))

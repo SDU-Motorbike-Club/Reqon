@@ -27,36 +27,17 @@ export function useMembers(): UseQueryResult<Member[], Error> {
   })
 }
 
-// Links a login that ALREADY exists (made in the Supabase dashboard) to the
-// roster by its UUID. Creating the login itself needs the service_role key,
-// which must NEVER reach a browser — it bypasses Row Level Security entirely —
-// so that goes through the Edge Function in useCreateMember() below instead.
-export function useAddMember() {
-  const queryClient = useQueryClient()
-  return useMutation<void, Error, { id: string; fullName: string; role: string }>({
-    mutationFn: async ({ id, fullName, role }) => {
-      const { error } = await supabase
-        .from('members')
-        .insert({ id, full_name: fullName, role })
-      // RLS decides whether this is allowed: `admin_roster_insert` requires can_add_members().
-      // Privileged roles are NOT set here — see roles/useMemberRoles.ts.
-      if (error) throw new DataError('add people to the roster', error)
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.members })
-    },
-  })
-}
-
 export type NewMember = {
   email: string
   fullName: string
   jobTitle: string
+  // Chosen by the admin, who hands it over; the person replaces it at first sign-in.
+  password: string
 }
 
-// What the admin is shown ONCE after adding someone or resetting a password:
-// the temporary password the Edge Function generated. The app never stores it;
-// the person is made to replace it at their first sign-in.
+// What the admin is shown ONCE after resetting a password: the temporary
+// password the Edge Function generated. The app never stores it; the person is
+// made to replace it at their first sign-in.
 export type IssuedPassword = { id: string; password: string }
 
 // Creates the login AND the roster row in one step, through the `create-member`
@@ -65,17 +46,17 @@ export type IssuedPassword = { id: string; password: string }
 // token. The function asks the database — as that person — whether they may
 // add members (can_add_members(): active President, Vice President or
 // Developer), and inserts the roster row as them too, so RLS decides twice.
-// It generates the first password itself and returns it with the new id.
+// The first password is the one the admin typed. If a login for that email
+// already exists, the function links it by its UUID instead (`linked`) and
+// leaves its password alone.
 export function useCreateMember() {
   const queryClient = useQueryClient()
-  return useMutation<IssuedPassword, Error, NewMember>({
+  return useMutation<{ id: string; linked: boolean }, Error, NewMember>({
     mutationFn: async (member) => {
       const what = 'add people to the roster'
-      const data = await invokeEdgeFunction<{ id?: unknown; password?: unknown }>('create-member', member, what)
-      if (typeof data.id !== 'string' || typeof data.password !== 'string') {
-        throw new DataError(`${what}: the server sent no answer`, null)
-      }
-      return { id: data.id, password: data.password }
+      const data = await invokeEdgeFunction<{ id?: unknown; linked?: unknown }>('create-member', member, what)
+      if (typeof data.id !== 'string') throw new DataError(`${what}: the server sent no answer`, null)
+      return { id: data.id, linked: data.linked === true }
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.members })

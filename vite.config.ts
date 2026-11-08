@@ -13,6 +13,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    // Optional features are OFF in unit tests whatever a developer's .env.local says, so the suite gives the same
+    // result on every machine and in CI. Tests that need a feature turn it on themselves (vi.stubEnv).
+    env: { VITE_ATTACHMENTS_ENABLED: 'false', VITE_BACKUPS_ENABLED: 'false' },
     css: false,
     // Playwright owns tests/e2e (real browser, real local DB, its own
     // runner and config) — Vitest must never try to collect those files.

@@ -54,6 +54,9 @@ export function BookReader({
   const doc = useRegulationDocument(regsRef)
   const file = useBookFile(regsRef ? doc.data : null)
   const [draft, setDraft] = useState<string | null>(null)
+  // How the scrolling book sizes its pages: a whole page in view (the way to see a page at a glance), or the full
+  // column width (for small print).
+  const [fit, setFit] = useState<'page' | 'width'>('page')
 
   // The open document, fixed per DOCUMENT: a private file's link is re-signed
   // in the background, and swapping the address under an open document would
@@ -140,13 +143,15 @@ export function BookReader({
   }
 
   return (
-    <div className="flex flex-col gap-2" data-testid="book-reader" data-page={printed}>
+    <div className="flex flex-col gap-4" data-testid="book-reader" data-page={printed}>
       {notice && (
-        <p role="status" className="rounded border border-amber-400 bg-amber-50 p-2 text-sm text-amber-950" data-testid="book-page-notice">
+        <p role="status" className="rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950" data-testid="book-page-notice">
           {notice}
         </p>
       )}
-      <p className="text-sm text-slate-700" data-testid="book-location">
+      {/* Where you are and how to move, on one calm card instead of loose lines above the book. */}
+      <div className={`flex flex-col gap-3 rounded-lg border border-slate-200 bg-surface ${compact ? 'p-3' : 'p-4'}`}>
+      <p className="text-base text-slate-800" data-testid="book-location">
         {ruleRef && (
           <>
             Rule <span className="font-mono font-semibold text-slate-900">{ruleRef}</span> ·{' '}
@@ -157,13 +162,13 @@ export function BookReader({
         {` · ${regsRef}`}
       </p>
 
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Page">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3" role="group" aria-label="Page">
         {mode === 'page' && (
           <button type="button" className={buttonSecondary} onClick={() => go(printed - 1)} disabled={printed <= 1}>
             <span aria-hidden="true">←</span> Previous
           </button>
         )}
-        <label className="flex items-center gap-1 text-sm text-slate-700">
+        <label className="flex items-center gap-2 text-sm text-slate-700">
           {mode === 'scroll' ? 'Go to page' : 'Page'}
           <input
             inputMode="numeric"
@@ -174,7 +179,7 @@ export function BookReader({
             }}
             onBlur={() => setDraft(null)}
             aria-describedby={lastPrinted !== null ? 'book-page-count' : undefined}
-            className="min-h-11 w-16 rounded border border-slate-300 px-2 py-1 text-sm sm:min-h-0"
+            className="min-h-11 w-20 rounded border border-slate-300 bg-surface px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
           />
         </label>
         {lastPrinted !== null && (
@@ -187,12 +192,30 @@ export function BookReader({
             Next <span aria-hidden="true">→</span>
           </button>
         )}
+        {mode === 'scroll' && (
+          <div role="group" aria-label="Page size" className="inline-flex overflow-hidden rounded border border-slate-300" data-testid="book-fit">
+            {(['page', 'width'] as const).map((choice) => (
+              <button
+                key={choice}
+                type="button"
+                aria-pressed={fit === choice}
+                onClick={() => setFit(choice)}
+                className={`min-h-11 px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-ring sm:min-h-0 ${
+                  fit === choice ? 'bg-slate-200 text-slate-950' : 'bg-surface text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                {choice === 'page' ? 'Whole page' : 'Full width'}
+              </button>
+            ))}
+          </div>
+        )}
         <a href={openUrl} target="_blank" rel="noopener noreferrer" className={linkButton} data-testid="book-open-external">
           Open the PDF in a new tab
           <span className="sr-only"> (opens in a new tab)</span>
         </a>
         {toolbarExtra}
         {file.data.external && <span className="text-xs text-slate-600">Hosted outside Reqon</span>}
+      </div>
       </div>
 
       {readError ? (
@@ -211,7 +234,8 @@ export function BookReader({
               // With no page asked for, the book opens at its very start, the cover included.
               pageIndex={page === null ? 1 : index}
               label={`Requirements Book, ${regsRef}`}
-              maxHeightClass={compact ? 'max-h-[70vh]' : 'h-[calc(100dvh-14rem)] min-h-[24rem]'}
+              maxHeightClass={compact ? 'max-h-[70vh]' : 'h-[calc(100dvh-17rem)] min-h-[24rem]'}
+              fit={fit}
               onDocument={setPdfPages}
               onVisiblePage={(visible) => {
                 const next = Math.max(1, visible - offset)

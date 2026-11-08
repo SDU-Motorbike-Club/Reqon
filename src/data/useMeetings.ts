@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase.ts'
 import type { Database } from '../lib/database.types.ts'
 import { useSeasonId } from '../season/context.ts'
 import { DataError } from '../core/errors.ts'
+import { invokeEdgeFunction } from './edgeFunctions.ts'
 import { fetchAllRows, unwrap } from './errors.ts'
 import { queryKeys } from './queryKeys.ts'
 import { useSeasonScopedQuery } from './seasonQuery.ts'
@@ -30,6 +31,8 @@ export type MeetingDraft = {
   subteamKey: string | null
   agenda: string | null
   notes: string | null
+  // Two or three sentences on what was decided; written by hand or drafted by useSummarizeMeeting and then saved.
+  summary: string | null
   attendees: string | null
 }
 
@@ -76,8 +79,21 @@ const toRow = (draft: MeetingDraft) => ({
   subteam_key: draft.subteamKey,
   agenda: draft.agenda,
   notes: draft.notes,
+  summary: draft.summary,
   attendees: draft.attendees,
 })
+
+// Asks the summarize-meeting Edge Function for a DRAFT summary of the text in the form. Nothing is saved: the
+// person reads and edits it, then saves the meeting. The model key stays on the server (see the function).
+export function useSummarizeMeeting() {
+  return useMutation<string, Error, { title: string; agenda: string; notes: string }>({
+    mutationFn: async (input) => {
+      const data = await invokeEdgeFunction<{ summary?: unknown }>('summarize-meeting', input, 'write a summary')
+      if (typeof data.summary !== 'string' || !data.summary.trim()) throw new DataError('write a summary: the server sent no answer', null)
+      return data.summary.trim()
+    },
+  })
+}
 
 // An UPDATE or DELETE that RLS refuses touches no rows and reports no error, so
 // ask the database which of the two happened rather than guessing.

@@ -1,5 +1,6 @@
 import { ALL_DEPARTMENTS, resolveDepartmentParam } from '../departments/filter.ts'
 import { mergeSearchParams } from '../lib/searchParams.ts'
+import { isOverdue } from './overdue.ts'
 import { tasksInScope, type TaskScope } from './scope.ts'
 import type { Task } from './types.ts'
 
@@ -65,4 +66,31 @@ export function applyTaskFilter(current: URLSearchParams, filter: TaskFilter): U
 
 export function isDefaultTaskFilter(filter: TaskFilter): boolean {
   return filter.scope === 'all' && filter.department === ALL_DEPARTMENTS
+}
+
+// The Board's date range, kept apart from TaskFilter so the Gantt's lens is untouched.
+// Calendar-day strings (YYYY-MM-DD), compared as strings like isOverdue does.
+export type DateRange = { from: string | null; to: string | null }
+export const NO_DATE_RANGE: DateRange = { from: null, to: null }
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
+const day = (raw: string | null) => (raw && ISO_DAY.test(raw) ? raw : null)
+
+export function dateRangeFromParams(params: URLSearchParams): DateRange {
+  return { from: day(params.get('from')), to: day(params.get('to')) }
+}
+
+export function applyDateRange(current: URLSearchParams, range: DateRange): URLSearchParams {
+  return mergeSearchParams(current, { from: range.from, to: range.to })
+}
+
+// Hides tasks whose deadline falls outside [from, to], with three exceptions: a task
+// with no deadline, and any task that is overdue (a missed deadline must stay visible
+// however far back it is), are always shown.
+export function inDateRange<T extends Pick<Task, 'due_date' | 'state'>>(tasks: readonly T[], range: DateRange, today: string): T[] {
+  if (range.from === null && range.to === null) return tasks as T[]
+  return tasks.filter((t) => {
+    if (t.due_date === null || isOverdue(t, today)) return true
+    return (range.from === null || t.due_date >= range.from) && (range.to === null || t.due_date <= range.to)
+  })
 }

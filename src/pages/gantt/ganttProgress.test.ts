@@ -54,17 +54,12 @@ describe('milestoneProgress: one rule, counted once', () => {
     expect(view).toMatchObject({ done: 1, total: 2, percent: 50, archivedUnfinished: 1 })
   })
 
-  it('with no linked task, the drafted checklist stands in and is labelled as drafted', () => {
-    const view = milestoneProgress([sec('s1', true), sec('s2')], [], 'M1')
-    expect(view).toMatchObject({ basis: 'drafted', percent: 50, done: 1, total: 2 })
-    expect(progressLabel(view)).toBe('1 of 2 sections drafted (no tasks linked)')
-    expect(progressLabel(view, 'submission', 'done')).toBe('1 of 2 sections done (no tasks linked)')
-  })
-
-  it('with nothing at all it says so, and has no percentage', () => {
-    const view = milestoneProgress([], [], 'M1')
-    expect(view).toMatchObject({ basis: 'none', percent: null })
-    expect(progressLabel(view)).toBe('No linked work')
+  it('with no linked task it says so and has no percentage, even when sections are drafted', () => {
+    for (const sections of [[sec('s1', true), sec('s2')], []]) {
+      const view = milestoneProgress(sections, [], 'M1')
+      expect(view).toMatchObject({ basis: 'none', percent: null })
+      expect(progressLabel(view)).toBe('No tasks yet')
+    }
   })
 
   it('once a task is linked the drafted ticks stop counting', () => {

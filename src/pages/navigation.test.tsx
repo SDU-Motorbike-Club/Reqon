@@ -153,6 +153,18 @@ describe('Now dashboard', () => {
     expect(within(list).getByRole('link', { name: 'Late fairing drawing' })).toHaveAttribute('href', '/board?task=t-late')
   })
 
+  it('leads with my own tasks, draws a late deadline in red, and puts "Propose a task" above the lists', () => {
+    renderApp()
+    const mine = screen.getByTestId('now-mine')
+    const overdue = screen.getByTestId('now-overdue')
+    expect(mine.compareDocumentPosition(overdue) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(mine).toHaveTextContent('Late fairing drawing')
+    expect(mine).toHaveTextContent('In progress · Design Envelope')
+    expect(within(mine).getByText('due 01/01/20')).toHaveClass('text-red-700')
+    const propose = screen.getByRole('link', { name: 'Propose a task' })
+    expect(propose.compareDocumentPosition(mine) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('shows loading and unavailable as their own states, never as zero work', () => {
     metrics.attentionLoading = true
     const { unmount } = renderApp()

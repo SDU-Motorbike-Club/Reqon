@@ -76,6 +76,7 @@ declare
   clause_x text; clause_y text;
   t uuid; tb uuid; tc uuid; td uuid;
   sec1 uuid; sub1 uuid;
+  psec uuid; psec2 uuid; pp uuid; pc1 uuid; pc2 uuid; pq uuid; pq1 uuid;
   base_req bigint; base_ms bigint;
   b_art record; a_before record; a_after record;
   r text;
@@ -228,6 +229,21 @@ begin
     (select (is_urgent and not is_overdue and not is_blocked)::text from attention(season, current_date) where title = '[PG] urgent only'), 'true');
   perform pg_temp.expect('done, cancelled and archived tasks are never listed',
     (select count(*)::text from attention(season, current_date + 3650) where title in ('[PG] parent done', '[PG] child a cancelled', '[PG] child a wip, archived')), '0');
+
+  -- ------------------------------------------- parent tasks and their subtasks (20260153)
+  insert into milestone_sections (milestone_key, ordinal, name) values (ms, 953, 'PG parent section') returning id into psec;
+  insert into milestone_sections (milestone_key, ordinal, name) values (ms, 954, 'PG parent section, subtasks elsewhere') returning id into psec2;
+  pp  := pg_temp.mkt(season, 'parent task', 'PG_PARENT', 'todo', false, ms, psec);
+  pc1 := pg_temp.mkt(season, 'subtask done', 'PG_PARENT', 'done', false, ms, psec);
+  pc2 := pg_temp.mkt(season, 'subtask todo', 'PG_PARENT', 'todo', false, ms, psec);
+  update tasks set parent_id = pp where id in (pc1, pc2);
+  perform pg_temp.expect('a parent and two subtasks in one section count as the two subtasks: 1 of 2, not 1 of 3',
+    pg_temp.prog(season, 'section', psec::text), '2|1|0|0|0|1|50');
+  pq  := pg_temp.mkt(season, 'parent with subtask elsewhere', 'PG_PARENT', 'todo', false, ms, psec2);
+  pq1 := pg_temp.mkt(season, 'subtask in another group', 'PG_PARENT', 'todo', false, ms, null);
+  update tasks set parent_id = pq where id = pq1;
+  perform pg_temp.expect('a parent whose subtask is counted in another group still counts in its own',
+    pg_temp.prog(season, 'section', psec2::text), '1|0|0|0|0|1|0');
 
   -- ================================================================= verdict
   select count(*), count(*) filter (where not (got like expected)),

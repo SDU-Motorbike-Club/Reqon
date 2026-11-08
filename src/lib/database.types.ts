@@ -2607,6 +2607,7 @@ export type Database = {
           links_required: boolean
           milestone_key: string | null
           owner_id: string | null
+          parent_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           season_id: string
           section_id: string | null
@@ -2634,6 +2635,7 @@ export type Database = {
           links_required?: boolean
           milestone_key?: string | null
           owner_id?: string | null
+          parent_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           season_id: string
           section_id?: string | null
@@ -2661,6 +2663,7 @@ export type Database = {
           links_required?: boolean
           milestone_key?: string | null
           owner_id?: string | null
+          parent_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           season_id?: string
           section_id?: string | null
@@ -3273,6 +3276,7 @@ export type Database = {
           links_required: boolean
           milestone_key: string | null
           owner_id: string | null
+          parent_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           season_id: string
           section_id: string | null
@@ -3309,6 +3313,7 @@ export type Database = {
           links_required: boolean
           milestone_key: string | null
           owner_id: string | null
+          parent_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           season_id: string
           section_id: string | null
@@ -3345,6 +3350,7 @@ export type Database = {
           links_required: boolean
           milestone_key: string | null
           owner_id: string | null
+          parent_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           season_id: string
           section_id: string | null
@@ -3522,6 +3528,7 @@ export type Database = {
           links_required: boolean
           milestone_key: string | null
           owner_id: string | null
+          parent_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           season_id: string
           section_id: string | null
@@ -3853,6 +3860,7 @@ export type Database = {
           links_required: boolean
           milestone_key: string | null
           owner_id: string | null
+          parent_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           season_id: string
           section_id: string | null
@@ -4157,6 +4165,7 @@ export type Database = {
           links_required: boolean
           milestone_key: string | null
           owner_id: string | null
+          parent_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           season_id: string
           section_id: string | null

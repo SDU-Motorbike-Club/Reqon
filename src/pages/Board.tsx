@@ -1,10 +1,11 @@
-import { useId, useMemo, useState } from 'react'
+import { Fragment, useCallback, useId, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { attachmentPermissions, canArchiveTask, canCreateTask, canEditTask, canReassignTaskOwner, canRestoreTask, canSubmitProposal, taskDepartmentTargets } from '../auth/permissions.ts'
 import { useAuth } from '../auth/context.ts'
 import { departmentChoices } from '../departments/filter.ts'
 import { DepartmentNav } from '../departments/DepartmentNav.tsx'
 import { ScopeDepartmentFilter } from '../departments/ScopeDepartmentFilter.tsx'
+import { useAvatars } from '../data/useAvatars.ts'
 import { useMembers } from '../data/useMembers.ts'
 import { useMilestones } from '../data/useMilestones.ts'
 import { useProposals } from '../data/useProposals.ts'
@@ -19,12 +20,12 @@ import { useTaskActor } from '../data/useTaskActor.ts'
 import { useTaskDependencies } from '../data/useTaskDependencies.ts'
 import { useSourceProposals, useTaskRequirements, useTasksForProgress } from '../data/useTaskHistory.ts'
 import { useRestoreTask, useTasks, useUpdateTask, type Task } from '../data/useTasks.ts'
-import { todayIso } from '../lib/dates.ts'
+import { formatDay, todayIso } from '../lib/dates.ts'
 import { milestoneLabel } from '../milestones/label.ts'
 import { isHistory } from '../proposals/filters.ts'
 import { ProposalsPanel } from '../proposals/ProposalsPanel.tsx'
 import { dependentsOf, openPrerequisites, prerequisiteCandidates, prerequisitesOf, taskRefLookup } from '../tasks/dependencies.ts'
-import { applyTaskFilter, DEFAULT_TASK_FILTER, filterTasks, isDefaultTaskFilter, taskFilterFromParams, taskScopeCounts, type TaskFilter } from '../tasks/filters.ts'
+import { applyDateRange, applyTaskFilter, dateRangeFromParams, DEFAULT_TASK_FILTER, filterTasks, inDateRange, isDefaultTaskFilter, NO_DATE_RANGE, taskFilterFromParams, taskScopeCounts, type DateRange, type TaskFilter } from '../tasks/filters.ts'
 import type { TaskScope } from '../tasks/scope.ts'
 import { TASK_STATES } from '../tasks/taskState.ts'
 import { pageMain } from '../ui/layout.ts'
@@ -32,10 +33,14 @@ import { PageHeader } from '../ui/PageHeader.tsx'
 import { ActionError, ErrorState } from '../ui/states.tsx'
 import { Dialog } from '../ui/Dialog.tsx'
 import { buttonPrimary, buttonSecondary } from '../ui/buttons.ts'
+import { groupBoardTasks, topLevelId } from '../tasks/hierarchy.ts'
 import { LANE_PAGE, laneWindow } from './board/boardView.ts'
 import { MoveControl } from './board/MoveControl.tsx'
 import { NewTaskDialog } from './board/NewTaskDialog.tsx'
+import { Avatar } from '../ui/Avatar.tsx'
 import { TaskCard } from './board/TaskCard.tsx'
+import { taskDropHandlers } from './gantt/ganttDrag.ts'
+import type { TaskState } from '../tasks/types.ts'
 import { TaskDetails, type TaskLinksView, type TaskPermissions } from './board/TaskDetails.tsx'
 import { mergeSearchParams } from '../lib/searchParams.ts'
 import { useUrlParams } from '../lib/useUrlParams.ts'
@@ -61,6 +66,8 @@ export default function Board() {
   const links = useTaskRequirements()
   const actor = useTaskActor()
   const updateTask = useUpdateTask()
+  // Everyone's profile pictures, loaded once and kept for an hour; a card falls back to initials until they arrive.
+  const avatars = useAvatars()
   const realtime = useRealtimeTasks()
   // Someone else linking a task to a requirement must update the counts here.
   useRealtimeTaskRequirements()
@@ -93,10 +100,24 @@ export default function Board() {
   }, [params, departmentList])
   // Merged into the address, so ?task= and anything else in it survives.
   const setFilter = (next: TaskFilter) => setParams((current) => applyTaskFilter(current, next), { replace: true })
+  const range = useMemo(() => dateRangeFromParams(params), [params])
+  const setRange = (next: DateRange) => setParams((current) => applyDateRange(current, next), { replace: true })
+  // One address update, so scope, department and dates reset together.
+  const clearFilters = () => setParams((current) => applyDateRange(applyTaskFilter(current, DEFAULT_TASK_FILTER), NO_DATE_RANGE), { replace: true })
 
   const memberName = useMemo(() => new Map((members.data ?? []).map((m) => [m.id, m.full_name])), [members.data])
   const deptName = useMemo(() => new Map((departmentList ?? []).map((d) => [d.key, d.name])), [departmentList])
-  const visible = useMemo(() => filterTasks(allTasks, filter, myId), [allTasks, filter, myId])
+  const visible = useMemo(() => inDateRange(filterTasks(allTasks, filter, myId), range, today), [allTasks, filter, myId, range, today])
+  // Parent tasks carry their subtasks; "My tasks" stays a flat list of the viewer's own tasks.
+  const flat = filter.scope === 'mine'
+  const { tops, childrenOf } = useMemo(() => groupBoardTasks(visible, allTasks, flat), [visible, allTasks, flat])
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
+  const toggle = (id: string) =>
+    setExpanded((s) => {
+      const next = new Set(s)
+      if (!next.delete(id)) next.add(id)
+      return next
+    })
   // How many extra cards each lane has been asked to show beyond the first page.
   const [extra, setExtra] = useState<Record<string, number>>({})
 
@@ -129,6 +150,14 @@ export default function Board() {
   // After an archive the card is gone: say so, and offer Undo to whoever may restore.
   // The New task dialog (a task leader creates a task straight on the Board), and the line that says it was made.
   const [creating, setCreating] = useState(false)
+  // Set while "Add subtask" is open: the task the new one will be part of.
+  const [subtaskOf, setSubtaskOf] = useState<Task | null>(null)
+  const [createdNote, setCreatedNote] = useState<string | null>(null)
+  // Dragging a card onto a lane: the lane under it (to highlight), and the card dropped on Blocked that
+  // must first say why (or what blocks it).
+  const [overLane, setOverLane] = useState<TaskState | null>(null)
+  const [blockAskFor, setBlockAskFor] = useState<string | null>(null)
+  const clearBlockAsk = useCallback(() => setBlockAskFor(null), [])
   const [created, setCreated] = useState<string | null>(null)
   const [archived, setArchived] = useState<{ id: string; title: string; canRestore: boolean; restored: boolean } | null>(null)
   const restore = useRestoreTask()
@@ -196,6 +225,17 @@ export default function Board() {
       attachments: attachmentPermissions(actor, task),
     }
   }
+  // A card dropped on a lane. The same rules as the lane <select>: only someone who may edit the task, nothing
+  // when the lane is the one it is already in, and Blocked with no open prerequisite asks why first.
+  const dropTask = (id: string, state: TaskState) => {
+    const task = allTasks.find((t) => t.id === id)
+    if (!task || task.state === state || !permsFor(task).canEdit) return
+    if (state === 'blocked' && openPrerequisites(linksFor(task).prerequisites).length === 0) {
+      setBlockAskFor(id)
+      return
+    }
+    updateTask.mutate({ id, state })
+  }
   const ownersFor = (task: (typeof allTasks)[number]) =>
     task.owner_id && !activeOwners.some((o) => o.id === task.owner_id)
       ? [...activeOwners, { id: task.owner_id, name: `${memberName.get(task.owner_id) ?? 'Someone'} (no longer active)` }]
@@ -203,7 +243,7 @@ export default function Board() {
 
   // The tour explains one real card: the first VISIBLE one, reading the lanes in
   // order, so the tour never points at a card the filter has hidden.
-  const tutorialTaskId = LANES.map((lane) => visible.find((t) => t.state === lane.state)).find(Boolean)?.id
+  const tutorialTaskId = LANES.map((lane) => tops.find((t) => t.state === lane.state)).find(Boolean)?.id
 
   const error = tasks.error ?? members.error ?? departments.error
   if (error) {
@@ -225,7 +265,7 @@ export default function Board() {
     )
   }
 
-  const filtered = !isDefaultTaskFilter(filter)
+  const filtered = !isDefaultTaskFilter(filter) || range.from !== null || range.to !== null
   const nothingAtAll = !tasks.isLoading && allTasks.length === 0
 
   return (
@@ -252,6 +292,7 @@ export default function Board() {
             data-tutorial="board-new-task"
             onClick={() => {
               setCreated(null)
+              setCreatedNote(null)
               setCreating(true)
             }}
           >
@@ -276,6 +317,11 @@ export default function Board() {
         {created && (
           <p role="status" className="text-sm text-emerald-800" data-testid="board-task-created">
             Created “{created}”.
+          </p>
+        )}
+        {createdNote && (
+          <p role="alert" className="rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-950" data-testid="board-subtask-note">
+            {createdNote}
           </p>
         )}
       </div>
@@ -331,13 +377,37 @@ export default function Board() {
             scopeTestId="board-scope"
           />
         )}
+        {/* Tasks with a deadline after "To" are hidden; overdue and undated tasks always stay. */}
+        <div className="mt-2 flex flex-wrap items-end gap-3 text-xs text-slate-700" data-testid="board-date-range">
+          <label className="flex flex-col gap-1">
+            Due from
+            <input
+              type="date"
+              value={range.from ?? ''}
+              max={range.to ?? undefined}
+              onChange={(e) => setRange({ ...range, from: e.target.value || null })}
+              className="min-h-11 rounded border border-slate-300 bg-surface px-2 text-sm text-slate-900 sm:min-h-0"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            Due to
+            <input
+              type="date"
+              value={range.to ?? ''}
+              min={range.from ?? undefined}
+              onChange={(e) => setRange({ ...range, to: e.target.value || null })}
+              className="min-h-11 rounded border border-slate-300 bg-surface px-2 text-sm text-slate-900 sm:min-h-0"
+            />
+          </label>
+          {(range.from !== null || range.to !== null) && <span>Overdue and undated tasks always show.</span>}
+        </div>
         <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600" data-testid="board-filter-summary">
           <span>
             Showing {visible.length} of {allTasks.length} active tasks
             {filtered ? ` · ${filter.scope === 'mine' ? 'My tasks' : 'All tasks'} · ${filter.department === 'all' ? 'All departments' : (choices.find((c) => c.key === filter.department)?.label ?? filter.department)}` : ''}
           </span>
           {filtered && (
-            <button type="button" onClick={() => setFilter(DEFAULT_TASK_FILTER)} className="inline-flex min-h-11 items-center rounded font-medium text-slate-900 underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-accent-ring focus-visible:outline-none sm:min-h-0">
+            <button type="button" onClick={clearFilters} className="inline-flex min-h-11 items-center rounded font-medium text-slate-900 underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-accent-ring focus-visible:outline-none sm:min-h-0">
               Clear filters
             </button>
           )}
@@ -401,7 +471,7 @@ export default function Board() {
       {!tasks.isLoading && !nothingAtAll && visible.length === 0 && (
         <p className="mb-3 rounded border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700" data-testid="board-no-match">
           No tasks match these filters.{' '}
-          <button type="button" onClick={() => setFilter(DEFAULT_TASK_FILTER)} className="underline underline-offset-2 hover:text-slate-900">
+          <button type="button" onClick={clearFilters} className="underline underline-offset-2 hover:text-slate-900">
             Clear filters
           </button>
         </p>
@@ -413,39 +483,82 @@ export default function Board() {
           in, so "In progress" is not buried under every To do card. */}
       <div className="relative -mx-3 flex snap-x snap-mandatory scroll-px-3 gap-3 overflow-x-auto overscroll-x-contain px-3 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3 min-[75rem]:grid-cols-5" data-tutorial="board-lanes">
         {LANES.map((lane) => {
-          const laneTasks = visible.filter((t) => t.state === lane.state)
+          const laneTasks = tops.filter((t) => t.state === lane.state)
           const limit = LANE_PAGE + (extra[lane.state] ?? 0)
-          const { shown, hidden } = laneWindow(laneTasks, limit, focusId ?? openTaskId)
+          const { shown, hidden } = laneWindow(laneTasks, limit, topLevelId(focusId ?? openTaskId, allTasks, flat))
+          const card = (task: (typeof allTasks)[number], nested = false, inside?: ReactNode) => {
+            const source = task.source_proposal ? sources.data?.get(task.source_proposal) : undefined
+            return (
+              <TaskCard
+                key={task.id}
+                task={task}
+                today={today}
+                tutorial={task.id === tutorialTaskId}
+                focused={task.id === focusId}
+                departmentName={task.subteam_key ? (deptName.get(task.subteam_key) ?? task.subteam_key) : null}
+                ownerName={task.owner_id ? (memberName.get(task.owner_id) ?? 'Someone no longer on the roster') : null}
+                ownerImage={task.owner_id ? (avatars.data?.get(task.owner_id) ?? null) : null}
+                milestoneLabel={task.milestone_key ? (milestoneName.get(task.milestone_key) ?? task.milestone_key) : null}
+                requirementKeys={keysByTask.get(task.id) ?? []}
+                source={source ? { id: source.id, title: source.title } : null}
+                perms={permsFor(task)}
+                moving={updateTask.isPending}
+                links={linksFor(task)}
+                detailsOpen={task.id === openTaskId}
+                onOpenDetails={() => setOpenTaskId(task.id)}
+                askBlock={task.id === blockAskFor}
+                onAskBlockDone={clearBlockAsk}
+                onMove={(id, state, blockedReason) => updateTask.mutate({ id, state, ...(blockedReason ? { blockedReason } : {}) })}
+                nested={nested}
+              >
+                {inside}
+              </TaskCard>
+            )
+          }
           return (
-            <section key={lane.state} className={`w-[85%] flex-none snap-start self-start rounded-lg border p-2 sm:w-auto sm:self-auto ${lane.boardTone}`} aria-labelledby={`lane-${lane.state}`} data-testid={`lane-${lane.state}`}>
-              <h2 id={`lane-${lane.state}`} className="mb-2 text-xs font-semibold tracking-wide text-slate-700 uppercase">
+            <section
+              key={lane.state}
+              className={`w-[85%] flex-none snap-start self-start rounded-lg border p-3 transition-shadow sm:w-auto sm:self-auto ${lane.boardTone} ${overLane === lane.state ? 'ring-2 ring-slate-500 ring-offset-1' : ''}`}
+              aria-labelledby={`lane-${lane.state}`}
+              data-testid={`lane-${lane.state}`}
+              {...taskDropHandlers(
+                (id) => dropTask(id, lane.state),
+                (over) => setOverLane((current) => (over ? lane.state : current === lane.state ? null : current)),
+              )}
+            >
+              <h2 id={`lane-${lane.state}`} className="mb-3 text-xs font-semibold tracking-wide text-slate-700 uppercase">
                 {lane.label} <span className="font-normal text-slate-700">({laneTasks.length})</span>
               </h2>
               {laneTasks.length === 0 ? (
                 <p className="px-1 py-2 text-xs text-slate-700">Nothing here.</p>
               ) : (
-                <ul className="space-y-2">
+                <ul className="space-y-3">
                   {shown.map((task) => {
-                    const source = task.source_proposal ? sources.data?.get(task.source_proposal) : undefined
+                    const kids = childrenOf.get(task.id) ?? []
+                    // Opened by the user, or because the address names one of its subtasks.
+                    const open = kids.length > 0 && (expanded.has(task.id) || kids.some((k) => k.id === (focusId ?? openTaskId)))
                     return (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        today={today}
-                        tutorial={task.id === tutorialTaskId}
-                        focused={task.id === focusId}
-                        departmentName={task.subteam_key ? (deptName.get(task.subteam_key) ?? task.subteam_key) : null}
-                        ownerName={task.owner_id ? (memberName.get(task.owner_id) ?? 'Someone no longer on the roster') : null}
-                        milestoneLabel={task.milestone_key ? (milestoneName.get(task.milestone_key) ?? task.milestone_key) : null}
-                        requirementKeys={keysByTask.get(task.id) ?? []}
-                        source={source ? { id: source.id, title: source.title } : null}
-                        perms={permsFor(task)}
-                        moving={updateTask.isPending}
-                        links={linksFor(task)}
-                        detailsOpen={task.id === openTaskId}
-                        onOpenDetails={() => setOpenTaskId(task.id)}
-                        onMove={(id, state, blockedReason) => updateTask.mutate({ id, state, ...(blockedReason ? { blockedReason } : {}) })}
-                      />
+                      <Fragment key={task.id}>
+                        {/* The subtasks live inside the parent's own card (one bubble), under its Details button. */}
+                        {card(
+                          task,
+                          false,
+                          kids.length > 0 && (
+                            <div className="mt-3 border-t border-slate-200 pt-1" data-testid={`subtasks-${task.id}`}>
+                              <button
+                                type="button"
+                                aria-expanded={open}
+                                onClick={() => toggle(task.id)}
+                                className="inline-flex min-h-11 items-center gap-1 rounded text-xs font-medium text-slate-800 hover:underline focus-visible:ring-2 focus-visible:ring-accent-ring focus-visible:outline-none sm:min-h-0"
+                              >
+                                <span aria-hidden="true">{open ? '▾' : '▸'}</span>
+                                {kids.length} {kids.length === 1 ? 'subtask' : 'subtasks'} · {kids.filter((k) => k.state === 'done').length} done
+                              </button>
+                              {open && <ul className="mt-2 space-y-3">{kids.map((k) => card(k, true))}</ul>}
+                            </div>
+                          ),
+                        )}
+                      </Fragment>
                     )
                   })}
                 </ul>
@@ -480,11 +593,17 @@ export default function Board() {
       </div>
 
       <NewTaskDialog
-        open={creating}
-        onClose={() => setCreating(false)}
-        onCreated={(task) => {
+        open={creating || subtaskOf !== null}
+        parent={subtaskOf}
+        onClose={() => {
           setCreating(false)
+          setSubtaskOf(null)
+        }}
+        onCreated={(task, note) => {
+          setCreating(false)
+          setSubtaskOf(null)
           setCreated(task.title)
+          setCreatedNote(note ?? null)
         }}
         departments={activeDepartments}
         owners={activeOwners}
@@ -520,9 +639,18 @@ export default function Board() {
         {openTask && (
           <>
             <div className="mb-3 flex items-start justify-between gap-3">
-              <h2 id={dialogTitleId} className="text-base font-semibold text-balance text-slate-900">
-                {openTask.title}
-              </h2>
+              <div className="min-w-0">
+                <h2 id={dialogTitleId} className="text-base font-semibold text-balance text-slate-900">
+                  {openTask.title}
+                </h2>
+                {/* Whose task it is, with their face, so a task opened from a link is never anonymous. */}
+                {openTask.owner_id && (
+                  <p className="mt-1 flex items-center gap-2 text-sm text-slate-700" data-testid="task-dialog-owner">
+                    <Avatar name={memberName.get(openTask.owner_id) ?? 'Someone'} image={avatars.data?.get(openTask.owner_id) ?? null} size="sm" />
+                    {memberName.get(openTask.owner_id) ?? 'Someone no longer on the roster'}
+                  </p>
+                )}
+              </div>
               <button type="button" onClick={() => setOpenTaskId(null)} className="min-h-11 shrink-0 rounded px-2 text-sm underline underline-offset-2 sm:min-h-0">
                 Close
               </button>
@@ -538,10 +666,59 @@ export default function Board() {
                   idPrefix="task-dialog-state"
                   testIdPrefix="task-dialog-block-form"
                   visibleLabel="Lane"
+                  links={linksFor(openTask)}
                 />
                 <ActionError error={updateTask.isError ? updateTask.error : null} className="mt-1" />
               </div>
             )}
+            {/* A broad task is broken down here: the new task starts from this one's department, submission and deadline. */}
+            {canCreateTask(actor) && openTask.parent_id == null && (
+              <div className="mb-3">
+                <button
+                  type="button"
+                  className={buttonSecondary}
+                  data-testid="board-add-subtask"
+                  onClick={() => {
+                    setCreated(null)
+                    setCreatedNote(null)
+                    setOpenTaskId(null)
+                    setSubtaskOf(openTask)
+                  }}
+                >
+                  Add subtask
+                </button>
+              </div>
+            )}
+            {/* Its subtasks, a little below and to the right, like bullet points without the bullets. Opening one
+                opens that task's own page. Always every subtask, whatever the Board's filters are. */}
+            {(() => {
+              const kids = allTasks.filter((t) => t.parent_id === openTask.id)
+              if (kids.length === 0) return null
+              return (
+                <section className="mb-4" aria-label="Subtasks" data-testid="task-dialog-subtasks">
+                  <h3 className="text-xs font-semibold text-slate-700">
+                    Subtasks <span className="font-normal tabular-nums">({kids.filter((k) => k.state === 'done').length} of {kids.length} done)</span>
+                  </h3>
+                  <ul className="mt-2 list-none space-y-2 pl-5">
+                    {kids.map((k) => (
+                      <li key={k.id} className="flex flex-wrap items-baseline gap-x-2 text-sm" data-testid={`task-dialog-subtask-${k.id}`}>
+                        <button
+                          type="button"
+                          onClick={() => setOpenTaskId(k.id)}
+                          className="min-h-11 rounded text-left font-medium text-slate-900 underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-accent-ring focus-visible:outline-none sm:min-h-0"
+                        >
+                          {k.title}
+                        </button>
+                        <span className="text-xs text-slate-600">
+                          {TASK_STATES.find((s) => s.state === k.state)?.label}
+                          {k.due_date ? ` · due ${formatDay(k.due_date)}` : ''}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )
+            })()}
             <TaskDetails
               key={openTask.id}
               task={openTask}

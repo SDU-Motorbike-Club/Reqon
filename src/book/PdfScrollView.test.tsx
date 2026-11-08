@@ -8,6 +8,8 @@ const fake = vi.hoisted(() => ({
   destroyed: 0,
   rendered: [] as number[],
   observers: [] as { cb: (e: unknown[]) => void; opts: { rootMargin?: string }; targets: Element[] }[],
+  // What the fake ResizeObserver reports for the scroll area (height unknown unless a test sets it).
+  box: { width: 600 } as { width: number; height?: number },
 }))
 
 vi.mock('pdfjs-dist', () => ({
@@ -56,7 +58,7 @@ beforeEach(() => {
     constructor(cb: (e: unknown[]) => void) {
       this.cb = cb
     }
-    observe() { this.cb([{ contentRect: { width: 600 } }]) }
+    observe() { this.cb([{ contentRect: fake.box }]) }
     disconnect() {}
   }
   vi.stubGlobal('ResizeObserver', FakeRO)
@@ -78,6 +80,36 @@ describe('PdfScrollView', () => {
     expect(seen).toHaveBeenCalledWith(5)
     expect(document.querySelectorAll('[data-page]')).toHaveLength(5)
     expect(fake.rendered).toEqual([]) // nothing is near yet, so nothing is drawn
+  })
+
+  describe('how big a page is drawn', () => {
+    // The fake page is 600 x 840, so its height is 1.4 times its width.
+    const slotWidth = async (fit?: 'page' | 'width') => {
+      render(<PdfScrollView {...props} pageIndex={1} fit={fit} />)
+      await waitFor(() => expect(screen.getByTestId('book-scroll')).toHaveAttribute('data-pages', '5'))
+      return (document.querySelector('[data-page="1"]') as HTMLElement).style.width
+    }
+    afterEach(() => { fake.box = { width: 600 } })
+
+    it('fills the column by default, as before', async () => {
+      fake.box = { width: 600, height: 524 }
+      expect(await slotWidth()).toBe('600px')
+    })
+
+    it('fits a WHOLE page in the visible area when asked: (height - air) / 1.4', async () => {
+      fake.box = { width: 900, height: 524 }
+      expect(await slotWidth('page')).toBe('357px') // (524 - 24) / 1.4
+    })
+
+    it('never makes a page wider than the column, even when the area is very tall', async () => {
+      fake.box = { width: 300, height: 4000 }
+      expect(await slotWidth('page')).toBe('300px')
+    })
+
+    it('falls back to the full column when the height is not known', async () => {
+      fake.box = { width: 600 }
+      expect(await slotWidth('page')).toBe('600px')
+    })
   })
 
   it('draws only the pages near the screen, and frees one that leaves', async () => {

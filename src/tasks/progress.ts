@@ -34,18 +34,23 @@ export type Progress = {
   openActive: number
 }
 
-type ProgressTask = Pick<Task, 'state'> & Partial<Pick<Task, 'id' | 'archived_at'>>
+type ProgressTask = Pick<Task, 'state'> & Partial<Pick<Task, 'id' | 'archived_at' | 'parent_id'>>
 
+// A parent task and its subtasks are one piece of work, not 1 + n. Inside the group being counted a parent
+// that has a subtask is left out and its subtasks stand for it; a parent whose subtasks are counted
+// elsewhere still counts here. Mirrored by v_task_progress (20260153000000).
 export function taskProgress(tasks: readonly ProgressTask[]): Progress {
   const seen = new Set<string>()
-  const distinct: ProgressTask[] = []
+  const unique: ProgressTask[] = []
   for (const task of tasks) {
     if (task.id !== undefined) {
       if (seen.has(task.id)) continue
       seen.add(task.id)
     }
-    distinct.push(task)
+    unique.push(task)
   }
+  const parents = new Set(unique.map((t) => t.parent_id).filter((id): id is string => id != null))
+  const distinct = unique.filter((t) => t.id === undefined || !parents.has(t.id))
   const counted = distinct.filter((t) => t.state !== 'cancelled')
   const archived = (t: ProgressTask) => t.archived_at != null
   const done = counted.filter((t) => t.state === 'done').length

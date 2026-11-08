@@ -27,7 +27,7 @@ import { useSubteams } from '../data/useSubteams.ts'
 import { useTaskActor } from '../data/useTaskActor.ts'
 import { useTaskDependencies } from '../data/useTaskDependencies.ts'
 import { useTasksForProgress } from '../data/useTaskHistory.ts'
-import { useTasks, useUpdateTask, type Task } from '../data/useTasks.ts'
+import { useTasks, useUpdateTask, type Task, type TaskEdit } from '../data/useTasks.ts'
 import { gridStyle } from './gantt/ganttGrid.ts'
 import { GanttLegend } from './gantt/GanttLegend.tsx'
 import { GanttToolbar } from './gantt/GanttToolbar.tsx'
@@ -68,6 +68,8 @@ export default function Gantt() {
   const actor = useTaskActor()
   const permissions = usePermissions()
   const updateTask = useUpdateTask()
+  // Date saves report their own error in the row, so they use a mutation of their own: sharing one would show the same error twice.
+  const scheduleTask = useUpdateTask()
   useRealtimeTasks()
   useRealtimeTaskDependencies()
   const dependencies = useTaskDependencies()
@@ -97,6 +99,8 @@ export default function Gantt() {
   // together, so it is confirmed first (the same rule LinkTaskTool follows).
   const [pendingMove, setPendingMove] = useState<{ task: Task; target: LinkTarget; label: string } | null>(null)
   const [moveNotice, setMoveNotice] = useState<string | null>(null)
+  // The last unlink, kept so it can be undone: the task as it was, and where it was linked.
+  const [unlinked, setUnlinked] = useState<{ task: Task; from: string } | null>(null)
   const moveTitleId = useId()
 
   const toggle = (set: ReadonlySet<string>, key: string) => {
@@ -126,7 +130,7 @@ export default function Gantt() {
   // The lens lives in the address, like the Board's filter, and uses the same
   // shared control, parsing and "My tasks" meaning (owner = the viewer).
   const departmentList = departments.data
-  const { filter, notice } = useMemo(() => {
+  const { filter: parsedFilter, notice: parsedNotice } = useMemo(() => {
     if (!departmentList) {
       const raw = params.get('dept')
       return {
@@ -136,6 +140,10 @@ export default function Gantt() {
     }
     return taskFilterFromParams(params, departmentList)
   }, [params, departmentList])
+  // "My tasks" means owner = the viewer. Without a roster row it would quietly show everything under that name, so say so and show all.
+  const noMember = parsedFilter.scope === 'mine' && myId === null
+  const filter: TaskFilter = noMember ? { ...parsedFilter, scope: 'all' } : parsedFilter
+  const notice = noMember ? 'My tasks needs a place on the roster, so all tasks are shown.' : parsedNotice
   // Merged into the address: a filter change keeps what is open and ?task=.
   const setFilter = (next: TaskFilter) => setParams((current) => applyTaskFilter(current, next), { replace: true })
   const choices = useMemo(
@@ -146,18 +154,16 @@ export default function Gantt() {
   const departmentLabel = filter.department === 'all' ? null : (choices.find((c) => c.key === filter.department)?.label ?? filter.department)
   const lensName =
     departmentLabel && filter.scope === 'mine' ? `My ${departmentLabel} tasks` : departmentLabel ? departmentLabel : filter.scope === 'mine' ? 'My tasks' : 'All tasks'
-  const counts = useMemo(() => taskScopeCounts(taskRows, filter.department, myId), [taskRows, filter.department, myId])
+  // The Gantt shows linked tasks only, so both sets of counts are taken from them and agree with each other.
+  const linked = useMemo(() => taskRows.filter((t) => t.milestone_key !== null || t.section_id !== null), [taskRows])
+  const counts = useMemo(() => taskScopeCounts(linked, filter.department, myId), [linked, filter.department, myId])
   // Linked tasks each department entry would show under the current scope.
   const departmentCounts = useMemo(() => {
-    const inScope = filterTasks(
-      taskRows.filter((t) => t.milestone_key !== null || t.section_id !== null),
-      { scope: filter.scope, department: 'all' },
-      myId,
-    )
+    const inScope = filterTasks(linked, { scope: filter.scope, department: 'all' }, myId)
     const out: Record<string, number> = { all: inScope.length }
     for (const task of inScope) if (task.subteam_key) out[task.subteam_key] = (out[task.subteam_key] ?? 0) + 1
     return out
-  }, [taskRows, filter.scope, myId])
+  }, [linked, filter.scope, myId])
 
   const departmentNames = useMemo(() => new Map((departmentList ?? []).map((d) => [d.key, d.name])), [departmentList])
   const memberNames = useMemo(() => new Map((members.data ?? []).map((m) => [m.id, m.full_name])), [members.data])
@@ -166,7 +172,6 @@ export default function Gantt() {
   // Everything the chart must fit: milestone windows and deadlines AND task
   // starts and ends. Only tasks that are actually linked to a submission count,
   // so a loose Board task's date does not stretch the timeline.
-  const linked = useMemo(() => taskRows.filter((t) => t.milestone_key !== null || t.section_id !== null), [taskRows])
   const range = timelineRange(planningDates(milestoneRows, linked), today)
   const ticks = scale === 'week' ? weekTicks(range) : monthTicks(range)
   // Weeks need room to be legible; the chart already scrolls sideways.
@@ -220,6 +225,21 @@ export default function Gantt() {
     return { canEdit, canReassign: canEdit && canReassignTaskOwner(actor, task) }
   }
 
+  // A failed row action names the task it was for: the mutation keeps the edit it was given.
+  const failedId = updateTask.isError ? updateTask.variables?.id : undefined
+  const failedTitle = failedId ? (taskRows.find((t) => t.id === failedId)?.title ?? null) : null
+  // Any action other than the unlink itself retires the Undo: re-linking after, say, a move would silently undo the move.
+  const run = (edit: TaskEdit, keepUndo = false) => {
+    if (!keepUndo) setUnlinked(null)
+    updateTask.mutate(edit)
+  }
+  // Puts the task back exactly where it was (milestone and section together, like any link).
+  const undoUnlink = () => {
+    if (!unlinked || unlinked.task.milestone_key === null) return
+    run(linkEdit(unlinked.task, { seasonId: seasonId ?? '', milestoneKey: unlinked.task.milestone_key, sectionId: unlinked.task.section_id }))
+    setUnlinked(null)
+  }
+
   const env: GanttEnv = {
     today,
     range,
@@ -249,24 +269,29 @@ export default function Gantt() {
         setPendingMove({ task, target, label })
         return
       }
-      updateTask.mutate(linkEdit(task, target))
+      run(linkEdit(task, target))
     },
     onSchedule: async (task, start, due) => {
       const plan = planScheduleEdit(task, start, due)
       if (plan.kind === 'invalid') throw new Error(plan.reason)
       if (plan.kind === 'unchanged') return 'Nothing to save — the dates are the same.'
-      await updateTask.mutateAsync(plan.edit)
+      await scheduleTask.mutateAsync(plan.edit)
       return `Saved: ${plan.changed.join(', ')}.`
     },
     expandedTask,
     onToggleTask: (taskId) => writeParams({ task: expandedTask === taskId ? null : taskId }),
     prerequisitesFor: (task) => prerequisitesOf(dependencyLinks, task.id, prerequisiteLookup),
-    onMove: (taskId, state, blockedReason) =>
-      updateTask.mutate({ id: taskId, state, ...(blockedReason ? { blockedReason } : {}) }),
-    onOwner: (taskId, ownerId) => updateTask.mutate({ id: taskId, ownerId }),
-    onLink: (task, target) => updateTask.mutate(linkEdit(task, target)),
-    onUnlinkSection: (task) => updateTask.mutate(unlinkSectionEdit(task)),
-    onUnlinkMilestone: (task) => updateTask.mutate(unlinkMilestoneEdit(task)),
+    onMove: (taskId, state, blockedReason) => run({ id: taskId, state, ...(blockedReason ? { blockedReason } : {}) }),
+    onOwner: (taskId, ownerId) => run({ id: taskId, ownerId }),
+    onLink: (task, target) => run(linkEdit(task, target)),
+    onUnlinkSection: (task) => {
+      setUnlinked({ task, from: sectionNames.get(task.section_id ?? '') ?? 'its section' })
+      run(unlinkSectionEdit(task), true)
+    },
+    onUnlinkMilestone: (task) => {
+      setUnlinked({ task, from: milestoneLabelFor(task.milestone_key) })
+      run(unlinkMilestoneEdit(task), true)
+    },
   }
 
   const error = milestones.error ?? sections.error ?? tasks.error
@@ -300,7 +325,7 @@ export default function Gantt() {
     <main id="main-content" tabIndex={-1} className={pageMain()}>
       <PageHeader
         title="Gantt"
-        description="Every submission on one timeline. Open a submission for its sections and unsectioned work, and a section for its subtasks — which are Board tasks, not copies."
+        description="Every submission on one timeline. Open one to see its sections and tasks; they are the Board’s tasks, not copies."
         tutorialId="gantt-header"
       />
 
@@ -309,7 +334,25 @@ export default function Gantt() {
       {(milestones.isLoading || tasks.isLoading) && (
         <p role="status" className="mb-2 text-xs text-slate-500">Loading…</p>
       )}
+      {failedTitle && (
+        <p className="mb-1 text-sm font-medium text-slate-900" data-testid="gantt-failed-task">
+          “{failedTitle}” was not changed.
+        </p>
+      )}
       <ActionError error={updateTask.error} className="mb-3" />
+      {unlinked && !updateTask.isError && (
+        <p role="status" className="mb-3 flex flex-wrap items-center gap-x-2 text-sm text-slate-800" data-testid="gantt-unlinked">
+          Unlinked “{unlinked.task.title}” from {unlinked.from}.
+          <button
+            type="button"
+            onClick={undoUnlink}
+            className="inline-flex min-h-11 items-center rounded px-1 font-medium underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-accent-ring focus-visible:outline-none sm:min-h-0"
+            data-testid="gantt-undo-unlink"
+          >
+            Undo
+          </button>
+        </p>
+      )}
       {moveNotice && (
         <p role="alert" className="mb-3 rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-950" data-testid="gantt-move-notice">
           {moveNotice}
@@ -394,8 +437,8 @@ export default function Gantt() {
                 : 'Showing every linked task. Pick a department to see one department’s work in the same structure.'}
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              The dashed line is today, the flag is a submission’s deadline and each dot is a task’s date. Drag a dot to
-              change a deadline, or a row onto another section — or open the task to do the same with the keyboard.
+              Dashed line: today. Flag: a submission’s deadline. Dot: a task’s date — drag it to reschedule, or open the task to
+              use the keyboard.
             </p>
           </div>
           {legendOpen && <GanttLegend id={legendId} />}
@@ -403,6 +446,12 @@ export default function Gantt() {
           {/* The chart keeps its proportions rather than squeezing; on a phone
               it scrolls sideways, which beats months three pixels wide. It is a
               focusable region so a keyboard user can scroll it. */}
+          {/* Progress waits for the archived part of the list; drawing it from the active list alone made the percentages drop and then rise. */}
+          {progress.isLoading ? (
+            <p role="status" className="text-sm text-slate-600" data-testid="gantt-progress-loading">
+              Loading progress…
+            </p>
+          ) : (
           <div
             ref={chartRegion}
             role="region"
@@ -413,10 +462,10 @@ export default function Gantt() {
             {/* The padding lives inside the scrolled content, so the sticky
                 label column has no gap for the ruler to show through. The month
                 lines behind every row come from the ruler's own ticks. */}
-            <div className="p-4 sm:min-w-[var(--gantt-min)]" style={{ '--gantt-min': chartWidth, ...gridStyle(ticks) } as CSSProperties} data-tutorial="gantt-chart">
-              <div className="grid grid-cols-[minmax(17rem,24rem)_1fr] items-start gap-3 border-b border-slate-200 pb-1 max-sm:hidden">
-                <span className="sticky left-0 z-10 flex items-end self-stretch bg-surface pr-2 text-xs font-medium text-slate-500">
-                  Submission · section · subtask
+            <div className="min-w-[var(--gantt-min)] p-4" style={{ '--gantt-min': chartWidth, ...gridStyle(ticks) } as CSSProperties} data-tutorial="gantt-chart">
+              <div className="grid grid-cols-1 items-start gap-3 border-b border-slate-200 pb-1 sm:grid-cols-[minmax(17rem,24rem)_1fr]">
+                <span className="sticky left-0 z-10 flex items-end self-stretch bg-surface pr-2 text-xs font-medium text-slate-500 max-sm:hidden">
+                  Submission · section · task
                 </span>
                 <div>
                   {/* Today gets a word as well as a line: nothing is colour-only. */}
@@ -462,6 +511,7 @@ export default function Gantt() {
               </ul>
             </div>
           </div>
+          )}
         </>
       )}
       <Dialog open={pendingMove !== null} onClose={() => setPendingMove(null)} labelledBy={moveTitleId}>
@@ -483,7 +533,7 @@ export default function Gantt() {
                 type="button"
                 className={buttonPrimary}
                 onClick={() => {
-                  updateTask.mutate(linkEdit(pendingMove.task, pendingMove.target))
+                  run(linkEdit(pendingMove.task, pendingMove.target))
                   setPendingMove(null)
                 }}
               >

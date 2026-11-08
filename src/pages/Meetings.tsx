@@ -13,8 +13,12 @@ import { useSubteams } from '../data/useSubteams.ts'
 import { formatDay, todayIso } from '../lib/dates.ts'
 import { RichTextField } from '../meetings/RichTextField.tsx'
 import { MeetingDialog } from '../meetings/MeetingDialog.tsx'
-import { MeetingShare } from '../meetings/MeetingShare.tsx'
 import { MeetingText } from '../meetings/MeetingText.tsx'
+import { agendaItems } from '../meetings/agendaPreview.ts'
+import { DisclosureSummary } from '../meetings/DisclosureSummary.tsx'
+import { MeetingDetail } from '../meetings/MeetingDetail.tsx'
+import { meetingSummary, SUMMARY_PLACEHOLDER } from '../meetings/meetingSummary.ts'
+import { splitMeetings } from '../meetings/splitMeetings.ts'
 import { Dialog } from '../ui/Dialog.tsx'
 import { PageHeader } from '../ui/PageHeader.tsx'
 import { buttonDanger, buttonPrimary, buttonSecondary } from '../ui/buttons.ts'
@@ -28,6 +32,8 @@ import { ActionError, EmptyState, ErrorState, LoadingState } from '../ui/states.
 // Who may do what comes from the database
 // (20260108000000_proposals_and_meetings.sql): everyone on the roster reads,
 // administrators create and edit, and only a president or developer deletes.
+
+const PAST_PAGE = 8
 
 const time = (value: string | null) => (value ? value.slice(0, 5) : null)
 
@@ -55,10 +61,20 @@ export default function Meetings() {
     key ? (departments.data?.find((d) => d.key === key)?.name ?? key) : null
   const [editing, setEditing] = useState<Meeting | 'new' | null>(null)
   const [deleting, setDeleting] = useState<Meeting | null>(null)
+  // The meeting whose detail dialog is open (a card was clicked).
+  const [viewing, setViewing] = useState<{ meeting: Meeting; upcoming: boolean } | null>(null)
   const [message, setMessage] = useState('')
   const deleteTitleId = useId()
 
   const rows = meetings.data ?? []
+  const { upcoming, past } = splitMeetings(rows, todayIso())
+  // A whole season of weekly meetings is a long scroll of full agendas and minutes, so the most recent are shown first.
+  const [allPast, setAllPast] = useState(false)
+  const olderHidden = allPast ? 0 : Math.max(0, past.length - PAST_PAGE)
+  const groups = [
+    { label: 'Upcoming', items: upcoming, total: upcoming.length },
+    { label: 'Past', items: allPast ? past : past.slice(0, PAST_PAGE), total: past.length },
+  ].filter((g) => g.total > 0)
 
   const closeDelete = () => {
     remove.reset()
@@ -102,11 +118,6 @@ export default function Meetings() {
         </p>
       </PageHeader>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-900">
-          {rows.length === 1 ? '1 meeting' : `${rows.length} meetings`}
-        </h2>
-      </div>
       <p role="status" className="mt-1 min-h-5 text-sm text-emerald-800">
         {message}
       </p>
@@ -127,88 +138,111 @@ export default function Meetings() {
               : 'When the board calls a meeting, it appears here with its agenda and minutes.'}
           </EmptyState>
         ) : (
-          <ul className="space-y-3">
-            {rows.map((meeting) => (
-              <li
-                key={meeting.id}
-                className="pc-lift rounded-lg border border-slate-200 bg-surface p-3"
-                data-testid={`meeting-${meeting.id}`}
-              >
-                {/* Weekly meetings share a title, so the DATE is what tells them apart: it leads, in the heading
-                    weight, and a meeting still to come says so in words. */}
-                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                  <p className="flex flex-wrap items-center gap-2 text-base font-semibold text-slate-950">
-                    <time dateTime={meeting.held_on}>{when(meeting)}</time>
-                    {meeting.held_on >= todayIso() && (
-                      <span className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800">Upcoming</span>
-                    )}
-                  </p>
-                  <p className="text-sm text-slate-600">
-                    {meeting.location ? `${meeting.location}` : ''}
-                    {meeting.subteam_key ? `${meeting.location ? ' · ' : ''}For ${departmentName(meeting.subteam_key)}` : ''}
-                  </p>
-                </div>
-                <h3 className="text-sm text-slate-700">{meeting.title}</h3>
-
-                {meeting.agenda && (
-                  <div className="mt-2">
-                    <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">Agenda</p>
-                    <div className="mt-1">
-                      <MeetingText text={meeting.agenda} testId={`meeting-agenda-${meeting.id}`} />
+          <div className="space-y-8">
+           {groups.map((group) => {
+            const isUpcoming = group.label === 'Upcoming'
+            return (
+            <section key={group.label} aria-labelledby={`meetings-${group.label}`}>
+          {/* The heading is the region's name; the hint sits beside it, outside, so the name stays "Upcoming (2)". */}
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 border-b border-slate-200 pb-2">
+            <h2 id={`meetings-${group.label}`} className="text-base font-semibold text-slate-950">
+              {group.label} ({group.total})
+            </h2>
+            <p className="text-xs text-slate-500">{isUpcoming ? 'Soonest first' : 'Newest first'}</p>
+          </div>
+          <ul className={isUpcoming ? 'space-y-4' : 'space-y-2'}>
+            {group.items.map((meeting) => {
+              const summary = meetingSummary(meeting)
+              const items = agendaItems(meeting.agenda ?? '')
+              const start = time(meeting.starts_at)
+              const clock = start ? (time(meeting.ends_at) ? `${start}–${time(meeting.ends_at)}` : start) : null
+              const where = [meeting.location, meeting.subteam_key ? `For ${departmentName(meeting.subteam_key)}` : null].filter(Boolean).join(' · ')
+              const weekday = new Date(`${meeting.held_on}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long' })
+              // The title is the real button and its ::after stretches over the whole card, so the whole card is the
+              // click target and nothing else sits on it (Share, Edit and Delete live in the detail dialog).
+              const open = (
+                <button
+                  type="button"
+                  className="cursor-pointer rounded text-left after:absolute after:inset-0 after:rounded-[inherit] after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-accent-ring"
+                  onClick={() => setViewing({ meeting, upcoming: isUpcoming })}
+                >
+                  {meeting.title}
+                </button>
+              )
+              // A meeting still to come is a large open card: it is the one thing to read next. Past meetings are
+              // quiet one-glance rows. Hierarchy is size and space, with no boxes or labels inside the card.
+              return isUpcoming ? (
+                <li
+                  key={meeting.id}
+                  className="pc-lift relative rounded-xl border border-accent/40 bg-surface p-5 transition-colors duration-150 ease-out hover:bg-slate-50/40 sm:p-7"
+                  data-testid={`meeting-${meeting.id}`}
+                >
+                  <div className="flex items-start justify-between gap-5">
+                    <div className="min-w-0">
+                      <h3 className="text-xl font-semibold text-balance break-words text-slate-950 sm:text-2xl">{open}</h3>
+                      {where && <p className="mt-1 text-sm break-words text-slate-600">{where}</p>}
                     </div>
+                    <time dateTime={meeting.held_on} className="shrink-0 text-right">
+                      <span className="block text-2xl font-semibold tabular-nums text-slate-950 sm:text-3xl">{formatDay(meeting.held_on)}</span>
+                      <span className="mt-0.5 block text-sm text-slate-600">
+                        {weekday}
+                        {clock ? `, ${clock}` : ''}
+                      </span>
+                    </time>
                   </div>
-                )}
-                {meeting.notes && (
-                  <div className="mt-3 border-t border-slate-100 pt-2">
-                    <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">Minutes</p>
-                    <div className="mt-1">
-                      <MeetingText text={meeting.notes} testId={`meeting-notes-${meeting.id}`} />
-                    </div>
+                  <div className="mt-5 border-t border-slate-200 pt-4">
+                    <p className="text-sm text-pretty break-words text-slate-500" data-testid={`meeting-summary-${meeting.id}`}>
+                      {summary ? summary.text : SUMMARY_PLACEHOLDER}
+                    </p>
+                    {items.length > 0 ? (
+                      <ul className="mt-3 list-disc space-y-1.5 pl-5 text-base text-pretty text-slate-800">
+                        {items.slice(0, 4).map((item, index) => (
+                          <li key={index}>
+                            <span className="line-clamp-2 break-words">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-3 text-base text-slate-500">The agenda is not written yet.</p>
+                    )}
+                    {items.length > 4 && <p className="mt-2 text-sm text-slate-500">+{items.length - 4} more</p>}
                   </div>
-                )}
-                {whoCame(meeting.id).length > 0 ? (
-                  <p className="mt-2 text-xs text-slate-600" data-testid={`meeting-who-${meeting.id}`}>
-                    Who came ({whoCame(meeting.id).length}): {whoCame(meeting.id).join(', ')}
+                </li>
+              ) : (
+                <li
+                  key={meeting.id}
+                  className="pc-lift relative rounded-lg border border-slate-200 bg-surface px-4 py-3 transition-colors duration-150 ease-out hover:bg-slate-50/40"
+                  data-testid={`meeting-${meeting.id}`}
+                >
+                  <div className="flex items-baseline justify-between gap-4">
+                    <h3 className="min-w-0 text-base font-medium text-balance break-words text-slate-950">{open}</h3>
+                    <time dateTime={meeting.held_on} className="shrink-0 text-sm tabular-nums text-slate-600">
+                      {formatDay(meeting.held_on)}
+                    </time>
+                  </div>
+                  <p className={`mt-0.5 line-clamp-2 text-sm text-pretty break-words ${summary ? 'text-slate-700' : 'text-slate-500'}`} data-testid={`meeting-summary-${meeting.id}`}>
+                    {summary ? summary.text : 'No summary yet.'}
+                    {summary?.fromMinutes && <span className="text-slate-500"> (from the minutes)</span>}
                   </p>
-                ) : (
-                  meeting.attendees && <p className="mt-2 text-xs text-slate-600">Who came: {meeting.attendees}</p>
-                )}
-
-                <MeetingShare meeting={meeting} department={departmentName(meeting.subteam_key)} />
-
-                {(can.canCreateMeeting || can.canDeleteMeeting) && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {can.canCreateMeeting && (
-                      <button
-                        type="button"
-                        className={buttonSecondary}
-                        aria-label={`Edit ${meeting.title}`}
-                        onClick={() => {
-                          setMessage('')
-                          setEditing(meeting)
-                        }}
-                      >
-                        Edit
-                      </button>
-                    )}
-                    {can.canDeleteMeeting && (
-                      <button
-                        type="button"
-                        className={buttonSecondary}
-                        aria-label={`Delete ${meeting.title}`}
-                        onClick={() => {
-                          setMessage('')
-                          setDeleting(meeting)
-                        }}
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                )}
-              </li>
-            ))}
+                  {where && <p className="mt-0.5 truncate text-xs text-slate-500">{where}</p>}
+                </li>
+              )
+            })}
           </ul>
+          {group.label === 'Past' && (olderHidden > 0 || allPast) && past.length > PAST_PAGE && (
+            <button
+              type="button"
+              className={`${buttonSecondary} mt-3`}
+              data-testid="meetings-older-toggle"
+              onClick={() => setAllPast((all) => !all)}
+            >
+              {allPast ? 'Show fewer' : `Show ${olderHidden} older ${olderHidden === 1 ? 'meeting' : 'meetings'}`}
+            </button>
+          )}
+            </section>
+            )
+           })}
+          </div>
         )}
       </div>
 
@@ -218,6 +252,28 @@ export default function Meetings() {
       {(can.canCreateMeeting || can.canEditMeetingTemplate) && (
         <DefaultAgenda canEdit={can.canEditMeetingTemplate} onSaved={setMessage} />
       )}
+
+      <MeetingDetail
+        meeting={viewing?.meeting ?? null}
+        upcoming={viewing?.upcoming ?? false}
+        came={viewing ? whoCame(viewing.meeting.id) : []}
+        department={viewing ? departmentName(viewing.meeting.subteam_key) : null}
+        onClose={() => setViewing(null)}
+        canEdit={can.canCreateMeeting}
+        canDelete={can.canDeleteMeeting}
+        onEdit={() => {
+          if (!viewing) return
+          setMessage('')
+          setEditing(viewing.meeting)
+          setViewing(null)
+        }}
+        onDelete={() => {
+          if (!viewing) return
+          setMessage('')
+          setDeleting(viewing.meeting)
+          setViewing(null)
+        }}
+      />
 
       <MeetingDialog
         open={editing !== null}
@@ -335,8 +391,8 @@ function DefaultAgenda({ canEdit, onSaved }: { canEdit: boolean; onSaved: (messa
           You have unsaved changes to the default agenda. Open “Edit default agenda” to save or discard them.
         </p>
       )}
-      <details className="mt-2">
-        <summary className="cursor-pointer py-3 text-xs sm:py-0 font-medium text-slate-700 underline-offset-2 hover:underline">Show the default agenda</summary>
+      <details className="group mt-1">
+        <DisclosureSummary>Show the default agenda</DisclosureSummary>
         <div className="mt-2 rounded border border-slate-100 bg-slate-50 p-2">
           {template.error ? (
             <ActionError error={template.error} />

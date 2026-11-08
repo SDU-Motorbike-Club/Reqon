@@ -6,6 +6,13 @@ import { vi } from 'vitest'
 vi.stubEnv('VITE_SUPABASE_URL', 'http://localhost:54321')
 vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'test-anon-key')
 
+// waitFor / findBy* give up after 1s by default, which a slow file (settings.test.tsx takes ~25s) can exceed on a loaded
+// machine or under coverage. A longer ceiling costs nothing when the UI is ready; it only stops the suite flaking.
+if (typeof window !== 'undefined') {
+  const { configure } = await import('@testing-library/react')
+  configure({ asyncUtilTimeout: 4000 })
+}
+
 // jsdom has <dialog> but not its modal methods. Enough of them for the app's
 // Dialog component; real browsers add the rest (inertness, focus return).
 // (Node-environment tests, such as scripts/book, have no window at all.)

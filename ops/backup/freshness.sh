@@ -17,4 +17,4 @@ rclone lsjson --files-only "$REMOTE/daily" > "$WORK/list.json" || die "cannot li
 AGE="$(node "$BACKUP_DIR/json.mjs" age-hours "$WORK/list.json" "${BACKUP_NOW:-}")"
 [ "$AGE" != "none" ] || die "there is no backup in $REMOTE/daily at all" 1
 log "newest daily backup is $AGE hours old (limit $MAX)"
-node -e 'process.exit(Number(process.argv[1]) > Number(process.argv[2]) ? 1 : 0)' "$AGE" "$MAX" || die "the newest backup is older than $MAX hours" 1
+node -e 'process.exit(Number(process.argv[1]) > Number(process.argv[2]) ? 1 : 0)' -- "$AGE" "$MAX" || die "the newest backup is older than $MAX hours" 1

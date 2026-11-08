@@ -145,10 +145,10 @@ mkdir -p "$T/two"; cp "$FILE" "$FILE.copy" 2>/dev/null; cp "$FILE" "$T/two/reqon
 BACKUP_OUT_DIR="$T/two" BACKUP_R2_REMOTE="$R2" expect_exit 2 "two backup files in one folder are refused (no guessing)" "$OPS/publish.sh"
 
 section "freshness (BAK-08)"
-BACKUP_R2_REMOTE="$R2" BACKUP_NOW=2026-11-01T13:17:00Z expect_exit 0 "10 hours after the newest backup: fresh" "$OPS/freshness.sh"
-BACKUP_R2_REMOTE="$R2" BACKUP_NOW=2026-11-03T04:00:00Z expect_exit 1 "48.7 hours after: stale" "$OPS/freshness.sh"
+BACKUP_R2_REMOTE="$R2" BACKUP_NOW=2027-03-01T13:17:00Z expect_exit 0 "10 hours after the newest backup: fresh" "$OPS/freshness.sh"
+BACKUP_R2_REMOTE="$R2" BACKUP_NOW=2027-03-03T04:00:00Z expect_exit 1 "48.7 hours after: stale" "$OPS/freshness.sh"
 BACKUP_R2_REMOTE="bkr2:$BUCKET/empty-area" expect_exit 1 "no backup at all: fails" "$OPS/freshness.sh"
-BACKUP_R2_REMOTE="$R2" BACKUP_MAX_AGE_HOURS=1000 BACKUP_NOW=2026-11-03T04:00:00Z expect_exit 0 "the limit is configurable" "$OPS/freshness.sh"
+BACKUP_R2_REMOTE="$R2" BACKUP_MAX_AGE_HOURS=1000 BACKUP_NOW=2027-03-03T04:00:00Z expect_exit 0 "the limit is configurable" "$OPS/freshness.sh"
 
 section "private GitHub repository (BAK-03)"
 git init --quiet --bare "$T/remote.git"

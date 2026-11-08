@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from 'react'
 import { buttonSecondary } from '../ui/buttons.ts'
+import { DisclosureSummary } from './DisclosureSummary.tsx'
 import { emailText, whatsappText, type ShareableMeeting } from './meetingText.ts'
 
 // Announcement texts for one meeting, ready to paste into WhatsApp or an email.
@@ -37,10 +38,9 @@ export function MeetingShare({ meeting, department }: { meeting: ShareableMeetin
   const box =
     'mt-1 w-full rounded border border-slate-300 bg-slate-50 px-2 py-1.5 font-mono text-xs text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring'
   return (
-    <details className="mt-3 border-t border-slate-100 pt-2">
-      <summary className="cursor-pointer py-3 text-xs font-medium text-slate-700 underline-offset-2 hover:underline sm:py-0">
-        Share this meeting
-      </summary>
+    // A flex item of the card's footer row; open, it takes the whole row.
+    <details className="group relative z-10 open:basis-full">
+      <DisclosureSummary>Share this meeting</DisclosureSummary>
       <div className="mt-2 grid gap-3 sm:grid-cols-2">
         {(['whatsapp', 'email'] as const).map((which) => (
           <div key={which}>

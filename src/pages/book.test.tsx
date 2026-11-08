@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -40,10 +40,10 @@ vi.mock('../book/PdfPageView.tsx', () => ({
 // The Book screen reads as one scrollable column (PdfScrollView). The stub records the page it was asked to
 // scroll to, and a button stands in for the reader scrolling to another page.
 vi.mock('../book/PdfScrollView.tsx', () => ({
-  default: (p: { url: string; pageIndex: number; label: string; onDocument: (n: number) => void; onVisiblePage: (n: number) => void; onError: (m: string) => void }) => {
+  default: (p: { url: string; pageIndex: number; label: string; fit?: string; onDocument: (n: number) => void; onVisiblePage: (n: number) => void; onError: (m: string) => void }) => {
     if (pdf.error) queueMicrotask(() => p.onError(pdf.error as string))
     return (
-      <div data-testid="pdf-stub" data-url={p.url} data-page-index={p.pageIndex} role="img" aria-label={p.label}>
+      <div data-testid="pdf-stub" data-url={p.url} data-page-index={p.pageIndex} data-fit={p.fit} role="img" aria-label={p.label}>
         <button type="button" data-testid="stub-scroll-to-5" onClick={() => p.onVisiblePage(5)}>scroll to 5</button>
       </div>
     )
@@ -87,6 +87,19 @@ describe('a configured book', () => {
     expect(open).toHaveAttribute('rel', expect.stringContaining('noopener'))
     expect(screen.getByTestId('book-location')).toHaveTextContent('The start of the book')
     expect(screen.getByText('Hosted outside Reqon')).toBeInTheDocument()
+  })
+
+  it('shows a whole page by default, and switches to the full column width and back', async () => {
+    renderBook()
+    expect(await screen.findByTestId('pdf-stub')).toHaveAttribute('data-fit', 'page')
+    const group = within(screen.getByTestId('book-fit'))
+    expect(group.getByRole('button', { name: 'Whole page' })).toHaveAttribute('aria-pressed', 'true')
+    expect(group.getByRole('button', { name: 'Full width' })).toHaveAttribute('aria-pressed', 'false')
+    await userEvent.click(group.getByRole('button', { name: 'Full width' }))
+    expect(screen.getByTestId('pdf-stub')).toHaveAttribute('data-fit', 'width')
+    expect(group.getByRole('button', { name: 'Full width' })).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(group.getByRole('button', { name: 'Whole page' }))
+    expect(screen.getByTestId('pdf-stub')).toHaveAttribute('data-fit', 'page')
   })
 
   it('opens at a known page, shifting the printed number by the edition offset', async () => {

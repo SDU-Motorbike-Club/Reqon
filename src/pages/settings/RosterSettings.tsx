@@ -3,14 +3,14 @@ import { Link } from 'react-router-dom'
 import { canGrantRole, canResetPassword, type PrivilegedRole } from '../../auth/permissions.ts'
 import { useAuth } from '../../auth/context.ts'
 import { usePermissions } from '../../auth/usePermissions.ts'
-import { useAddMember, useCreateMember, useMembers, useResetPassword, useUpdateMember, type MemberState } from '../../data/useMembers.ts'
+import { useCreateMember, useMembers, useResetPassword, useUpdateMember, type MemberState } from '../../data/useMembers.ts'
 import { useAvatars } from '../../data/useAvatars.ts'
 import { useSubteams } from '../../data/useSubteams.ts'
 import { isActive } from '../../departments/types.ts'
 import { mergeSearchParams } from '../../lib/searchParams.ts'
 import { RoleBadges } from '../../roles/RoleBadges.tsx'
 import { Avatar } from '../../ui/Avatar.tsx'
-import { buttonDanger, buttonQuiet, buttonSecondary } from '../../ui/buttons.ts'
+import { buttonDanger, buttonPrimary, buttonQuiet, buttonSecondary } from '../../ui/buttons.ts'
 import { ActionError, ErrorState } from '../../ui/states.tsx'
 import { useState, type FormEvent } from 'react'
 import { IssuedPassword } from './IssuedPassword.tsx'
@@ -229,10 +229,10 @@ function RosterRow({
 // account" form. Split out of the former Settings.tsx (Phase 6 §6.1) — owns
 // its own members query, its own add/update mutations, its own form state.
 //
-const EMPTY_RECRUIT = { email: '', fullName: '', role: DEFAULT_JOB_TITLE }
+const EMPTY_RECRUIT = { email: '', fullName: '', password: '', role: DEFAULT_JOB_TITLE }
 
-// A temporary password just issued, and where it was asked for.
-type Issued = { where: 'add' | 'reset'; name: string; email?: string; password: string }
+// The password just reset, shown once.
+type Issued = { name: string; password: string }
 
 // Asks usePermissions() itself rather than taking canAdminister/canManageRoles
 // as props: a President who hands over their own role mid-session must see
@@ -249,12 +249,11 @@ export function RosterSettings() {
   const subteams = useSubteams()
   const headsOf = (memberId: string) =>
     (subteams.data ?? []).filter((d) => isActive(d) && d.lead_id === memberId).map((d) => ({ key: d.key, name: d.name }))
-  const addMember = useAddMember()
   const createMember = useCreateMember()
   const updateMember = useUpdateMember()
   const resetPassword = useResetPassword()
   const [issued, setIssued] = useState<Issued | null>(null)
-  const [newMember, setNewMember] = useState({ id: '', fullName: '', role: DEFAULT_JOB_TITLE })
+  const [added, setAdded] = useState('')
   const [recruit, setRecruit] = useState(EMPTY_RECRUIT)
 
   const roleSettings = useRoleSettings((members.data ?? []).map((m) => ({ id: m.id, name: m.full_name })))
@@ -267,23 +266,24 @@ export function RosterSettings() {
     // worth saying out loud.
   ].filter((group) => group.heading !== 'Alumni' || group.people.length > 0)
 
-  const titles = jobTitleOptions(members.data ?? [], newMember.role, recruit.role)
+  const titles = jobTitleOptions(members.data ?? [], recruit.role)
 
   async function submitRecruit(e: FormEvent) {
     e.preventDefault()
     if (createMember.isPending) return
     const fullName = recruit.fullName.trim()
     const email = recruit.email.trim()
-    if (!fullName || !email) return
-    setIssued(null)
+    if (!fullName || !email || !recruit.password) return
+    setAdded('')
     try {
-      const { password } = await createMember.mutateAsync({
+      const { linked } = await createMember.mutateAsync({
         email,
         fullName,
+        password: recruit.password,
         jobTitle: recruit.role.trim() || DEFAULT_JOB_TITLE,
       })
       setRecruit(EMPTY_RECRUIT)
-      setIssued({ where: 'add', name: fullName, email, password })
+      setAdded(linked ? `${fullName} is on the roster, linked to the login that already existed.` : `${fullName} is on the roster.`)
     } catch {
       // Refused or failed: the message is shown, and what was typed stays.
     }
@@ -293,24 +293,9 @@ export function RosterSettings() {
     setIssued(null)
     try {
       const { password } = await resetPassword.mutateAsync({ id })
-      setIssued({ where: 'reset', name, password })
+      setIssued({ name, password })
     } catch {
       // Refused or failed: the message is shown above the roster.
-    }
-  }
-
-  async function submitMember(e: FormEvent) {
-    e.preventDefault()
-    if (addMember.isPending || !newMember.id.trim() || !newMember.fullName.trim()) return
-    try {
-      await addMember.mutateAsync({
-        id: newMember.id.trim(),
-        fullName: newMember.fullName.trim(),
-        role: newMember.role.trim() || DEFAULT_JOB_TITLE,
-      })
-      setNewMember({ id: '', fullName: '', role: DEFAULT_JOB_TITLE })
-    } catch {
-      // Refused or failed: the message is shown, and what was typed stays.
     }
   }
 
@@ -318,6 +303,98 @@ export function RosterSettings() {
 
   return (
     <>
+      {canAddMembers && (
+        <details className="group mb-4" data-tutorial="add-member">
+          {/* The first thing in Roster, and a real button: the form used to sit below every member, where nobody found it. */}
+          <summary className={`${buttonPrimary} w-fit cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>Add person</summary>
+          <div className="mt-3 rounded-lg border border-slate-200 bg-surface p-3">
+          <form onSubmit={submitRecruit} aria-labelledby="add-member-heading">
+            <h3 id="add-member-heading" className="text-sm font-medium text-slate-900">
+              Add someone to the roster
+            </h3>
+            {/* The login is made by the create-member Edge Function, the only
+                place the service_role key lives. This browser sends only your
+                own session; the database checks can_add_members() for you. */}
+            <p className="mt-1 mb-2 text-xs text-pretty text-slate-600">
+              This creates their login and puts them on the roster in one step. Give them the
+              password you choose here; they choose their own the first time they sign in. If a login
+              for that email already exists, it is linked to the roster and its password is left alone.
+              They start with no privileged role — give one afterwards with <strong>Change roles</strong>{' '}
+              if needed.
+            </p>
+            <label className="block text-xs font-medium text-slate-600" htmlFor="recruit-name">
+              Full name
+            </label>
+            <input
+              id="recruit-name"
+              required
+              maxLength={120}
+              autoComplete="off"
+              value={recruit.fullName}
+              onChange={(e) => setRecruit((s) => ({ ...s, fullName: e.target.value }))}
+              className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
+            />
+            <label className="mt-2 block text-xs font-medium text-slate-600" htmlFor="recruit-email">
+              Email they sign in with
+            </label>
+            <input
+              id="recruit-email"
+              type="email"
+              required
+              maxLength={254}
+              autoComplete="off"
+              value={recruit.email}
+              onChange={(e) => setRecruit((s) => ({ ...s, email: e.target.value }))}
+              className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
+            />
+            <label className="mt-2 block text-xs font-medium text-slate-600" htmlFor="recruit-password">
+              Password you give them
+            </label>
+            <input
+              id="recruit-password"
+              type="password"
+              required
+              minLength={8}
+              maxLength={72}
+              autoComplete="new-password"
+              value={recruit.password}
+              onChange={(e) => setRecruit((s) => ({ ...s, password: e.target.value }))}
+              className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
+            />
+            <p className="mt-1 text-xs text-slate-600">At least 8 characters.</p>
+            <span aria-hidden="true" className="mt-2 block text-xs font-medium text-slate-600">
+              Job title
+            </span>
+            {/* Same picker as the roster rows, so a new person gets one of the
+                titles the club already uses rather than a fifth spelling of it. */}
+            <div className="mt-1">
+              <JobTitleSelect
+                id="recruit-role"
+                label="Job title"
+                titles={titles}
+                value={recruit.role}
+                disabled={createMember.isPending}
+                onChange={(role) => setRecruit((s) => ({ ...s, role }))}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={createMember.isPending}
+              className="mt-2 min-h-11 rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring disabled:opacity-60 sm:min-h-0"
+            >
+              {createMember.isPending ? 'Adding…' : 'Add to roster'}
+            </button>
+            {/* Its own slot, so a stale create error never hides a later
+                roster-row or link error shown above. */}
+            <ActionError error={createMember.error} className="mt-2" />
+            <p role="status" className="mt-1 min-h-4 text-xs font-medium text-emerald-800">
+              {added}
+            </p>
+          </form>
+
+          </div>
+        </details>
+      )}
       {readError && (
         <ErrorState
           title="Could not load the roster"
@@ -327,8 +404,8 @@ export function RosterSettings() {
           }}
         />
       )}
-      <ActionError error={addMember.error ?? updateMember.error ?? resetPassword.error} className="mb-2" />
-      {issued?.where === 'reset' && (
+      <ActionError error={updateMember.error ?? resetPassword.error} className="mb-2" />
+      {issued && (
         <div className="mb-2">
           <IssuedPassword name={issued.name} password={issued.password} onDone={() => setIssued(null)} />
         </div>
@@ -409,138 +486,6 @@ export function RosterSettings() {
       </p>
       {roleSettings.dialog as ReactNode}
 
-      {canAddMembers && (
-        <div className="mt-3 rounded-lg border border-slate-200 bg-surface p-3" data-tutorial="add-member">
-          <form onSubmit={submitRecruit} aria-labelledby="add-member-heading">
-            <h3 id="add-member-heading" className="text-sm font-medium text-slate-900">
-              Add someone to the roster
-            </h3>
-            {/* The login is made by the create-member Edge Function, the only
-                place the service_role key lives. This browser sends only your
-                own session; the database checks can_add_members() for you. */}
-            <p className="mt-1 mb-2 text-xs text-pretty text-slate-600">
-              This creates their login and puts them on the roster in one step, and gives you a
-              temporary password to hand over. They choose their own the first time they sign in.
-              They start with no privileged role — give one afterwards with <strong>Change roles</strong>{' '}
-              if needed.
-            </p>
-            <label className="block text-xs font-medium text-slate-600" htmlFor="recruit-name">
-              Full name
-            </label>
-            <input
-              id="recruit-name"
-              required
-              maxLength={120}
-              autoComplete="off"
-              value={recruit.fullName}
-              onChange={(e) => setRecruit((s) => ({ ...s, fullName: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
-            />
-            <label className="mt-2 block text-xs font-medium text-slate-600" htmlFor="recruit-email">
-              Email they sign in with
-            </label>
-            <input
-              id="recruit-email"
-              type="email"
-              required
-              maxLength={254}
-              autoComplete="off"
-              value={recruit.email}
-              onChange={(e) => setRecruit((s) => ({ ...s, email: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
-            />
-            <span aria-hidden="true" className="mt-2 block text-xs font-medium text-slate-600">
-              Job title
-            </span>
-            {/* Same picker as the roster rows, so a new person gets one of the
-                titles the club already uses rather than a fifth spelling of it. */}
-            <div className="mt-1">
-              <JobTitleSelect
-                id="recruit-role"
-                label="Job title"
-                titles={titles}
-                value={recruit.role}
-                disabled={createMember.isPending}
-                onChange={(role) => setRecruit((s) => ({ ...s, role }))}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={createMember.isPending}
-              className="mt-2 min-h-11 rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring disabled:opacity-60 sm:min-h-0"
-            >
-              {createMember.isPending ? 'Adding…' : 'Add to roster'}
-            </button>
-            {/* Its own slot, so a stale create error never hides a later
-                roster-row or link error shown above. */}
-            <ActionError error={createMember.error} className="mt-2" />
-            <p role="status" className="mt-1 min-h-4 text-xs font-medium text-emerald-800">
-              {issued?.where === 'add' ? `${issued.name} is on the roster.` : ''}
-            </p>
-            {issued?.where === 'add' && (
-              <IssuedPassword
-                name={issued.name}
-                email={issued.email}
-                password={issued.password}
-                onDone={() => setIssued(null)}
-              />
-            )}
-          </form>
-
-          {/* The older path, kept for a login that already exists — made in the
-              Supabase dashboard, or left over from before this form. */}
-          <details className="mt-2 border-t border-slate-200 pt-2">
-            <summary className="cursor-pointer py-3 text-xs font-medium text-slate-700 sm:py-0">
-              Their login already exists? Link it by UUID
-            </summary>
-            <form onSubmit={submitMember} className="mt-2">
-              <p className="mb-2 text-xs text-slate-600">
-                Copy the user&apos;s <strong>UUID</strong> from the Supabase dashboard
-                (<strong>Authentication → Users</strong>) and paste it below.
-              </p>
-              <label className="block text-xs font-medium text-slate-600" htmlFor="new-member-id">
-                Auth user UUID
-              </label>
-              <input
-                id="new-member-id"
-                value={newMember.id}
-                onChange={(e) => setNewMember((s) => ({ ...s, id: e.target.value }))}
-                placeholder="00000000-0000-0000-0000-000000000000"
-                className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
-              />
-              <label className="mt-2 block text-xs font-medium text-slate-600" htmlFor="new-member-name">
-                Full name of the linked person
-              </label>
-              <input
-                id="new-member-name"
-                value={newMember.fullName}
-                onChange={(e) => setNewMember((s) => ({ ...s, fullName: e.target.value }))}
-                className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
-              />
-              <span aria-hidden="true" className="mt-2 block text-xs font-medium text-slate-600">
-                Job title
-              </span>
-              <div className="mt-1">
-                <JobTitleSelect
-                  id="new-member-role"
-                  label="Job title of the linked person"
-                  titles={titles}
-                  value={newMember.role}
-                  disabled={addMember.isPending}
-                  onChange={(role) => setNewMember((s) => ({ ...s, role }))}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={addMember.isPending}
-                className={`${buttonSecondary} mt-2 text-sm`}
-              >
-                {addMember.isPending ? 'Linking…' : 'Link to roster'}
-              </button>
-            </form>
-          </details>
-        </div>
-      )}
     </>
   )
 }

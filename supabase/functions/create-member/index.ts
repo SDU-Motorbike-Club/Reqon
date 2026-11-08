@@ -16,18 +16,20 @@
 // A new person never gets a privileged role here; that stays with
 // apply_role_plan() / can_grant_role() in the role dialog.
 //
-// The first password is generated HERE, not typed by the admin, and comes back
-// exactly once so the admin can hand it over. The roster row carries
-// must_change_password (migration 20260138000000_temporary_passwords.sql), so
-// the app asks the new person to choose their own before anything else — after
-// that, nobody but them knows it.
+// The first password is typed by the admin, who hands it over. The roster row
+// carries must_change_password (migration 20260138000000_temporary_passwords.sql),
+// so the app asks the new person to choose their own before anything else —
+// after that, nobody but them knows it.
 //
-// Request:  POST { email, fullName, jobTitle? }
-// Response: 200 { id, password } | 4xx/5xx { error }
-// The password is never logged, and is returned only in that one 200 answer.
+// If a login for that email ALREADY exists, it is linked to the roster by its
+// UUID instead: its password is left alone and the typed one is ignored.
+//
+// Request:  POST { email, fullName, password, jobTitle? }
+// Response: 200 { id, linked } | 4xx/5xx { error }
+// The password is never logged or echoed back.
 
 import { createClient } from 'npm:@supabase/supabase-js@2.117.2'
-import { generatePassword } from '../_shared/passwords.ts'
+import { passwordProblem } from '../_shared/passwords.ts'
 
 const corsHeaders = {
   // A bearer token, not a cookie, carries the caller's identity, so a wildcard
@@ -50,7 +52,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MAX_NAME = 120
 const MAX_TITLE = 80
 
-type Input = { email: string; fullName: string; jobTitle: string }
+type Input = { email: string; fullName: string; jobTitle: string; password: string }
 
 function parse(raw: unknown): Input | string {
   if (typeof raw !== 'object' || raw === null) return 'Send a JSON body.'
@@ -63,7 +65,10 @@ function parse(raw: unknown): Input | string {
   if (!fullName) return 'Give the person a full name — it is what every screen shows.'
   if (fullName.length > MAX_NAME) return `The full name must be at most ${MAX_NAME} characters.`
   if (jobTitle.length > MAX_TITLE) return `The job title must be at most ${MAX_TITLE} characters.`
-  return { email, fullName, jobTitle }
+  const password = body.password
+  const problem = passwordProblem(password)
+  if (problem) return problem
+  return { email, fullName, jobTitle, password: password as string }
 }
 
 Deno.serve(async (req) => {
@@ -112,39 +117,48 @@ Deno.serve(async (req) => {
 
   // email_confirm: they can sign in straight away with the password they are
   // given; the app then makes them choose their own.
-  const password = generatePassword()
   const { data: created, error: createError } = await admin.auth.admin.createUser({
     email: input.email,
-    password,
+    password: input.password,
     email_confirm: true,
   })
+  let linked = false
+  let newId = created?.user?.id ?? ''
   if (createError || !created.user) {
     // weak_password is also a 422, so it is checked before the email_exists
-    // fallback on status, which would otherwise call it "already exists". A
-    // generated password fails it only if the project's password rules ask for
-    // something it lacks.
+    // fallback on status, which would otherwise call it "already exists".
     if (createError?.code === 'weak_password') {
-      console.error('create-member: the generated password does not meet the project password rules')
-      return reply(500, { error: 'Could not create the login: the generated password does not meet this project’s password rules. Nothing was changed.' })
+      return reply(400, { error: 'That password does not meet this project’s password rules. Choose a longer or less common one.' })
     }
     if (createError?.code === 'email_exists' || (!createError?.code && createError?.status === 422)) {
-      return reply(409, {
-        error: `A login already exists for ${input.email}. If they are not on the roster yet, link it by UUID instead.`,
-      })
+      // The login exists already: link it by its UUID. Its password stays as it is.
+      // shortcut: scans Auth users 1000 at a time, fine for a club roster; use a SQL lookup past a few thousand.
+      for (let page = 1; !newId; page++) {
+        const { data: found, error: listError } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
+        if (listError) return reply(500, { error: 'Could not look up the existing login. Nothing was changed.' })
+        newId = found.users.find((u) => u.email?.toLowerCase() === input.email)?.id ?? ''
+        if (found.users.length < 1000) break
+      }
+      if (!newId) return reply(500, { error: 'Could not look up the existing login. Nothing was changed.' })
+      linked = true
+    } else {
+      console.error('create-member: createUser failed', createError?.code ?? createError?.status)
+      return reply(500, { error: 'Could not create the login. Nothing was changed.' })
     }
-    console.error('create-member: createUser failed', createError?.code ?? createError?.status)
-    return reply(500, { error: 'Could not create the login. Nothing was changed.' })
   }
 
-  const newId = created.user.id
   const { error: rosterError } = await asCaller
     .from('members')
-    .insert({ id: newId, full_name: input.fullName, role: input.jobTitle, must_change_password: true })
+    .insert({ id: newId, full_name: input.fullName, role: input.jobTitle, must_change_password: !linked })
 
   if (rosterError) {
-    // Undo the login so no account without a roster row is left behind.
-    const { error: undoError } = await admin.auth.admin.deleteUser(newId)
-    console.error('create-member: roster insert failed', rosterError.code, undoError ? 'and undo failed' : 'login removed')
+    if (rosterError.code === '23505') {
+      return reply(409, { error: `${input.email} is already on the roster. Nothing was changed.` })
+    }
+    // Undo the login we just made so no account without a roster row is left behind;
+    // a login that existed before is never touched.
+    const { error: undoError } = linked ? { error: null } : await admin.auth.admin.deleteUser(newId)
+    console.error('create-member: roster insert failed', rosterError.code, linked ? 'existing login kept' : undoError ? 'and undo failed' : 'login removed')
     if (undoError) {
       return reply(500, {
         error: `The login for ${input.email} was created but could not be added to the roster, and removing it failed. Delete it in the Supabase dashboard (Authentication -> Users) before trying again.`,
@@ -159,6 +173,6 @@ Deno.serve(async (req) => {
   }
 
   // Audit line in the function logs: who added whom. No email, no password.
-  console.log('create-member: added', newId, 'by', who.user.id)
-  return reply(200, { id: newId, password })
+  console.log('create-member: added', newId, linked ? '(linked existing login)' : '', 'by', who.user.id)
+  return reply(200, { id: newId, linked })
 })

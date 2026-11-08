@@ -49,4 +49,23 @@ describe('the one progress rule (mirror of v_task_progress)', () => {
     const c = t('C', 'done', 'P')
     expect(line(taskProgress([c, c, t('B', 'wip', 'P'), c]))).toBe('2|1|0|0|0|1|50')
   })
+
+  // The same two cases as supabase/tests/progress_views_test.sql (20260153).
+  it('counts a parent and its subtasks as the subtasks: 1 of 2, not 1 of 3', () => {
+    const parent = t('PP', 'wip', 'P')
+    const done = { ...t('C1', 'done', 'P'), parent_id: 'PP' }
+    const open = { ...t('C2', 'todo', 'P'), parent_id: 'PP' }
+    expect(line(taskProgress([parent, done, open]))).toBe('2|1|0|0|0|1|50')
+  })
+
+  it('still counts a parent whose subtask is counted in another group', () => {
+    const parent = t('PQ', 'todo', 'P')
+    expect(line(taskProgress([parent]))).toBe('1|0|0|0|0|1|0')
+  })
+
+  it('keeps an archived subtask standing in for its parent', () => {
+    const parent = t('PP', 'done', 'P')
+    const archivedChild = { ...t('C1', 'done', 'P', { archived: true }), parent_id: 'PP' }
+    expect(line(taskProgress([parent, archivedChild]))).toBe('1|1|1|0|0|0|100')
+  })
 })

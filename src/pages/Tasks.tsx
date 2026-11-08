@@ -2,7 +2,9 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/context.ts'
 import { useSubteams } from '../data/useSubteams.ts'
-import { useTaskList } from '../data/useTaskList.ts'
+import { useTaskList, type TaskListRow } from '../data/useTaskList.ts'
+import { useTasks } from '../data/useTasks.ts'
+import { nestUnderParents } from '../tasks/hierarchy.ts'
 import { formatDay, todayIso } from '../lib/dates.ts'
 import { useUrlParams } from '../lib/useUrlParams.ts'
 import {
@@ -32,6 +34,9 @@ const FIELD =
   'mt-1 min-h-11 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0'
 const LABEL = 'block text-xs font-medium text-slate-600'
 
+// A list row with what nestUnderParents needs (id, parent, title); `row` is absent on the season-wide entries used only for lookups.
+type Entry = { id: string; parent_id: string | null; title: string; row?: TaskListRow }
+
 // Every active task of the season in one list, sortable by any column. The sort, the filters and the
 // page live in the address (?sort=&dir=&q=&dept=&scope=&state=&page=), so a reload or a shared link keeps
 // them. The database sorts and filters every row, not only the page on screen. Column headings are
@@ -47,6 +52,18 @@ export default function Tasks() {
 
   const go = (next: TaskListParams) => setParams(() => taskListToParams(next), { replace: true })
   const rows = result.data?.rows ?? []
+  // The list view carries no parent, so parents come from the season's task list the Board already loads. A subtask
+  // goes right under its parent when both are on this page; one whose parent is elsewhere keeps its place and says
+  // "Part of …". A parent says how many subtasks it has (all of them, not only the ones on this page).
+  const seasonTasks = useTasks().data
+  const { nestedRows, subtaskCount } = useMemo(() => {
+    const all: Entry[] = (seasonTasks ?? []).map((t) => ({ id: t.id, parent_id: t.parent_id, title: t.title }))
+    const parentOf = new Map(all.map((t) => [t.id, t.parent_id]))
+    const count = new Map<string, number>()
+    for (const t of all) if (t.parent_id) count.set(t.parent_id, (count.get(t.parent_id) ?? 0) + 1)
+    const entries: Entry[] = rows.map((row) => ({ id: row.id ?? '', parent_id: parentOf.get(row.id ?? '') ?? null, title: row.title ?? '', row }))
+    return { nestedRows: nestUnderParents(entries, all), subtaskCount: count }
+  }, [rows, seasonTasks])
   const total = result.data?.total ?? 0
   const pages = pageCountFor(total)
   const first = total === 0 ? 0 : (list.page - 1) * TASK_LIST_PAGE_SIZE + 1
@@ -157,14 +174,22 @@ export default function Tasks() {
               </tr>
             </thead>
             <tbody className="block sm:table-row-group">
-              {rows.map((row) => {
+              {nestedRows.map(({ task: entry, nested, partOf }) => {
+                const row = entry.row as TaskListRow
                 const overdue = row.due_date !== null && row.due_date < today && row.state !== 'done' && row.state !== 'cancelled'
+                const subtasks = subtaskCount.get(entry.id) ?? 0
                 return (
-                  <tr key={row.id} className="block border-t border-slate-100 px-3 py-2 first:border-t-0 sm:table-row sm:px-0 sm:py-0" data-testid={`task-row-${row.id}`}>
-                    <td className="block py-0.5 font-medium text-slate-900 sm:table-cell sm:px-3 sm:py-2">
+                  <tr key={row.id} className={`block border-t border-slate-100 px-3 py-2 first:border-t-0 sm:table-row sm:px-0 sm:py-0 ${nested ? 'bg-slate-50' : ''}`} data-testid={`task-row-${row.id}`} data-nested={nested || undefined}>
+                    <td className={`block py-0.5 font-medium text-slate-900 sm:table-cell sm:py-2 ${nested ? 'pl-5 sm:pl-10 sm:pr-3' : 'sm:px-3'}`}>
                       <Link to={`/board?task=${encodeURIComponent(row.id ?? '')}`} className="underline-offset-2 hover:underline">
                         {row.title}
                       </Link>
+                      {subtasks > 0 && (
+                        <span className="block text-xs font-normal text-slate-600" data-testid={`task-subtasks-${row.id}`}>
+                          {subtasks} {subtasks === 1 ? 'subtask' : 'subtasks'}
+                        </span>
+                      )}
+                      {partOf && <span className="block text-xs font-normal text-slate-600">Part of {partOf}</span>}
                     </td>
                     <td className="inline-block pr-3 text-xs text-slate-700 sm:table-cell sm:px-3 sm:py-2 sm:text-sm">{row.department_name ?? <span className="text-slate-500 italic">none</span>}</td>
                     <td className="inline-block pr-3 text-xs text-slate-700 sm:table-cell sm:px-3 sm:py-2 sm:text-sm">{row.owner_name ?? <span className="text-slate-500 italic">unassigned</span>}</td>

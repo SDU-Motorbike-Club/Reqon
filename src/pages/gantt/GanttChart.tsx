@@ -61,7 +61,7 @@ export function Track({
   return (
     <div
       onClick={onClick}
-      className={`relative h-8 max-sm:sr-only ${onClick ? 'cursor-pointer' : ''} [background-image:var(--gantt-grid-img)] [background-position:var(--gantt-grid-pos)] [background-size:var(--gantt-grid-size)] bg-no-repeat`}
+      className={`relative h-8 ${onClick ? 'cursor-pointer' : ''} [background-image:var(--gantt-grid-img)] [background-position:var(--gantt-grid-pos)] [background-size:var(--gantt-grid-size)] bg-no-repeat`}
     >
       {today !== null && (
         <span

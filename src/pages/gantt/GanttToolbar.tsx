@@ -32,11 +32,11 @@ export function GanttToolbar({
         {allOpen ? 'Collapse all' : 'Expand all'}
       </button>
       {onToday && (
-        <button type="button" className={`${buttonSecondary} text-xs max-sm:hidden`} onClick={onToday} data-testid="gantt-to-today">
+        <button type="button" className={`${buttonSecondary} text-xs`} onClick={onToday} data-testid="gantt-to-today">
           Jump to today
         </button>
       )}
-      <label className="flex items-center gap-1.5 text-xs text-slate-600 max-sm:hidden">
+      <label className="flex items-center gap-1.5 text-xs text-slate-600">
         Scale
         <select
           value={scale}

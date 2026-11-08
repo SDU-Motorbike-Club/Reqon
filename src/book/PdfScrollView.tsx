@@ -17,11 +17,15 @@ export default function PdfScrollView({
   pageIndex,
   label,
   maxHeightClass,
+  fit = 'width',
   onDocument,
   onVisiblePage,
   onError,
 }: {
   url: string
+  // 'page' sizes each page so a WHOLE page fits the visible area (and never wider than the column); 'width' fills
+  // the column, which on a wide screen is taller than the area, for reading small print.
+  fit?: 'page' | 'width'
   // 1-based PDF page the reader asks to see. Scrolls there when it differs from the page the reader is already on.
   pageIndex: number
   label: string
@@ -37,6 +41,7 @@ export default function PdfScrollView({
   const doc = loaded?.url === url ? loaded.doc : null
   const ratio = loaded?.url === url ? loaded.ratio : 1.3
   const [width, setWidth] = useState(0)
+  const [height, setHeight] = useState(0)
   const [near, setNear] = useState<ReadonlySet<number>>(new Set())
   const reported = useRef<number | null>(null)
   const onDocumentRef = useRef(onDocument)
@@ -70,18 +75,26 @@ export default function PdfScrollView({
     }
   }, [url])
 
-  // Follow the column's width, so a page fits a narrow screen.
+  // Follow the column's size, so a page fits a narrow screen and, in 'page' mode, the height of the area too.
   useEffect(() => {
     const root = rootRef.current
     if (!root) return
     if (typeof ResizeObserver === 'undefined') {
       setWidth(root.clientWidth || 800)
+      setHeight(root.clientHeight || 0)
       return
     }
-    const observer = new ResizeObserver((entries) => setWidth(Math.floor(entries[0].contentRect.width)))
+    const observer = new ResizeObserver((entries) => {
+      setWidth(Math.floor(entries[0].contentRect.width))
+      setHeight(Math.floor(entries[0].contentRect.height ?? 0))
+    })
     observer.observe(root)
     return () => observer.disconnect()
   }, [])
+
+  // The width a page is drawn at. Whole-page mode leaves a little air above and below; with the height unknown it
+  // falls back to the full column, which is what the reader did before.
+  const pageWidth = fit === 'page' && height > 0 && width > 0 ? Math.min(width, Math.max(240, Math.floor((height - 24) / ratio))) : width
 
   const pages = doc?.numPages ?? 0
   // One stable function, so a page is not redrawn on every render of this component.
@@ -133,7 +146,7 @@ export default function PdfScrollView({
     if (reported.current === index) return
     reported.current = index
     slots.current[index - 1]?.scrollIntoView({ block: 'start' })
-  }, [pageIndex, pages, url, width])
+  }, [pageIndex, pages, url, pageWidth])
 
   return (
     <div
@@ -158,10 +171,10 @@ export default function PdfScrollView({
               slots.current[index - 1] = el
             }}
             data-page={index}
-            className="mx-auto mb-2 w-full bg-surface"
-            style={{ aspectRatio: `1 / ${ratio}` }}
+            className="mx-auto mb-3 bg-surface shadow-sm"
+            style={{ aspectRatio: `1 / ${ratio}`, width: pageWidth > 0 ? pageWidth : '100%' }}
           >
-            {width > 0 && near.has(index) && <PageCanvas doc={doc} index={index} width={width} label={`${label}, PDF page ${index}`} onError={fail} />}
+            {pageWidth > 0 && near.has(index) && <PageCanvas doc={doc} index={index} width={pageWidth} label={`${label}, PDF page ${index}`} onError={fail} />}
           </div>
         ))}
     </div>

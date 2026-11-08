@@ -11,7 +11,7 @@ import { editorExtensions } from './editorExtensions.ts'
 const same = (a: string, b: string) => a.replace(/\s+$/, '') === b.replace(/\s+$/, '')
 
 const tool =
-  'min-h-11 rounded px-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring disabled:opacity-40 aria-pressed:bg-slate-200 aria-pressed:text-slate-950 sm:min-h-0 sm:py-1'
+  'min-h-11 shrink-0 whitespace-nowrap rounded px-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring disabled:opacity-40 aria-pressed:bg-slate-200 aria-pressed:text-slate-950 sm:min-h-0 sm:py-1'
 
 export default function RichTextEditor({
   labelId,
@@ -93,7 +93,8 @@ export default function RichTextEditor({
 
   return (
     <div className="rounded border border-slate-300 bg-surface focus-within:ring-2 focus-within:ring-accent-ring">
-      <div role="toolbar" aria-label="Formatting" className="flex flex-wrap items-center gap-0.5 rounded-t border-b border-slate-200 bg-slate-50 p-1">
+      {/* One swipeable row on a phone (three wrapped rows ate half the screen); wraps on a wider one. */}
+      <div role="toolbar" aria-label="Formatting" className="flex items-center gap-0.5 overflow-x-auto rounded-t border-b border-slate-200 bg-slate-50 p-1 sm:flex-wrap sm:overflow-visible">
         <button type="button" className={tool} aria-pressed={state.heading} disabled={disabled} onMouseDown={keepFocus} onClick={run(() => editor.chain().focus().toggleHeading({ level: 2 }).run())}>
           Heading
         </button>

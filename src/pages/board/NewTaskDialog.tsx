@@ -1,7 +1,9 @@
 import { useId, useMemo, useState, type FormEvent } from 'react'
 import { flushSync } from 'react-dom'
 import { useClauses } from '../../data/useClauses.ts'
+import { useSetTaskParent } from '../../data/useTaskParent.ts'
 import { useCreateTask } from '../../data/useTasks.ts'
+import { todayIso } from '../../lib/dates.ts'
 import { buildRequirementOptions } from '../../proposals/requirementOptions.ts'
 import { RequirementPicker } from '../../proposals/RequirementPicker.tsx'
 import { TASK_PRIORITIES, TASK_PRIORITY_LABEL } from '../../tasks/priority.ts'
@@ -18,6 +20,9 @@ const SECTION_HEADING = 'text-[11px] font-semibold tracking-wide text-slate-500 
 
 type Errors = { title?: string; start?: string; due?: string }
 
+// What a new subtask takes from its parent: the same department, submission, section and a deadline to start from.
+export type SubtaskParent = Pick<Task, 'id' | 'title' | 'subteam_key' | 'milestone_key' | 'section_id' | 'due_date'>
+
 // A new task, made straight on the Board by a task leader (create_task). It is laid out
 // like the task overlay, in the same order: what it is, who and when, linked work,
 // department. A title and a deadline are needed. The milestone and the
@@ -32,10 +37,14 @@ export function NewTaskDialog({
   milestones,
   viewerId,
   defaultDepartment,
+  parent = null,
 }: {
   open: boolean
   onClose: () => void
-  onCreated: (task: Task) => void
+  // `note` is set when the task was made but could not be attached to its parent.
+  onCreated: (task: Task, note?: string) => void
+  // Makes this a subtask of that task: prefilled from it, and attached once created.
+  parent?: SubtaskParent | null
   departments: { key: string; name: string }[]
   owners: { id: string; name: string }[]
   milestones: { value: string; label: string }[]
@@ -45,6 +54,7 @@ export function NewTaskDialog({
 }) {
   const titleId = useId()
   const create = useCreateTask()
+  const setParent = useSetTaskParent()
   const clauses = useClauses()
   const options = useMemo(() => buildRequirementOptions(clauses.data ?? []), [clauses.data])
   const close = () => {
@@ -63,14 +73,30 @@ export function NewTaskDialog({
         options={options}
         viewerId={viewerId}
         defaultDepartment={defaultDepartment}
-        pending={create.isPending}
+        parent={parent}
+        pending={create.isPending || setParent.isPending}
         error={create.error}
         onCancel={close}
         onSubmit={async (task) => {
           try {
             const made = await create.mutateAsync(task)
             create.reset()
-            onCreated(made)
+            let note: string | undefined
+            if (parent) {
+              try {
+                // The section only carries over while the task stays on its parent's submission.
+                await setParent.mutateAsync({
+                  id: made.id,
+                  parentId: parent.id,
+                  sectionId: task.milestoneKey === parent.milestone_key ? parent.section_id : null,
+                })
+              } catch (e) {
+                note = `“${made.title}” was created as a task of its own, because it could not be made part of “${parent.title}”${
+                  e instanceof Error ? `: ${e.message}` : ''
+                }. Open its details and choose “Part of” to try again.`
+              }
+            }
+            onCreated(made, note)
           } catch {
             // Shown by ActionError; the dialog stays open with what was typed.
           }
@@ -88,11 +114,13 @@ function Form({
   options,
   viewerId,
   defaultDepartment,
+  parent,
   pending,
   error,
   onCancel,
   onSubmit,
 }: {
+  parent: SubtaskParent | null
   titleId: string
   departments: { key: string; name: string }[]
   owners: { id: string; name: string }[]
@@ -110,11 +138,13 @@ function Form({
   const [detail, setDetail] = useState('')
   const [owner, setOwner] = useState('')
   const [priority, setPriority] = useState<TaskPriority>('normal')
-  const [start, setStart] = useState('')
-  const [due, setDue] = useState('')
-  const [milestone, setMilestone] = useState('')
+  // A task starts the day it is made unless the person says otherwise; the field can still be cleared.
+  const [start, setStart] = useState(() => todayIso())
+  const [due, setDue] = useState(parent?.due_date ?? '')
+  const [milestone, setMilestone] = useState(parent?.milestone_key ?? '')
   const [keys, setKeys] = useState<string[]>([])
-  const [department, setDepartment] = useState(departments.some((d) => d.key === defaultDepartment) ? defaultDepartment : '')
+  const firstDepartment = parent?.subteam_key ?? defaultDepartment
+  const [department, setDepartment] = useState(departments.some((d) => d.key === firstDepartment) ? firstDepartment : '')
   const [errors, setErrors] = useState<Errors>({})
 
   function submit(event: FormEvent) {
@@ -157,12 +187,16 @@ function Form({
   return (
     <form onSubmit={submit} noValidate className="space-y-3" data-testid="new-task-form">
       <h2 id={titleId} className="text-base font-semibold text-balance text-slate-900">
-        New task
+        {parent ? 'New subtask' : 'New task'}
       </h2>
-      <p className="text-xs text-slate-600">Made directly, without a proposal. It starts in To do.</p>
+      <p className="text-xs text-slate-600" data-testid="new-task-intro">
+        {parent
+          ? `Part of “${parent.title}”. Department, submission and deadline start from it. It starts in To do.`
+          : 'Made directly, without a proposal. It starts in To do.'}
+      </p>
 
       <fieldset disabled={pending} className="grid gap-3 sm:grid-cols-2">
-        <legend className="sr-only">New task</legend>
+        <legend className="sr-only">{parent ? 'New subtask' : 'New task'}</legend>
         <div className="sm:col-span-2">
           <label htmlFor={fid('title')} className={`${LABEL} ${REQUIRED}`}>
             Title

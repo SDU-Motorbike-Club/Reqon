@@ -10,6 +10,8 @@ const state = vi.hoisted(() => ({
   pending: false,
   error: null as Error | null,
   asked: [] as unknown[],
+  // The season's tasks (id, parent, title): where the list gets each row's parent from.
+  season: [] as { id: string; parent_id: string | null; title: string }[],
 }))
 
 vi.mock('../auth/context.ts', () => ({ useAuth: () => ({ status: 'member', member: { id: 'me', status: 'active' } }) }))
@@ -22,6 +24,7 @@ vi.mock('../data/useTaskList.ts', () => ({
     return { data: state.pending ? undefined : { rows: state.rows, total: state.total }, isPending: state.pending, error: state.error, refetch: () => {} }
   },
 }))
+vi.mock('../data/useTasks.ts', () => ({ useTasks: () => ({ data: state.season }) }))
 vi.mock('../lib/dates.ts', async (orig) => ({ ...(await orig<typeof import('../lib/dates.ts')>()), todayIso: () => '2026-10-27' }))
 
 const { default: Tasks } = await import('./Tasks.tsx')
@@ -49,6 +52,7 @@ beforeEach(() => {
   state.pending = false
   state.error = null
   state.asked = []
+  state.season = []
 })
 
 describe('Tasks list', () => {
@@ -67,6 +71,36 @@ describe('Tasks list', () => {
     expect(second.getByText('unassigned')).toBeInTheDocument()
     expect(second.getByText('no deadline')).toBeInTheDocument()
     expect(second.getByText('Urgent')).toBeInTheDocument()
+  })
+
+  it('nests a subtask right under its parent when both are on the page, wherever the sort put it', () => {
+    state.rows = [row('s1', { title: 'Design' }), row('other'), row('p', { title: 'T-shirts' }), row('s2', { title: 'Funds' })]
+    state.total = 4
+    state.season = [
+      { id: 'p', parent_id: null, title: 'T-shirts' },
+      { id: 's1', parent_id: 'p', title: 'Design' },
+      { id: 's2', parent_id: 'p', title: 'Funds' },
+      { id: 'other', parent_id: null, title: 'Task other' },
+    ]
+    renderAt()
+    const order = within(screen.getByTestId('tasks-table')).getAllByTestId(/^task-row-/).map((tr) => tr.getAttribute('data-testid'))
+    expect(order).toEqual(['task-row-other', 'task-row-p', 'task-row-s1', 'task-row-s2'])
+    expect(screen.getByTestId('task-row-s1')).toHaveAttribute('data-nested', 'true')
+    expect(screen.getByTestId('task-row-p')).not.toHaveAttribute('data-nested')
+    expect(screen.getByTestId('task-subtasks-p')).toHaveTextContent('2 subtasks')
+    expect(screen.queryByTestId('task-subtasks-other')).not.toBeInTheDocument()
+  })
+
+  it('keeps a subtask in its own place, saying what it is part of, when its parent is not on this page', () => {
+    state.rows = [row('s1', { title: 'Design' })]
+    state.total = 1
+    state.season = [
+      { id: 'p', parent_id: null, title: 'T-shirts' },
+      { id: 's1', parent_id: 'p', title: 'Design' },
+    ]
+    renderAt()
+    expect(screen.getByTestId('task-row-s1')).not.toHaveAttribute('data-nested')
+    expect(screen.getByTestId('task-row-s1')).toHaveTextContent('Part of T-shirts')
   })
 
   it('marks an overdue open task, and not a finished one', () => {
