@@ -37,10 +37,14 @@ test.describe('Phase 14 UI against the real database', () => {
     const m = readManifest()
     await login(page, m.users.member.email, m.password)
     await page.goto('/meetings')
+    // A meeting's agenda is in its detail dialog: the whole card is the button that opens it.
+    await page.getByRole('button', { name: `${PREFIX} build meeting` }).click()
     const agenda = page.getByTestId(`meeting-agenda-${meetingId}`)
     await expect(agenda.getByRole('heading', { name: 'Build status' })).toBeVisible()
     await expect(agenda.locator('li li')).toHaveText('welds checked')
     await expect(agenda.locator('img')).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
     // A member neither calls meetings nor edits the default agenda.
     await expect(page.getByRole('button', { name: 'Edit default agenda' })).toHaveCount(0)
 

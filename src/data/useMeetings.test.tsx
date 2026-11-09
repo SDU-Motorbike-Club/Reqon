@@ -62,7 +62,7 @@ async function failure<T>(run: () => Promise<T>) {
 
 const draft = {
   title: 'Weekly', heldOn: '2026-11-03', startsAt: '16:30', endsAt: null, location: 'Workshop', subteamKey: null,
-  agenda: '## Agenda', notes: null, attendees: null,
+  agenda: '## Agenda', notes: null, summary: null, attendees: null,
 }
 
 beforeEach(() => {

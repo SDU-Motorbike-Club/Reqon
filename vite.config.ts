@@ -9,6 +9,8 @@ export default defineConfig({
   // The attachment compression worker (src/attachments/media) loads Mediabunny with a dynamic import,
   // which needs an ES-module worker; every browser that can compress video supports those.
   worker: { format: 'es' },
+  // Pre-bundled so the dev server does not find it mid-test, re-optimize and reload the page (it made the 1080p e2e flaky).
+  optimizeDeps: { include: ['mediabunny'] },
   test: {
     environment: 'jsdom',
     globals: true,
