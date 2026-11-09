@@ -42,7 +42,7 @@ export default function Inbox() {
           />
           <span className="min-w-0">
             {isNew && <span className="sr-only">New: </span>}
-            <span className={`block text-sm text-pretty ${isNew ? 'font-medium text-slate-900' : 'text-slate-700'}`}>{view.text}</span>
+            <span className={`block text-sm text-pretty break-words whitespace-pre-line ${isNew ? 'font-medium text-slate-900' : 'text-slate-700'}`}>{view.text}</span>
             <time dateTime={n.created_at} className="text-xs text-slate-500">
               {formatInstant(n.created_at)}
             </time>
@@ -66,7 +66,7 @@ export default function Inbox() {
     <main id="main-content" tabIndex={-1} className={pageMain('reading')}>
       <PageHeader
         title="Inbox"
-        description="What needs you: tasks handed to you, proposals waiting for your review, and answers to your own proposals."
+        description="What needs you: tasks handed to you, proposals waiting for your review, answers to your own proposals, and messages from other members."
       />
       {notifications.isLoading ? (
         <LoadingState label="Loading your inbox…" />

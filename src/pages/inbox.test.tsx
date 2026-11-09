@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 type Row = {
   id: number; member_id: string; activity_id: number; season_id: string | null; kind: string; entity: string
   entity_id: string; actor_id: string | null; title: string | null; created_at: string; read_at: string | null
+  body?: string | null
 }
 const state = vi.hoisted(() => ({ rows: [] as Row[], marked: [] as unknown[], loading: false, error: null as Error | null }))
 
@@ -79,6 +80,16 @@ describe('Inbox', () => {
     await user.click(screen.getByTestId('notification-7'))
     expect(state.marked).toEqual([{ id: 7 }])
     expect(screen.getByTestId('where')).toHaveTextContent('/board?task=t7')
+  })
+
+  it('shows a message from another member in full, and opening it goes to their profile to reply', async () => {
+    state.rows = [row(9, 'message', { entity: 'member', entity_id: 'm2', actor_id: 'm2', title: null, body: 'Can you cover the Friday build?' })]
+    const user = userEvent.setup()
+    renderInbox()
+    expect(screen.getByTestId('notification-9')).toHaveTextContent('Bo Wrench: Can you cover the Friday build?')
+    expect(screen.getByTestId('notification-9')).toHaveAttribute('href', '/inbox?profile=m2')
+    await user.click(screen.getByTestId('notification-9'))
+    expect(state.marked).toEqual([{ id: 9 }])
   })
 
   it('opening one already read marks nothing', async () => {

@@ -9,6 +9,7 @@ import { TASK_DRAG_TYPE } from '../gantt/ganttDrag.ts'
 import { isOverdue } from './boardModel.ts'
 import type { TaskLinksView, TaskPermissions } from './TaskDetails.tsx'
 import { MoveControl } from './MoveControl.tsx'
+import { ProfileLink } from '../../members/ProfileLink.tsx'
 
 type Props = {
   task: Task
@@ -109,7 +110,11 @@ export function TaskCard(props: Props) {
           <dt className="sr-only">Owner</dt>
           <dd className="inline-flex items-center gap-1.5 font-medium">
             {props.ownerName ? <Avatar name={props.ownerName} image={props.ownerImage} size="xs" /> : null}
-            {props.ownerName ?? <Missing>Unassigned</Missing>}
+            {props.ownerName && task.owner_id ? (
+              <ProfileLink memberId={task.owner_id}>{props.ownerName}</ProfileLink>
+            ) : (
+              (props.ownerName ?? <Missing>Unassigned</Missing>)
+            )}
           </dd>
           <dt className="sr-only">Department</dt>
           <dd className="min-w-0 truncate">{props.departmentName ?? <Missing>No department</Missing>}</dd>

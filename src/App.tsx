@@ -13,6 +13,7 @@ import { LoadingState } from './ui/states.tsx'
 import { useRealtimeNotifications } from './data/useNotifications.ts'
 import { useScrollRestoration } from './ui/useScrollRestoration.ts'
 import { useRealtimeSubteams } from './data/useRealtimeSubteams.ts'
+import { ProfileDialog } from './members/ProfileDialog.tsx'
 
 // Route-level code splitting (Phase 7 §7.1): the authenticated shell — auth
 // gate, season handling, the tutorial overlay, the header, navigation and the
@@ -109,6 +110,8 @@ export default function App() {
             Skip to main content
           </a>
           <AppHeader />
+          {/* A member's profile (?profile=<id>), openable from any screen. */}
+          <ProfileDialog />
           {/* Keyed on the path: a screen that crashed recovers simply by navigating
               somewhere else, instead of staying broken until a full reload. */}
           <ErrorBoundary key={location.pathname}>

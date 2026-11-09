@@ -73,8 +73,6 @@ vi.mock('../data/useMeetings.ts', async () => {
     }
   },
   useUpdateMeeting: () => ({ mutateAsync: async (draft: Record<string, unknown>) => { state.updated.push(draft) }, reset: vi.fn(), isPending: false, error: null }),
-  // The model call is the Edge Function's (supabase/functions/summarize-meeting); here it answers at once.
-  useSummarizeMeeting: () => ({ mutate: (_input: unknown, options?: { onSuccess?: (s: string) => void }) => options?.onSuccess?.('Drafted.'), reset: vi.fn(), isPending: false, error: null }),
   useSaveMeetingTemplate: () => {
     const [error, setError] = useState<Error | null>(null)
     return {
@@ -431,7 +429,7 @@ describe('calling and editing a meeting', () => {
     expect(dialog.getByTestId('meeting-summary-p')).toHaveTextContent('Agreed the budget.')
   })
 
-  it('drafts a summary into the form and saves exactly what is in the box', async () => {
+  it('has no AI summary button: the summary is typed by hand and saved exactly as typed', async () => {
     const user = userEvent.setup()
     state.can = { canCreateMeeting: true, canDeleteMeeting: false, canEditMeetingTemplate: false }
     state.meetings = [meeting({ notes: 'Decided things' })]
@@ -439,11 +437,11 @@ describe('calling and editing a meeting', () => {
     await user.click(await screen.findByRole('button', { name: 'Weekly build' }))
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit Weekly build' }))
     const dialog = within(screen.getByRole('dialog'))
-    await user.click(dialog.getByRole('button', { name: 'Write a summary' }))
-    expect(dialog.getByLabelText('Summary (optional)')).toHaveValue('Drafted.')
+    expect(dialog.queryByRole('button', { name: /write (a summary|it again)/i })).not.toBeInTheDocument()
+    await user.type(dialog.getByLabelText('Summary (optional)'), 'Agreed the plan.')
     await user.click(dialog.getByRole('button', { name: 'Save changes' }))
     await waitFor(() => expect(state.updated).toHaveLength(1))
-    expect(state.updated[0]).toMatchObject({ id: 'm1', summary: 'Drafted.' })
+    expect(state.updated[0]).toMatchObject({ id: 'm1', summary: 'Agreed the plan.' })
   })
 
   it('lists who did not come, and taking someone off the list saves them as having come', async () => {

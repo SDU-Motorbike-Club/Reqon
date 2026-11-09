@@ -4,7 +4,6 @@ import {
   useCreateMeeting,
   useMeetingAttendance,
   useSetMeetingAttendees,
-  useSummarizeMeeting,
   useUpdateMeeting,
   type Meeting,
   type MeetingDraft,
@@ -136,7 +135,6 @@ function Form({
   const [notes, setNotes] = useState(meeting?.notes ?? '')
   // An old summary that is only the minutes again (migration 20260108 copied them) is not shown as a summary.
   const [summary, setSummary] = useState(meeting?.summary && meeting.summary.trim() !== (meeting.notes ?? '').trim() ? meeting.summary : '')
-  const writing = useSummarizeMeeting()
   // Who came is recorded by listing who DIDN'T (everyone else came). What was saved before is only replaced when the
   // person changes the list here, so saving before it has loaded can never wipe it. The old free-text line is kept.
   const members = useMembers().data ?? []
@@ -353,22 +351,9 @@ function Form({
         />
 
         <div>
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <label className={label} htmlFor={fieldId('summary')}>
-              Summary (optional)
-            </label>
-            <button
-              type="button"
-              className={`${buttonSecondary} text-xs`}
-              disabled={pending || writing.isPending || (!agenda.trim() && !notes.trim())}
-              onClick={() => {
-                writing.reset()
-                writing.mutate({ title: title.trim(), agenda, notes }, { onSuccess: setSummary })
-              }}
-            >
-              {writing.isPending ? 'Writing…' : summary.trim() ? 'Write it again' : 'Write a summary'}
-            </button>
-          </div>
+          <label className={label} htmlFor={fieldId('summary')}>
+            Summary (optional)
+          </label>
           <textarea
             id={fieldId('summary')}
             name="summary"
@@ -379,10 +364,6 @@ function Form({
             placeholder="Two or three sentences on what was decided."
             className={field}
           />
-          <p className="mt-1 text-xs text-slate-600">
-            The button drafts one from the agenda and minutes. Read it and fix it before you save; nothing is saved until you do.
-          </p>
-          <ActionError error={writing.error} className="mt-1" />
         </div>
 
         <h3 className={heading}>Who came</h3>

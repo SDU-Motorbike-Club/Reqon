@@ -17,6 +17,7 @@ export type NotificationKind =
   | 'role_granted'
   | 'meeting_called'
   | 'tasks_unassigned'
+  | 'message'
 
 export type NotificationView = {
   // One sentence, said to the person reading it.
@@ -30,7 +31,7 @@ function named(noun: string, title: string | null, without = `a ${noun}`): strin
   return title ? `the ${noun} “${title}”` : without
 }
 
-export function describeNotification(n: Pick<Notification, 'kind' | 'title' | 'entity_id'>, actorName: string | null): NotificationView {
+export function describeNotification(n: Pick<Notification, 'kind' | 'title' | 'entity_id'> & Partial<Pick<Notification, 'body'>>, actorName: string | null): NotificationView {
   const who = actorName ?? 'Someone'
   const yours = n.title ? `your proposal “${n.title}”` : 'your proposal'
   const task = `/board?task=${encodeURIComponent(n.entity_id)}`
@@ -65,6 +66,9 @@ export function describeNotification(n: Pick<Notification, 'kind' | 'title' | 'e
     case 'tasks_unassigned':
       // Sent by the weekly job (no person acts), with the count in the title: "57 open tasks are not assigned to anyone yet".
       return { text: `${n.title ?? 'Some open tasks are not assigned to anyone yet'}.`, to: '/tasks' }
+    case 'message':
+      // Person to person (send_message, 20260154000000). entity_id is the sender: opening it shows their profile, where the reply box is.
+      return { text: `${who}: ${n.body ?? ''}`, to: `/inbox?profile=${encodeURIComponent(n.entity_id)}` }
     default:
       return { text: `${who}: ${n.kind.replaceAll('_', ' ')}${n.title ? ` — ${n.title}` : ''}.`, to: '/' }
   }

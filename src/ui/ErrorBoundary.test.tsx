@@ -68,3 +68,36 @@ describe('a render crash', () => {
     expect(logged.some((c) => String(c[0]).includes('crashed while rendering'))).toBe(true)
   })
 })
+
+describe('a screen file that a newer deploy replaced', () => {
+  function Stale(): React.ReactElement {
+    throw new Error('error loading dynamically imported module: https://x.app/assets/AttachmentsPanel-abc.js')
+  }
+  const reload = vi.fn()
+  beforeEach(() => {
+    reload.mockClear()
+    sessionStorage.clear()
+    vi.stubGlobal('location', { ...window.location, reload })
+  })
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('reloads once on its own, and not again right after (no reload loop)', () => {
+    render(<ErrorBoundary><Stale /></ErrorBoundary>)
+    expect(reload).toHaveBeenCalledTimes(1)
+    render(<ErrorBoundary><Stale /></ErrorBoundary>)
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers a reload, since trying the same import again cannot work', async () => {
+    sessionStorage.setItem('reqon:chunk-reload', String(Date.now())) // the automatic reload already happened
+    render(<ErrorBoundary><Stale /></ErrorBoundary>)
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Reload the app' }))
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not reload for an ordinary crash', () => {
+    render(<ErrorBoundary><Boom fail /></ErrorBoundary>)
+    expect(reload).not.toHaveBeenCalled()
+  })
+})

@@ -49,6 +49,18 @@ describe('describeNotification', () => {
     })
   })
 
+  it('shows a message with its text from the sender, and opens the sender’s profile to reply', () => {
+    expect(describeNotification({ kind: 'message', title: null, entity_id: 'u1', body: 'Can you cover the Friday build?' }, 'Ada Rider')).toEqual({
+      text: 'Ada Rider: Can you cover the Friday build?',
+      to: '/inbox?profile=u1',
+    })
+    // A sender who left the roster, and a hostile id, still read and link safely.
+    expect(describeNotification({ kind: 'message', title: null, entity_id: 'a&b', body: 'Hi' }, null)).toEqual({
+      text: 'Someone: Hi',
+      to: '/inbox?profile=a%26b',
+    })
+  })
+
   it('does not break on a kind this client does not know yet', () => {
     expect(describeNotification(n('meeting_requested', 'Weekly'), 'Ada Rider')).toEqual({ text: 'Ada Rider: meeting requested — Weekly.', to: '/' })
   })

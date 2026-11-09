@@ -17,6 +17,7 @@ import { IssuedPassword } from './IssuedPassword.tsx'
 import { JobTitleSelect } from './JobTitleSelect.tsx'
 import { DEFAULT_JOB_TITLE, jobTitleOptions, splitRoster, type RosterMember } from './rosterModel.ts'
 import { useRoleSettings } from './RoleSettings.tsx'
+import { ProfileLink } from '../../members/ProfileLink.tsx'
 
 function RosterRow({
   member,
@@ -66,9 +67,9 @@ function RosterRow({
     <li className="px-3 py-2" data-testid={`member-${member.id}`}>
       <div className="flex flex-wrap items-center gap-2">
         <Avatar name={member.full_name} image={image} size="sm" />
-        <span className={`text-sm font-medium ${retired ? 'text-slate-500' : 'text-slate-900'}`}>
+        <ProfileLink memberId={member.id} className={`text-sm font-medium ${retired ? 'text-slate-500' : 'text-slate-900'}`}>
           {member.full_name}
-        </span>
+        </ProfileLink>
         {/* Whoever can edit the title sees it in the picker below; showing it here too printed it twice. */}
         {!canAdminister && (
           <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] whitespace-nowrap text-slate-700">

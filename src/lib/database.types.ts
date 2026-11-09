@@ -1334,8 +1334,9 @@ export type Database = {
       }
       notifications: {
         Row: {
-          activity_id: number
+          activity_id: number | null
           actor_id: string | null
+          body: string | null
           created_at: string
           entity: string
           entity_id: string
@@ -1347,8 +1348,9 @@ export type Database = {
           title: string | null
         }
         Insert: {
-          activity_id: number
+          activity_id?: number | null
           actor_id?: string | null
+          body?: string | null
           created_at?: string
           entity: string
           entity_id: string
@@ -1360,8 +1362,9 @@ export type Database = {
           title?: string | null
         }
         Update: {
-          activity_id?: number
+          activity_id?: number | null
           actor_id?: string | null
+          body?: string | null
           created_at?: string
           entity?: string
           entity_id?: string
@@ -3664,6 +3667,7 @@ export type Database = {
       mark_attachment_purged: { Args: { p_ids: number[] }; Returns: number }
       mark_password_reset: { Args: { p_member: string }; Returns: undefined }
       meeting_schedule_dates: { Args: { p_count: number }; Returns: string[] }
+      member_email: { Args: { p_member_id: string }; Returns: string }
       notify_unassigned_tasks: {
         Args: { p_include_developers?: boolean }
         Returns: number
@@ -4018,6 +4022,10 @@ export type Database = {
       }
       save_club_credential: {
         Args: { p_id: string; p_login: string; p_secret?: string }
+        Returns: undefined
+      }
+      send_message: {
+        Args: { p_body: string; p_to: string }
         Returns: undefined
       }
       set_attachment_caption: {
