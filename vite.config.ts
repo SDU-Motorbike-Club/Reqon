@@ -19,6 +19,8 @@ export default defineConfig({
     // result on every machine and in CI. Tests that need a feature turn it on themselves (vi.stubEnv).
     env: { VITE_ATTACHMENTS_ENABLED: 'false', VITE_BACKUPS_ENABLED: 'false' },
     css: false,
+    // The default 5s is too tight for typing-heavy tests under coverage on a shared CI runner (settings roster test flaked there).
+    testTimeout: 15_000,
     // Playwright owns tests/e2e (real browser, real local DB, its own
     // runner and config) — Vitest must never try to collect those files.
     exclude: ['**/node_modules/**', '**/dist/**', 'tests/e2e/**'],
