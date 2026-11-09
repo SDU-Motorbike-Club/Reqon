@@ -1,9 +1,14 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AnnouncementHistoryDialog, AnnouncementTag, NewAnnouncementDialog } from '../announcements/AnnouncementDialogs.tsx'
+import { usePermissions } from '../auth/usePermissions.ts'
 import { useMembers } from '../data/useMembers.ts'
 import { INBOX_SIZE, useMarkNotificationsRead, useNotifications } from '../data/useNotifications.ts'
 import { formatInstant } from '../lib/dates.ts'
+import { mergeSearchParams } from '../lib/searchParams.ts'
+import { useUrlParams } from '../lib/useUrlParams.ts'
 import { describeNotification, type Notification } from '../notifications/presentation.ts'
-import { buttonSecondary } from '../ui/buttons.ts'
+import { buttonPrimary, buttonSecondary } from '../ui/buttons.ts'
 import { pageMain } from '../ui/layout.ts'
 import { PageHeader } from '../ui/PageHeader.tsx'
 import { ActionError, EmptyState, ErrorState, LoadingState } from '../ui/states.tsx'
@@ -17,6 +22,13 @@ export default function Inbox() {
   const notifications = useNotifications()
   const members = useMembers()
   const markRead = useMarkNotificationsRead()
+  const { canAnnounce } = usePermissions()
+  // The history is an address (?announcements=1), so an announcement in the list can open it and Back closes it.
+  const [params, setParams] = useUrlParams()
+  const historyOpen = params.get('announcements') === '1'
+  const setHistory = (open: boolean) =>
+    setParams((current) => mergeSearchParams(current, { announcements: open ? '1' : null }), { replace: !open })
+  const [composing, setComposing] = useState(false)
   const names = new Map((members.data ?? []).map((m) => [m.id, m.full_name]))
 
   const rows = notifications.data ?? []
@@ -33,7 +45,7 @@ export default function Inbox() {
           onClick={() => {
             if (isNew) markRead.mutate({ id: n.id })
           }}
-          className="flex items-start gap-2 px-3 py-2 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-ring"
+          className={`flex items-start gap-2 px-3 py-2 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-ring ${view.label ? 'border-l-4 border-accent bg-slate-50' : ''}`}
           data-testid={`notification-${n.id}`}
         >
           <span
@@ -42,6 +54,8 @@ export default function Inbox() {
           />
           <span className="min-w-0">
             {isNew && <span className="sr-only">New: </span>}
+            {view.label && <AnnouncementTag />}
+            {view.heading && <span className="block text-sm font-semibold break-words text-slate-900">{view.heading}</span>}
             <span className={`block text-sm text-pretty break-words whitespace-pre-line ${isNew ? 'font-medium text-slate-900' : 'text-slate-700'}`}>{view.text}</span>
             <time dateTime={n.created_at} className="text-xs text-slate-500">
               {formatInstant(n.created_at)}
@@ -66,8 +80,27 @@ export default function Inbox() {
     <main id="main-content" tabIndex={-1} className={pageMain('reading')}>
       <PageHeader
         title="Inbox"
-        description="What needs you: tasks handed to you, proposals waiting for your review, answers to your own proposals, and messages from other members."
-      />
+        description="What needs you: tasks handed to you, proposals waiting for your review, answers to your own proposals, messages from other members, and announcements to the whole club."
+        // In the header, so an empty inbox still has them. Only the leadership writes an announcement.
+        actions={
+          canAnnounce ? (
+            <button type="button" className={buttonPrimary} onClick={() => setComposing(true)}>
+              New announcement
+            </button>
+          ) : undefined
+        }
+      >
+        {/* Everyone reads the history. Quiet text under the description, like the Board's Archive link. */}
+        <p className="mt-1 text-xs text-slate-500">
+          <button
+            type="button"
+            onClick={() => setHistory(true)}
+            className="inline-flex min-h-11 items-center underline underline-offset-2 sm:min-h-0"
+          >
+            Previous announcements
+          </button>
+        </p>
+      </PageHeader>
       {notifications.isLoading ? (
         <LoadingState label="Loading your inbox…" />
       ) : notifications.error ? (
@@ -99,6 +132,8 @@ export default function Inbox() {
           {list('Earlier', earlier)}
         </>
       )}
+      <NewAnnouncementDialog open={composing} onClose={() => setComposing(false)} />
+      <AnnouncementHistoryDialog open={historyOpen} onClose={() => setHistory(false)} />
     </main>
   )
 }

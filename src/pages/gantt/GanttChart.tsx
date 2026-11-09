@@ -1,18 +1,22 @@
 import type { ReactNode } from 'react'
-import { placeDay, type Span } from './ganttModel.ts'
+import type { TaskState } from '../../tasks/types.ts'
+import { placeBar, placeDay, type Span } from './ganttModel.ts'
 
 // Shared chart primitives: the label-column/timeline grid, the track shapes are
 // drawn in, and the shapes themselves. Used by every row level and by the ruler
 // in Gantt.tsx, so all of them share one left edge and one drawing rule.
 //
-// Two shapes and a line, so nothing depends on colour alone (the legend in GanttLegend.tsx explains each):
+// A few shapes and a line, so nothing depends on colour alone (the legend in GanttLegend.tsx explains each):
 //   dashed line + "Today" on the ruler   today
 //   flag ⚑ (red)                         a submission's deadline
-//   dot ●                                a task's date (its deadline, or its start when it has no deadline)
-//   "!" in red / "✓" in green            the dot of overdue / finished work
-// There are no bars: a window or a period was a second shape for the same fact. Every mark is decorative to
+//   wide pale band                       a submission's window, from its opening to its deadline
+//   thin bar with end ticks              a section: from its earliest start to its latest deadline
+//   outlined bar                         a task with a start and a deadline; its fill and glyph say its state
+//   dot ●                                a task with only one date (its deadline, or its start)
+//   "!" / "✓" / "×"                      overdue / finished / cancelled work (inside the bar or in place of the dot)
+// Bars are thin and outlined on purpose: an earlier version was a wall of boxed tracks. Every mark is decorative to
 // assistive technology (aria-hidden); the same fact is written out as text in the row's summary (`summary` on
-// Track), and carries a short date caption ("Due 27 Nov") so it reads without hovering.
+// Track), and carries a short date caption ("20/11/26 → 25/11/26") so it reads without hovering.
 
 // On a phone the chart has no room: a row is just its label (the facts are in words under the name) and the bars
 // are left to assistive technology only. From `sm` up it is the label column beside the timeline.
@@ -76,6 +80,58 @@ export function Track({
       {children}
       {summary && <span className="sr-only">{summary}</span>}
     </div>
+  )
+}
+
+// A task bar's outline and fill by state. The colour is the second cue: the glyph inside and the line style (a
+// cancelled task is dashed and hollow) say the same thing, so nothing depends on colour alone.
+const TASK_BAR: Record<TaskState, string> = {
+  todo: 'border-slate-400 bg-slate-400/15',
+  wip: 'border-blue-500 bg-blue-500/25',
+  blocked: 'border-amber-500 bg-amber-500/25',
+  done: 'border-ok bg-ok/40',
+  cancelled: 'border-dashed border-slate-300 bg-transparent opacity-70',
+}
+
+export type BarVariant =
+  // A task with a start and a deadline: an outlined bar, its state in the outline, fill and glyph.
+  | { kind: 'task'; state: TaskState; overdue?: boolean; glyph?: string }
+  // A submission's window: a wide, pale band behind its deadline flag. `percent` fills it from the left.
+  | { kind: 'window'; percent?: number | null }
+  // A section: a thin bar from its earliest start to its latest deadline. `percent` fills it from the left.
+  | { kind: 'summary'; percent?: number | null }
+
+// A span drawn to scale on the timeline, with its date caption beside it. Returns nothing for a span wholly outside
+// the chart. A one-day span is still a visible sliver (min width), never a bar of zero width.
+export function Bar({ span, range, variant, title, caption }: { span: Span; range: Span; variant: BarVariant; title: string; caption?: string }) {
+  const box = placeBar(span, range)
+  if (!box) return null
+  const fill = variant.kind === 'task' ? null : variant.percent
+  const shape =
+    variant.kind === 'task'
+        // Overdue replaces the state's outline (two border colours on one element would let the grey win).
+      ? `inset-y-2 min-w-[6px] rounded border-2 ${variant.overdue ? 'border-accent-ring bg-accent/20' : TASK_BAR[variant.state]}`
+      : variant.kind === 'window'
+        ? 'inset-y-1 min-w-[6px] rounded border border-slate-300/40 bg-slate-300/15'
+        : 'top-1/2 h-2 min-w-[6px] -translate-y-1/2 rounded-sm bg-slate-400/60'
+  return (
+    <>
+      <span
+        aria-hidden="true"
+        title={title}
+        data-gantt-bar={variant.kind}
+        className={`absolute flex items-center justify-start overflow-hidden ${shape}`}
+        style={{ left: `${box.left}%`, width: `${box.width}%` }}
+      >
+        {fill !== null && fill !== undefined && fill > 0 && (
+          <span className="absolute inset-y-0 left-0 bg-ok/70" style={{ width: `${Math.min(100, fill)}%` }} />
+        )}
+        {variant.kind === 'task' && variant.glyph && (
+          <span className="relative z-[1] px-0.5 text-[11px] leading-none font-bold text-slate-900">{variant.glyph}</span>
+        )}
+      </span>
+      {caption && <Caption from={box.left} to={box.left + box.width} text={caption} />}
+    </>
   )
 }
 

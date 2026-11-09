@@ -71,6 +71,15 @@ describe('the permission matrix', () => {
     expect(NO_PERMISSIONS.canAddMembers).toBe(false)
   })
 
+  // send_announcement() (20260155000000) asks is_admin().
+  it('only the President, the Vice President and the Developer send announcements', () => {
+    const senders = (['developer', 'treasurer', 'president', 'vicepresident', 'documentation'] as PrivilegedRole[])
+      .filter((role) => permissionsFor([role]).canAnnounce)
+    expect(senders).toEqual(['developer', 'president', 'vicepresident'])
+    expect(permissionsFor([]).canAnnounce).toBe(false)
+    expect(NO_PERMISSIONS.canAnnounce).toBe(false)
+  })
+
   // can_view_club_credentials() (20260136000000): the club's service passwords. Deliberately narrower than
   // is_admin(): the Vice President is not included.
   it('only the President and the Developer open the club accounts', () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Milestone } from '../../data/useMilestones.ts'
 import type { Task, TaskState } from '../../data/useTasks.ts'
 import {
+  compareByDate,
   milestoneSpan,
   monthTicks,
   placeBar,
@@ -84,6 +85,8 @@ describe('month ruler', () => {
   it('labels every month in the range and covers it end to end', () => {
     const ticks = monthTicks({ from: '2026-11-01', to: '2027-01-31' })
     expect(ticks.map((t) => t.key)).toEqual(['2026-11', '2026-12', '2027-01'])
+    // An apostrophe before the year, so a month is never mistaken for a day of the month, and short enough to fit a tick.
+    expect(ticks.map((t) => t.label)).toEqual(['Nov ’26', 'Dec ’26', 'Jan ’27'])
     expect(ticks[0].left).toBe(0)
     // 30 + 31 + 31 = 92 days, and the last tick must end exactly at the edge.
     const last = ticks[2]
@@ -252,6 +255,25 @@ describe('rangeDays and shiftDay (dragging a bar)', () => {
   it('counts both ends of a range', () => {
     expect(rangeDays({ from: '2026-10-01', to: '2026-10-01' })).toBe(1)
     expect(rangeDays({ from: '2026-10-01', to: '2026-10-31' })).toBe(31)
+  })
+  it('orders tasks by when the work begins, then its deadline, then its title, with undated work last', () => {
+    const t = (title: string, starts_on: string | null, due_date: string | null) => ({ title, starts_on, due_date })
+    const sorted = [
+      t('No dates', null, null),
+      t('Deadline only, late', null, '2026-12-01'),
+      t('B same day', '2026-11-05', '2026-11-20'),
+      t('A same day', '2026-11-05', '2026-11-20'),
+      t('Starts early, ends late', '2026-11-05', '2026-12-30'),
+      t('Deadline only, early', null, '2026-11-02'),
+    ].sort(compareByDate)
+    expect(sorted.map((x) => x.title)).toEqual([
+      'Deadline only, early', // no start: its deadline (02/11) is when it begins
+      'A same day',
+      'B same day',
+      'Starts early, ends late', // same start, later deadline
+      'Deadline only, late',
+      'No dates',
+    ])
   })
   it('moves a calendar day by whole days across months, years and the DST change, never by a time zone', () => {
     expect(shiftDay('2026-10-31', 1)).toBe('2026-11-01')

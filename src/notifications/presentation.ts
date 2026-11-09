@@ -18,12 +18,17 @@ export type NotificationKind =
   | 'meeting_called'
   | 'tasks_unassigned'
   | 'message'
+  | 'announcement'
 
 export type NotificationView = {
   // One sentence, said to the person reading it.
   text: string
   // Where acting on it happens.
   to: string
+  // A tag shown beside it when it is not an ordinary notice ("Announcement"); text, not only colour.
+  label?: string
+  // A headline shown above the text (an announcement's title).
+  heading?: string
 }
 
 // "the task “X”" with a title, "a task" without one.
@@ -69,6 +74,9 @@ export function describeNotification(n: Pick<Notification, 'kind' | 'title' | 'e
     case 'message':
       // Person to person (send_message, 20260154000000). entity_id is the sender: opening it shows their profile, where the reply box is.
       return { text: `${who}: ${n.body ?? ''}`, to: `/inbox?profile=${encodeURIComponent(n.entity_id)}` }
+    case 'announcement':
+      // To the whole club (send_announcement, 20260155000000). Opening it shows the history, where it sits with the others.
+      return { text: `${who}: ${n.body ?? ''}`, to: '/inbox?announcements=1', label: 'Announcement', heading: n.title ?? undefined }
     default:
       return { text: `${who}: ${n.kind.replaceAll('_', ' ')}${n.title ? ` — ${n.title}` : ''}.`, to: '/' }
   }

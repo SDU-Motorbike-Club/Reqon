@@ -20,6 +20,15 @@ import { ParentSelect } from './ParentSelect.tsx'
 import { TaskPicker } from './TaskPicker.tsx'
 import { MAX_BLOCKER_REASON, planTaskEdit, type EditPlan } from './taskEditPlan.ts'
 
+// The Gantt opened on this task: its submission, its section (or the submission's unsectioned group) and its own sheet, so the
+// link lands on the task instead of on a closed section. shortcut: a task in a SUBsection also needs its parent section open,
+// which this screen does not know; open the parent on the Gantt.
+function ganttHref(task: Pick<Task, 'id' | 'milestone_key' | 'section_id'>): string {
+  const key = task.milestone_key ?? ''
+  const section = task.section_id ?? `unsectioned:${key}`
+  return `/gantt?open=${encodeURIComponent(key)}&sections=${encodeURIComponent(section)}&task=${encodeURIComponent(task.id)}`
+}
+
 export type TaskPermissions = {
   canEdit: boolean
   canReassign: boolean
@@ -520,7 +529,7 @@ export function TaskDetails(props: Props) {
                 ))}
               </select>
               {task.milestone_key && (
-                <Link className="mt-1 inline-block text-xs text-slate-700 underline underline-offset-2" to={`/gantt?open=${encodeURIComponent(task.milestone_key)}`}>
+                <Link className="mt-1 inline-block text-xs text-slate-700 underline underline-offset-2" to={ganttHref(task)}>
                   Open it in the Gantt
                 </Link>
               )}
@@ -541,7 +550,7 @@ export function TaskDetails(props: Props) {
             <li>
               Milestone:{' '}
               {task.milestone_key ? (
-                <Link className="underline underline-offset-2" to={`/gantt?open=${encodeURIComponent(task.milestone_key)}`}>
+                <Link className="underline underline-offset-2" to={ganttHref(task)}>
                   {props.milestones.find((m) => m.value === task.milestone_key)?.label ?? task.milestone_key}
                 </Link>
               ) : (

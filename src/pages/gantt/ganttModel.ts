@@ -105,11 +105,9 @@ export function monthTicks(range: Span): Tick[] {
       ticks.push({
         ...box,
         key: month.slice(0, 7),
-        label: new Date(`${month}T00:00:00Z`).toLocaleDateString('en-GB', {
-          month: 'short',
-          year: '2-digit',
-          timeZone: 'UTC',
-        }),
+        // "Nov ’26": the apostrophe stops it reading as the 26th of November (the app writes dates as DD/MM/YY), and it is short
+        // enough for a month about 65px wide; "Nov 2026" was cut off ("Nov 20…") in a real browser.
+        label: `${new Date(`${month}T00:00:00Z`).toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })} ’${month.slice(2, 4)}`,
       })
     }
     month = nextMonth(month)
@@ -178,6 +176,21 @@ export function spanOfDates(dates: (string | null | undefined)[]): Span | null {
 export function sectionSpan(tasks: Task[], sectionId: string, fallback: Span | null, subsectionIds: readonly string[] = []): Span | null {
   const ids = new Set([sectionId, ...subsectionIds])
   return spanOfDates(tasks.filter((t) => t.section_id !== null && ids.has(t.section_id)).flatMap((t) => [t.starts_on, t.due_date])) ?? fallback
+}
+
+// The order a group lists its tasks in: by when the work begins (its start, else its deadline), then its deadline,
+// then its title. A task with no dates goes last. Dates are YYYY-MM-DD text, so they compare as text. A Gantt reads
+// from the top left to the bottom right; creation order made the bars zig-zag.
+export function compareByDate(
+  a: Pick<Task, 'starts_on' | 'due_date' | 'title'>,
+  b: Pick<Task, 'starts_on' | 'due_date' | 'title'>,
+): number {
+  const day = (value: string | null) => (isDay(value) ? value.slice(0, 10) : '9999-99-99')
+  return (
+    day(a.starts_on ?? a.due_date).localeCompare(day(b.starts_on ?? b.due_date)) ||
+    day(a.due_date).localeCompare(day(b.due_date)) ||
+    a.title.localeCompare(b.title)
+  )
 }
 
 // "20/11/26": the same DD/MM/YY as everywhere else, to sit beside a mark.

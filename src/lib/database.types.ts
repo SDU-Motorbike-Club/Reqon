@@ -71,6 +71,38 @@ export type Database = {
           },
         ]
       }
+      announcements: {
+        Row: {
+          author_id: string | null
+          body: string
+          created_at: string
+          id: number
+          title: string | null
+        }
+        Insert: {
+          author_id?: string | null
+          body: string
+          created_at?: string
+          id?: number
+          title?: string | null
+        }
+        Update: {
+          author_id?: string | null
+          body?: string
+          created_at?: string
+          id?: number
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcements_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attachment_purge_queue: {
         Row: {
           attachment_id: string | null
@@ -4023,6 +4055,10 @@ export type Database = {
       save_club_credential: {
         Args: { p_id: string; p_login: string; p_secret?: string }
         Returns: undefined
+      }
+      send_announcement: {
+        Args: { p_body: string; p_title: string }
+        Returns: number
       }
       send_message: {
         Args: { p_body: string; p_to: string }

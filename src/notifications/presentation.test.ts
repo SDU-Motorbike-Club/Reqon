@@ -61,6 +61,21 @@ describe('describeNotification', () => {
     })
   })
 
+  it('labels an announcement, which no ordinary notice is', () => {
+    expect(describeNotification({ kind: 'announcement', title: null, entity_id: '4', body: 'Workshop closed Friday.' }, 'Ada Rider')).toEqual({
+      text: 'Ada Rider: Workshop closed Friday.',
+      to: '/inbox?announcements=1',
+      label: 'Announcement',
+    })
+    // Its title is the headline above the description.
+    expect(
+      describeNotification({ kind: 'announcement', title: 'Workshop closed', entity_id: '4', body: 'Back on Monday.' }, 'Ada Rider').heading,
+    ).toBe('Workshop closed')
+    for (const kind of ['task_assigned', 'message', 'role_granted', 'meeting_called']) {
+      expect(describeNotification({ kind, title: 'X', entity_id: 't1', body: 'Hi' }, 'Ada Rider').label).toBeUndefined()
+    }
+  })
+
   it('does not break on a kind this client does not know yet', () => {
     expect(describeNotification(n('meeting_requested', 'Weekly'), 'Ada Rider')).toEqual({ text: 'Ada Rider: meeting requested — Weekly.', to: '/' })
   })

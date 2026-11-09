@@ -96,6 +96,8 @@ export type Permissions = {
   // can_manage_roles(): open role management (President, Vice President,
   // Developer). Which roles may be changed is canGrantRole(roles, role).
   canManageRoles: boolean
+  // send_announcement() (20260155000000): tell every member at once (President, Vice President, Developer).
+  canAnnounce: boolean
   // can_manage_seasons(): create, edit and switch seasons (President, Developer)
   canManageSeasons: boolean
   // can_view_club_credentials() (20260136000000): open Settings → Club accounts, copy the club's service
@@ -149,6 +151,7 @@ export function permissionsFor(roles: readonly PrivilegedRole[]): Permissions {
     canAdminister: admin,
     canAddMembers: hasRole('president') || hasRole('vicepresident') || hasRole('developer'),
     canManageRoles: admin,
+    canAnnounce: admin,
     canManageSeasons: mayDelete,
     canViewClubCredentials: hasRole('president') || hasRole('developer'),
     canManageMilestoneStructure: editsMeetings,

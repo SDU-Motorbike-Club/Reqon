@@ -9,7 +9,7 @@ import { isUrgent, TASK_PRIORITY_BADGE_TONE, TASK_PRIORITY_LABEL } from '../../t
 import { buttonSecondary } from '../../ui/buttons.ts'
 import { Dialog } from '../../ui/Dialog.tsx'
 import { BlockReasonForm } from '../board/BlockReasonForm.tsx'
-import { Marker, ROW, STICKY_LABEL, selectSmall, Track } from './GanttChart.tsx'
+import { Bar, Marker, ROW, STICKY_LABEL, selectSmall, Track } from './GanttChart.tsx'
 import type { LinkTarget } from './ganttLinking.ts'
 import { taskMark, taskSummary } from './ganttMarks.ts'
 import { shortDay, spanCaption, type Span } from './ganttModel.ts'
@@ -251,15 +251,18 @@ export function GanttTaskRow({
         </div>
 
         <Track today={todayLeft} label={mark.kind === 'undated' ? 'No dates set' : undefined} summary={summary}>
-          {/* One dot per task, on its deadline (or its start when it has no deadline). The start and end of a period are
-              still written out in the caption, the tooltip and the details sheet. */}
+          {/* A task with both dates is a bar from its start to its deadline; with one date it is a dot. The dates are
+              also written out in the caption, the tooltip and the details sheet. */}
           {mark.kind === 'period' && (
-            <Marker
-              day={mark.span.to}
+            <Bar
+              span={mark.span}
               range={range}
-              kind="task-deadline"
-              overdue={mark.overdue}
-              done={mark.done}
+              variant={{
+                kind: 'task',
+                state: task.state,
+                overdue: mark.overdue,
+                glyph: task.state === 'done' ? '✓' : task.state === 'cancelled' ? '×' : mark.overdue ? '!' : undefined,
+              }}
               caption={spanCaption(mark.span)}
               title={`${task.title}: ${formatDay(mark.span.from)} → ${formatDay(mark.span.to)}${mark.overdue ? ' · overdue' : ''}`}
             />
@@ -304,6 +307,14 @@ export function GanttTaskRow({
           )}
         </Track>
       </div>
+
+      {/* A refused drag must say so on the row: the sheet below only shows its result while it is open, and the bar
+          just snaps back. */}
+      {!expanded && dateResult && !dateResult.ok && (
+        <p role="alert" className={`${indent} pb-1 text-xs text-red-800`} data-testid={`gantt-drag-error-${task.id}`}>
+          {dateResult.text}
+        </p>
+      )}
 
       {/* The details open in a side sheet, not in the middle of the chart: the chart keeps its place and its width. */}
       <Dialog open={expanded} onClose={onToggle} labelledBy={`${uid}-title`} size="side">

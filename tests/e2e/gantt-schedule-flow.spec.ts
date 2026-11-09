@@ -55,7 +55,7 @@ test.describe('Gantt schedule and move (UI-06)', () => {
     let start1 = start0
     let due1 = due0
     if ((page.viewportSize()?.width ?? 1280) >= 768) {
-      // A task is one dot on its deadline: dragging the dot moves the deadline and leaves the start alone.
+      // A task with both dates is a bar: dragging its right end moves the deadline and leaves the start alone.
       const body = row.locator('[data-schedule-part="end"]')
       await body.scrollIntoViewIfNeeded()
       const box = (await body.boundingBox())!
@@ -89,6 +89,75 @@ test.describe('Gantt schedule and move (UI-06)', () => {
     // A refresh shows what was saved.
     await page.reload()
     await expect(page.getByTestId(`gantt-task-more-${taskId}`).getByLabel('Deadline')).toHaveValue(newDue)
+  })
+
+  test('a task with both dates is drawn as a bar; dragging its body moves both dates, its left end only the start', async ({ page }) => {
+    test.skip((page.viewportSize()?.width ?? 1280) < 768, 'the pointer drag is for wide screens; a phone uses the date fields')
+    const m = readManifest()
+    const [start0, due0] = datesOf(taskId)
+    await login(page, m.users.headA.email, m.password)
+    await page.goto(`/gantt?open=${encodeURIComponent(m.milestoneKey)}&scale=month`)
+    const group = page.getByTestId(`gantt-unsectioned-${m.milestoneKey}`)
+    const toggle = group.getByRole('button', { name: /Unsectioned work/ })
+    if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click()
+    const row = page.getByTestId(`gantt-task-${taskId}`)
+    await expect(row).toBeVisible()
+
+    // Drawn as a span, not a dot, and the section group above it has its own summary bar.
+    await expect(row.locator('[data-gantt-bar="task"]')).toHaveCount(1)
+    await expect(group.locator('[data-gantt-bar="summary"]')).toHaveCount(1)
+
+    const dragBy = async (part: string, dx: number) => {
+      const handle = row.locator(`[data-schedule-part="${part}"]`)
+      await handle.scrollIntoViewIfNeeded()
+      const box = (await handle.boundingBox())!
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2, { steps: 8 })
+      await page.mouse.up()
+    }
+
+    // The body moves both dates by the same number of days, so the length of the task is unchanged.
+    await dragBy('move', 80)
+    await expect.poll(() => datesOf(taskId)[0], { timeout: 10_000 }).not.toBe(start0)
+    const [start1, due1] = datesOf(taskId)
+    expect(days(start0, start1)).toBeGreaterThan(0)
+    expect(days(due0, due1)).toBe(days(start0, start1))
+
+    // The left end changes the start alone.
+    await expect(row.locator('[data-gantt-bar="task"]')).toHaveCount(1)
+    await dragBy('start', -40)
+    await expect.poll(() => datesOf(taskId)[0], { timeout: 10_000 }).not.toBe(start1)
+    const [start2, due2] = datesOf(taskId)
+    expect(days(start2, start1)).toBeGreaterThan(0)
+    expect(due2).toBe(due1)
+  })
+
+  test('the "Link an existing task" box keeps its select inside it and on screen, however long a task title is', async ({ page }) => {
+    const m = readManifest()
+    // A task nobody has linked yet, with a title near the 200-character limit: the select's width follows its longest option.
+    runSql(
+      `insert into tasks (season_id, title, state, owner_id, subteam_key)
+       values ('${m.season.id}', '${PREFIX} ${'a very long task title that keeps going '.repeat(4)}', 'todo', '${m.users.member.id}', '${m.departments.headA.key}')`,
+    )
+    await login(page, m.users.headA.email, m.password)
+    await page.goto(`/gantt?open=${encodeURIComponent(m.milestoneKey)}&sections=unsectioned:${encodeURIComponent(m.milestoneKey)}&scale=month`)
+    const select = page.getByTestId(`gantt-unsectioned-${m.milestoneKey}`).getByLabel(/Link an existing board task to/)
+    await expect(select).toBeVisible()
+    const inner = (await select.boundingBox())!
+    const box = (await select.locator('xpath=..').boundingBox())!
+    const screen = page.viewportSize()!.width
+    expect(inner.x + inner.width).toBeLessThanOrEqual(box.x + box.width + 0.5) // inside its dashed box
+    expect(box.x + box.width).toBeLessThanOrEqual(screen + 0.5) // and the box inside the screen
+  })
+
+  test('"Open it in the Gantt" from a Board task lands on that task, with its group already open', async ({ page }) => {
+    const m = readManifest()
+    await login(page, m.users.headA.email, m.password)
+    await page.goto(`/board?task=${taskId}`)
+    await page.getByRole('link', { name: 'Open it in the Gantt' }).click()
+    await expect(page).toHaveURL(/\/gantt\?/)
+    await expect(page.getByTestId(`gantt-task-${taskId}`)).toBeVisible()
   })
 
   test('dragging the row onto a section of the same submission moves it there, as "Move to" does', async ({ page }) => {

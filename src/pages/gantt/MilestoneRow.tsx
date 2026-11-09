@@ -3,13 +3,13 @@ import type { Milestone, MilestoneSection } from '../../data/useMilestones.ts'
 import type { Task } from '../../data/useTasks.ts'
 import { formatDay } from '../../lib/dates.ts'
 import { sectionsFor, subsectionsOf, topLevelSections } from '../milestones/milestoneModel.ts'
-import { Marker, ROW, STICKY_LABEL, Track } from './GanttChart.tsx'
-import { shortDay } from './ganttModel.ts'
+import { Bar, Marker, ROW, STICKY_LABEL, Track } from './GanttChart.tsx'
+import { shortDay, spanCaption } from './ganttModel.ts'
 import { SectionRow } from './SectionRow.tsx'
 import { UnsectionedRow } from './UnsectionedRow.tsx'
 import type { GanttEnv } from './ganttEnv.ts'
 import { daysUntil, deadlineNote, milestoneMarks, milestoneSummary } from './ganttMarks.ts'
-import { lensProgress, milestoneProgress, progressLabel, type ProgressRow } from './ganttProgress.ts'
+import { lensProgress, milestoneProgress, progressLabel, unsectionedFor, type ProgressRow } from './ganttProgress.ts'
 
 // One submission: its window bar and deadline, TWO progress figures when a
 // department filter is on (the overall one, which never changes with the filter,
@@ -53,6 +53,10 @@ export function MilestoneRow({
   // A submission months away, and closed, steps back until it is looked at.
   const far = !open && marks.deadline !== null && daysUntil(marks.deadline, env.today) > 60
   const unsectionedKey = `unsectioned:${milestone.key}`
+  // Triage nudge: unsorted work matters once the deadline is within 30 days (or passed).
+  const unsorted = mySections.length > 0 && marks.deadline !== null && daysUntil(marks.deadline, env.today) <= 30
+    ? unsectionedFor(tasks, milestone.key).length
+    : 0
 
   const badge = progress.basis === 'tasks' ? `Overall ${progress.percent}%` : 'No tasks yet'
 
@@ -83,6 +87,14 @@ export function MilestoneRow({
               {badge}
               {late ? ' · deadline passed' : ''}
             </span>
+            {unsorted > 0 && (
+              <span
+                data-testid={`gantt-unsorted-${milestone.key}`}
+                className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900"
+              >
+                {unsorted} need{unsorted === 1 ? 's' : ''} a section
+              </span>
+            )}
             {lens && (
               <span
                 data-testid={`gantt-lens-${milestone.key}`}
@@ -110,6 +122,16 @@ export function MilestoneRow({
           label={marks.deadline === null && marks.opensOnly ? `Opens ${formatDay(marks.opensOnly)} · deadline TBC` : undefined}
           summary={milestoneSummary(milestone, env.today, words)}
         >
+          {/* The submission window, from its opening to its deadline, as a pale band behind the flag. With no opening date
+              there is no window and none is invented. */}
+          {marks.window && (
+            <Bar
+              span={marks.window}
+              range={env.range}
+              variant={{ kind: 'window', percent: progress.percent }}
+              title={`${milestoneLabel(milestone)} submission window: ${spanCaption(marks.window)}`}
+            />
+          )}
           {marks.deadline && (
             <Marker
               day={marks.deadline}
@@ -155,6 +177,7 @@ export function MilestoneRow({
           progressTasks={progressTasks}
           open={openSections.has(unsectionedKey)}
           onToggle={() => onToggleSection(unsectionedKey)}
+          hasSections={mySections.length > 0}
           env={env}
         />
       )}

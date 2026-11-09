@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { MilestoneSection } from '../../data/useMilestones.ts'
 import type { Task } from '../../data/useTasks.ts'
-import { ROW, STICKY_LABEL, Track } from './GanttChart.tsx'
+import { Bar, ROW, STICKY_LABEL, Track } from './GanttChart.tsx'
+import { compareByDate, sectionSpan, spanCaption } from './ganttModel.ts'
 import { taskDropHandlers } from './ganttDrag.ts'
 import { GanttTaskRow } from './GanttTaskRow.tsx'
 import { LinkTaskTool } from './LinkTaskTool.tsx'
@@ -48,6 +49,9 @@ export function SectionRow({
   const shown = under.filter(env.lens.matches)
   const progress = sectionProgress(section, progressTasks, subsectionIds)
   const words = progressLabel(progress, 'section', 'drafted')
+  // From the earliest start (or deadline) to the latest deadline of its tasks and its subsections' tasks. A section
+  // with no dated task draws nothing: no span is borrowed from the submission.
+  const span = sectionSpan(tasks, section.id, null, subsectionIds)
   const target = { seasonId: env.seasonId, milestoneKey, sectionId: section.id }
   const { direct, relink } = linkCandidates(tasks, target, (t) => env.permsFor(t).canEdit)
   const byId = new Map(tasks.map((t) => [t.id, t]))
@@ -88,12 +92,21 @@ export function SectionRow({
             env.lens.active ? `. ${shown.length} task${shown.length === 1 ? '' : 's'} shown for ${env.lens.name}` : ''
           }`}
         >
+          {span && (
+            <Bar
+              span={span}
+              range={env.range}
+              variant={{ kind: 'summary', percent: progress.percent }}
+              caption={spanCaption(span)}
+              title={`${section.name}: ${spanCaption(span)}`}
+            />
+          )}
         </Track>
       </div>
 
       {open && (
         <>
-          {nestUnderParents(shown, tasks).map(({ task, nested, partOf }) => {
+          {nestUnderParents([...shown].sort(compareByDate), tasks).map(({ task, nested, partOf }) => {
             const perms = env.permsFor(task)
             return (
               <GanttTaskRow

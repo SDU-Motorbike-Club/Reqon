@@ -2,7 +2,8 @@ import { milestoneLabel } from '../../milestones/label.ts'
 import { useState } from 'react'
 import type { Milestone } from '../../data/useMilestones.ts'
 import type { Task } from '../../data/useTasks.ts'
-import { ROW, STICKY_LABEL, Track } from './GanttChart.tsx'
+import { Bar, ROW, STICKY_LABEL, Track } from './GanttChart.tsx'
+import { compareByDate, spanCaption, spanOfDates } from './ganttModel.ts'
 import { taskDropHandlers } from './ganttDrag.ts'
 import { GanttTaskRow } from './GanttTaskRow.tsx'
 import { LinkTaskTool } from './LinkTaskTool.tsx'
@@ -21,6 +22,7 @@ export function UnsectionedRow({
   progressTasks,
   open,
   onToggle,
+  hasSections,
   env,
 }: {
   milestone: Milestone
@@ -28,10 +30,15 @@ export function UnsectionedRow({
   progressTasks: ProgressSource[]
   open: boolean
   onToggle: () => void
+  // The submission has sections to move into; without any, "needs a section" would be a dead end.
+  hasSections: boolean
   env: GanttEnv
 }) {
   const under = unsectionedFor(tasks, milestone.key)
+  const triage = hasSections && under.length > 0
   const shown = under.filter(env.lens.matches)
+  // From the earliest start (or deadline) to the latest deadline; nothing when no task here has a date.
+  const span = spanOfDates(under.flatMap((t) => [t.starts_on, t.due_date]))
   const words = progressLabel(lensProgress([], unsectionedFor(progressTasks, milestone.key), milestone.key))
   const target = { seasonId: env.seasonId, milestoneKey: milestone.key, sectionId: null }
   const { direct, relink } = linkCandidates(tasks, target, (t) => env.permsFor(t).canEdit)
@@ -65,18 +72,29 @@ export function UnsectionedRow({
             </span>
             Unsectioned work ({under.length})
           </button>
-          <span className="ml-auto shrink-0 text-[11px] text-slate-600">no section yet</span>
+          <span className={`ml-auto shrink-0 text-[11px] ${triage ? 'rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-900' : 'text-slate-600'}`}>
+            {triage ? 'needs a section' : 'no section yet'}
+          </span>
         </div>
         <Track
           today={env.todayLeft}
           summary={`Unsectioned work under ${milestoneLabel(milestone)}: ${under.length} task${under.length === 1 ? '' : 's'}, ${words}`}
         >
+          {span && (
+            <Bar
+              span={span}
+              range={env.range}
+              variant={{ kind: 'summary' }}
+              caption={spanCaption(span)}
+              title={`Unsectioned work: ${spanCaption(span)}`}
+            />
+          )}
         </Track>
       </div>
 
       {open && (
         <>
-          {nestUnderParents(shown, tasks).map(({ task, nested, partOf }) => {
+          {nestUnderParents([...shown].sort(compareByDate), tasks).map(({ task, nested, partOf }) => {
             const perms = env.permsFor(task)
             return (
               <GanttTaskRow

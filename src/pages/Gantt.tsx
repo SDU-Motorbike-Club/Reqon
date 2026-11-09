@@ -314,7 +314,24 @@ export default function Gantt() {
     )
   }
 
-  const allOpen = openMilestones.size === milestoneRows.length && milestoneRows.length > 0
+  // "Expand all" opens every level, sections too: a closed section is an empty-looking chart. A section row's key is its id,
+  // and a submission's unsectioned group is `unsectioned:<key>` (MilestoneRow).
+  // Only the groups that HAVE tasks: an empty section shows nothing but a link box, and opening all of them makes a very long page.
+  // A subsection's task also opens its parent, which is where the subsection is drawn.
+  const parentOf = new Map(sectionRows.map((s) => [s.id, s.parent_section_id]))
+  const withTasks = new Set<string>()
+  for (const t of taskRows) {
+    if (t.milestone_key === null) continue
+    if (t.section_id === null) withTasks.add(`unsectioned:${t.milestone_key}`)
+    else {
+      withTasks.add(t.section_id)
+      const parent = parentOf.get(t.section_id)
+      if (parent) withTasks.add(parent)
+    }
+  }
+  const everySectionKey = [...withTasks]
+  const allOpen =
+    openMilestones.size === milestoneRows.length && milestoneRows.length > 0 && everySectionKey.every((key) => openSections.has(key))
   const undated = linked.filter((t) => taskMark(t, today).kind === 'undated').length
   const late = linked.filter((t) => isOverdue(t, today)).length
   const upcoming = milestoneRows
@@ -415,9 +432,10 @@ export default function Gantt() {
               />
               <GanttToolbar
                 allOpen={allOpen}
-                onToggleAll={() =>
+                onToggleAll={() => {
                   setOpenMilestones(allOpen ? new Set() : new Set(milestoneRows.map((m) => m.key)))
-                }
+                  setOpenSections(allOpen ? new Set() : new Set(everySectionKey))
+                }}
                 scale={scale}
                 onScale={setScale}
                 legendOpen={legendOpen}
@@ -437,8 +455,8 @@ export default function Gantt() {
                 : 'Showing every linked task. Pick a department to see one department’s work in the same structure.'}
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              Dashed line: today. Flag: a submission’s deadline. Dot: a task’s date — drag it to reschedule, or open the task to
-              use the keyboard.
+              Dashed line: today. Flag: a submission’s deadline. Bar: a task from its start to its deadline; dot: a task with one
+              date. To reschedule, drag a bar (or either end of it) or a dot, or open the task to use the keyboard.
             </p>
           </div>
           {legendOpen && <GanttLegend id={legendId} />}

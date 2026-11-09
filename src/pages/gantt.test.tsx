@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -313,10 +313,13 @@ describe('honest dates', () => {
     renderGantt()
     await open(user, /MS1-1/, /Cover sheet/)
     const period = screen.getByTestId('gantt-task-t1')
-    expect(within(period).getByTitle('Draft the cover: 20/11/26 → 25/11/26')).toBeInTheDocument()
+    // Both dates: an outlined bar from the start to the deadline.
+    expect(within(period).getByTitle('Draft the cover: 20/11/26 → 25/11/26')).toHaveAttribute('data-gantt-bar', 'task')
     expect(period).toHaveTextContent('20/11/26 to 25/11/26')
     const deadline = screen.getByTestId('gantt-task-t2')
-    expect(within(deadline).getByTitle('Bodywork budget line: due 27/11/26')).toBeInTheDocument()
+    // One date: a dot, not a bar.
+    expect(within(deadline).getByTitle('Bodywork budget line: due 27/11/26')).not.toHaveAttribute('data-gantt-bar')
+    expect(deadline.querySelector('[data-gantt-bar]')).toBeNull()
     expect(deadline).toHaveTextContent('deadline 27/11/26 (no start date)')
   })
 
@@ -350,9 +353,9 @@ describe('honest dates', () => {
     renderGantt()
     const months = screen.getByTestId('gantt-months').textContent
     // The early start pulls the ruler back to September...
-    expect(months).toMatch(/Sep(t)? 26/)
+    expect(months).toMatch(/Sept? ’26/)
     // ...while t5 (a loose task dated March 2025, linked to nothing) does not.
-    expect(months).not.toContain('Mar 25')
+    expect(months).not.toContain('Mar ’25')
   })
 
   it('writes the periods and deadlines on the chart, not only in tooltips', async () => {
@@ -721,7 +724,17 @@ describe('reading the chart without colour, and with a keyboard', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     const legend = screen.getByTestId('gantt-legend')
     expect(toggle).toHaveAttribute('aria-controls', legend.id)
-    for (const text of [/^Today$/, /^Submission deadline$/, /^Task date$/, /^Overdue$/, /^Done$/]) {
+    for (const text of [
+      /^Today$/,
+      /^Submission deadline$/,
+      /^Submission window$/,
+      /^Section: first start to last deadline$/,
+      /^Task with a start and a deadline$/,
+      /^Task with one date$/,
+      /^Overdue$/,
+      /^Done$/,
+      /^Cancelled$/,
+    ]) {
       expect(within(legend).getByText(text)).toBeInTheDocument()
     }
     expect(legend).toHaveTextContent('Nothing is estimated')
@@ -917,5 +930,90 @@ describe('subsections, prerequisites and blockers', () => {
     tasks.push(task('t10', { title: 'Blocked with reason', state: 'blocked', blocked_reason: 'Sponsor has not paid', section_id: 'sec1', milestone_key: 'MS1-1' }))
     renderGantt('/gantt?open=MS1-1&sections=sec1&task=t10')
     expect(screen.getByTestId('gantt-blocker-t10')).toHaveTextContent('Sponsor has not paid')
+  })
+})
+
+describe('bars: a Gantt draws spans, not only dots', () => {
+  it('gives a section a summary bar from its earliest start to its latest deadline, even while it is closed', () => {
+    renderGantt('/gantt?open=MS1-1')
+    expect(screen.getByTitle('Cover sheet: 20/11/26 → 27/11/26')).toHaveAttribute('data-gantt-bar', 'summary')
+    // A section with no dated task draws nothing: no span is borrowed from the submission.
+    expect(screen.getByTestId('gantt-section-sec2').querySelector('[data-gantt-bar]')).toBeNull()
+  })
+
+  it('draws the submission window as a band, only when it has an opening date', () => {
+    renderGantt()
+    expect(within(screen.getByTestId('gantt-milestone-MS1-1')).getByTitle(/submission window: 01\/11\/26 → 30\/11\/26/)).toHaveAttribute('data-gantt-bar', 'window')
+    expect(screen.getByTestId('gantt-milestone-MS1-2').querySelector('[data-gantt-bar="window"]')).toBeNull()
+    // The deadline flag is still there with it.
+    expect(screen.getByTitle(/MS1-1.* deadline: 30\/11\/26/)).toBeInTheDocument()
+  })
+
+  it('lists a group\'s tasks by date, not by the order they were made', async () => {
+    tasks = [
+      task('zz', { title: 'Zeta', section_id: 'sec1', milestone_key: 'MS1-1', due_date: '2026-11-28' }),
+      task('nn', { title: 'No dates', section_id: 'sec1', milestone_key: 'MS1-1' }),
+      task('aa', { title: 'Alpha', section_id: 'sec1', milestone_key: 'MS1-1', starts_on: '2026-11-10', due_date: '2026-11-12' }),
+      task('mm', { title: 'Middle', section_id: 'sec1', milestone_key: 'MS1-1', starts_on: '2026-11-16', due_date: '2026-11-20' }),
+    ]
+    const user = userEvent.setup()
+    renderGantt()
+    await open(user, /MS1-1/, /Cover sheet/)
+    const order = screen.getAllByTestId(/^gantt-task-[a-z]+$/).map((el) => el.getAttribute('data-testid'))
+    // Alpha (from 10/11), Middle (from 16/11), Zeta (deadline 28/11), then the task with no dates.
+    expect(order).toEqual(['gantt-task-aa', 'gantt-task-mm', 'gantt-task-zz', 'gantt-task-nn'])
+  })
+
+  it('marks a finished bar with a tick and a cancelled one with a cross, so the state is not only colour', async () => {
+    tasks = [
+      task('dd', { title: 'Finished', state: 'done', section_id: 'sec1', milestone_key: 'MS1-1', starts_on: '2026-11-02', due_date: '2026-11-05' }),
+      task('cc', { title: 'Dropped', state: 'cancelled', section_id: 'sec1', milestone_key: 'MS1-1', starts_on: '2026-11-18', due_date: '2026-11-22' }),
+    ]
+    const user = userEvent.setup()
+    renderGantt()
+    await open(user, /MS1-1/, /Cover sheet/)
+    expect(screen.getByTitle('Finished: 02/11/26 → 05/11/26')).toHaveTextContent('✓')
+    expect(screen.getByTitle('Dropped: 18/11/26 → 22/11/26')).toHaveTextContent('×')
+  })
+
+  it('shows an overdue bar with "!" and its words', async () => {
+    tasks = [task('ov', { title: 'Behind', section_id: 'sec1', milestone_key: 'MS1-1', starts_on: '2026-11-02', due_date: '2026-11-10' })]
+    const user = userEvent.setup()
+    renderGantt()
+    await open(user, /MS1-1/, /Cover sheet/)
+    expect(screen.getByTitle('Behind: 02/11/26 → 10/11/26 · overdue')).toHaveTextContent('!')
+    expect(screen.getByTestId('gantt-task-ov')).toHaveTextContent('overdue')
+  })
+
+  it('"Expand all" opens the sections too, so the chart is not a stack of empty rows, and "Collapse all" closes them', async () => {
+    const user = userEvent.setup()
+    renderGantt()
+    expect(screen.queryByTestId('gantt-task-t1')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Expand all' }))
+    expect(screen.getByTestId('gantt-task-t1')).toBeInTheDocument()
+    expect(screen.getByTestId('gantt-task-t3')).toBeInTheDocument() // the unsectioned group opens too
+    expect(screen.getByTestId('gantt-task-t7')).toBeInTheDocument() // and another submission's section
+    // A section with no task has nothing to show, so it stays closed: opening every empty one would bury the chart.
+    expect(within(screen.getByTestId('gantt-section-sec2')).queryByText(/No tasks yet/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Collapse all' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Collapse all' }))
+    expect(screen.queryByTestId('gantt-task-t1')).not.toBeInTheDocument()
+  })
+
+  it('says so on the row when a drag is refused, instead of letting the bar snap back with no word', async () => {
+    Element.prototype.setPointerCapture ??= () => {}
+    updateTaskAsync.mockRejectedValueOnce(new Error('You can no longer edit this task.'))
+    const user = userEvent.setup()
+    renderGantt()
+    await open(user, /MS1-1/, /Cover sheet/)
+    const handle = screen.getByTestId('gantt-task-t1').querySelector('[data-schedule-part="move"]') as HTMLElement
+    const track = handle.parentElement as HTMLElement
+    track.getBoundingClientRect = () => ({ width: 800, left: 0, right: 800, top: 0, bottom: 10, height: 10, x: 0, y: 0, toJSON: () => ({}) })
+    fireEvent.pointerDown(handle, { button: 0, clientX: 100, pointerId: 1 })
+    fireEvent.pointerMove(handle, { clientX: 220, pointerId: 1 })
+    fireEvent.pointerUp(handle, { clientX: 220, pointerId: 1 })
+    // The details sheet is closed, so the refusal must show on the row itself.
+    expect(await screen.findByTestId('gantt-drag-error-t1')).toHaveTextContent('You can no longer edit this task.')
+    expect(screen.getByTestId('gantt-drag-error-t1')).toHaveAttribute('role', 'alert')
   })
 })

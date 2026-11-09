@@ -31,14 +31,16 @@ export function LinkTaskTool({
 
   if (direct.length === 0 && moves.length === 0) {
     return (
-      <p className="sticky left-12 z-10 my-1 ml-12 w-fit max-w-md bg-surface text-[11px] text-slate-600" data-testid="link-none">
+      <p className="sticky left-12 z-10 my-1 ml-12 w-fit max-w-[calc(100vw-5rem)] bg-surface text-[11px] text-slate-600 sm:max-w-md" data-testid="link-none">
         No task to link here. You can link tasks you own, or that belong to a department you head.
       </p>
     )
   }
 
   return (
-    <div className="sticky left-12 z-10 my-1 ml-12 flex w-fit max-w-md flex-col items-start gap-2 rounded border border-dashed border-slate-300 bg-slate-50 p-2">
+    // max-w: the box never outgrows a phone screen (ml-12 + the box must fit in 100vw); the select fills it, so a long task title
+    // is cut by the select instead of pushing it out of the dashed box.
+    <div className="sticky left-12 z-10 my-1 ml-12 flex w-fit max-w-[calc(100vw-5rem)] flex-col items-start gap-2 rounded border border-dashed border-slate-300 bg-slate-50 p-2 sm:max-w-md">
       <label className="sr-only" htmlFor={selectId}>
         Link an existing board task to {targetLabel}
       </label>
@@ -52,7 +54,7 @@ export function LinkTaskTool({
           if (move) setPending(move)
           else onLink(id)
         }}
-        className={selectSmall}
+        className={`${selectSmall} w-full min-w-0`}
       >
         <option value="">Link an existing task…</option>
         {direct.map((t) => (

@@ -122,6 +122,22 @@ begin
   perform pg_temp.expect('the President deletes the archived parent', pg_temp.attempt(pre, format('select delete_archived_task(%L)', dp)), 'ALLOWED');
   perform pg_temp.expect('... its archived subtask survives, no longer a subtask', (select (archived_at is not null and parent_id is null)::text from tasks where id = dc), 'true');
 
+  -- ============================================ a Done parent completes its open subtasks
+  declare fp uuid; f1 uuid; f2 uuid; f3 uuid;
+  begin
+    insert into tasks (season_id, title, owner_id, subteam_key, milestone_key) values (season, 'F parent', o1, pa, ms) returning id into fp;
+    insert into tasks (season_id, title, owner_id, subteam_key, milestone_key, parent_id) values (season, 'F1 todo', o1, pa, ms, fp) returning id into f1;
+    insert into tasks (season_id, title, owner_id, subteam_key, milestone_key, parent_id, state) values (season, 'F2 blocked', o1, pa, ms, fp, 'blocked') returning id into f2;
+    insert into tasks (season_id, title, owner_id, subteam_key, milestone_key, parent_id) values (season, 'F3 cancelled', o1, pa, ms, fp) returning id into f3;
+    update tasks set state = 'cancelled' where id = f3;
+    perform pg_temp.expect('marking the parent Done is allowed', pg_temp.attempt(o1, format('update tasks set state = ''done'' where id = %L', fp)), 'ALLOWED');
+    perform pg_temp.expect('... the parent stays Done', (select state::text from tasks where id = fp), 'done');
+    perform pg_temp.expect('... open and Blocked subtasks are Done, a cancelled one stays cancelled',
+      (select string_agg(state::text, ',' order by title) from tasks where parent_id = fp), 'done,done,cancelled');
+    perform pg_temp.expect('... a completed subtask has a completion time and no blocker reason',
+      (select (completed_at is not null and blocked_reason is null)::text from tasks where id = f2), 'true');
+  end;
+
   -- ================================================================= verdict
   select count(*), count(*) filter (where not (got like expected)),
          string_agg(case when not (got like expected) then format('  FAIL  %s — expected %s, got %s', label, expected, got) end, E'\n' order by n)

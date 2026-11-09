@@ -37,6 +37,30 @@ describe('ScheduleHandles', () => {
     expect(onCommit).toHaveBeenCalledWith({ start: '2026-10-05', due: '2026-10-13' })
   })
 
+  it('moves both dates together when the body of a bar is dragged', () => {
+    const { part, drag, onCommit } = renderHandles({ start: '2026-10-05', due: '2026-10-10' })
+    drag(part('move'), -30)
+    expect(onCommit).toHaveBeenCalledTimes(1)
+    expect(onCommit).toHaveBeenCalledWith({ start: '2026-10-02', due: '2026-10-07' })
+  })
+
+  it('changes only the start from the left end, and never past the deadline', () => {
+    const early = renderHandles({ start: '2026-10-05', due: '2026-10-10' })
+    early.drag(early.part('start'), -20)
+    expect(early.onCommit).toHaveBeenCalledWith({ start: '2026-10-03', due: '2026-10-10' })
+    const past = renderHandles({ start: '2026-10-05', due: '2026-10-10' })
+    past.drag(past.part('start'), 200)
+    expect(past.onCommit).toHaveBeenCalledWith({ start: '2026-10-10', due: '2026-10-10' })
+  })
+
+  it('draws three handles for a bar (body and both ends), and one for a dot', () => {
+    const bar = renderHandles({ start: '2026-10-05', due: '2026-10-10' })
+    expect([bar.part('move'), bar.part('start'), bar.part('end')].every(Boolean)).toBe(true)
+    const dot = renderHandles({ start: null, due: '2026-10-20' })
+    expect(dot.part('end')).toBeTruthy()
+    expect(dot.part('start')).toBeNull()
+  })
+
   it('never lets the deadline pass before the start', () => {
     const { part, drag, onCommit } = renderHandles({ start: '2026-10-05', due: '2026-10-10' })
     drag(part('end'), -100)
