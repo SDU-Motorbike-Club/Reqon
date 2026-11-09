@@ -5,10 +5,6 @@ import { DataError } from '../core/errors.ts'
 import { unwrap } from './errors.ts'
 import { queryKeys } from './queryKeys.ts'
 
-// The department domain's own row type — see departments/types.ts for why
-// this is an alias of the `subteams` table rather than a new hierarchy
-// (ADR-0001).
-export type Subteam = Department
 
 // The subteam list is structural reference data, not season data. Previously
 // lived in useMilestones.ts, which was never the right domain for it — moved

@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // --- Fake Supabase ---------------------------------------------------------
@@ -115,9 +116,11 @@ function renderApp(children: ReactNode = <Protected />) {
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <RequireAuth>{children}</RequireAuth>
-      </AuthProvider>
+      <MemoryRouter>
+        <AuthProvider>
+          <RequireAuth>{children}</RequireAuth>
+        </AuthProvider>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -151,7 +154,8 @@ describe('signed out', () => {
   it('offers no public sign-up and no dead password-reset link', async () => {
     renderApp()
     await screen.findByLabelText('Email')
-    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    // The privacy policy is the one link a signed-out visitor may follow.
+    expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/privacy'])
     expect(screen.queryByText(/sign up/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/forgot|reset/i)).not.toBeInTheDocument()
   })

@@ -12,6 +12,8 @@ type Past = { id: number; author_id: string | null; title: string | null; body: 
 const state = vi.hoisted(() => ({
   rows: [] as Row[], marked: [] as unknown[], loading: false, error: null as Error | null,
   canAnnounce: false, past: [] as Past[], sentAnnouncements: [] as { title: string; body: string }[],
+  comments: [] as { id: number; announcement_id: number; author_id: string | null; body: string; created_at: string }[],
+  posted: [] as string[], deleted: [] as number[],
 }))
 
 vi.mock('../data/useNotifications.ts', () => ({
@@ -29,12 +31,25 @@ vi.mock('../data/useMembers.ts', () => ({
     ],
   }),
 }))
+vi.mock('../data/useAvatars.ts', () => ({ useAvatars: () => ({ data: new Map([['m2', 'data:image/png;base64,AAAA']]) }) }))
 vi.mock('../auth/usePermissions.ts', () => ({ usePermissions: () => ({ canAnnounce: state.canAnnounce }) }))
 vi.mock('../auth/context.ts', () => ({ useAuth: () => ({ status: 'member', member: { id: 'm1', status: 'active' } }) }))
 vi.mock('../data/useAnnouncements.ts', () => ({
   ANNOUNCEMENT_TITLE_MAX: 100,
   ANNOUNCEMENT_MAX: 1000,
   HISTORY_SIZE: 100,
+  COMMENT_MAX: 500,
+  useAnnouncementCommentCounts: () => ({ data: new Map([[2, state.comments.length]]) }),
+  useAnnouncementComments: () => ({ data: state.comments, isPending: false, error: null, refetch: () => {} }),
+  usePostAnnouncementComment: () => ({
+    isPending: false,
+    error: null,
+    mutate: (body: string, options?: { onSuccess?: () => void }) => {
+      state.posted.push(body)
+      options?.onSuccess?.()
+    },
+  }),
+  useDeleteAnnouncementComment: () => ({ isPending: false, error: null, mutate: (id: number) => state.deleted.push(id) }),
   useAnnouncements: () => ({ data: state.past, isPending: false, error: null, refetch: () => {} }),
   useSendAnnouncement: () => ({
     isPending: false,
@@ -70,6 +85,9 @@ const row = (id: number, kind: string, extra: Partial<Row> = {}): Row => ({
 })
 
 beforeEach(() => {
+  state.comments = []
+  state.posted = []
+  state.deleted = []
   state.rows = []
   state.marked = []
   state.loading = false
@@ -198,6 +216,36 @@ describe('Inbox announcements', () => {
     expect(history.getByTestId('announcement-1')).toHaveTextContent('A former member')
     await user.click(history.getByRole('button', { name: 'Close' }))
     expect(screen.queryByTestId('announce-history')).not.toBeInTheDocument()
+  })
+
+  it('opens a group-chat thread under an announcement, with each commenter’s picture and name, and posts a comment', async () => {
+    state.past = [{ id: 2, author_id: 'm2', title: 'Workshop', body: 'Closed Monday.', created_at: '2026-11-02T09:00:00Z' }]
+    state.comments = [
+      { id: 10, announcement_id: 2, author_id: 'm2', body: 'Thanks for the notice', created_at: '2026-11-02T10:00:00Z' },
+      { id: 11, announcement_id: 2, author_id: 'm1', body: 'See you Tuesday', created_at: '2026-11-02T11:00:00Z' },
+    ]
+    const user = userEvent.setup()
+    renderInbox()
+    await user.click(screen.getByRole('button', { name: 'Previous announcements' }))
+    await user.click(screen.getByTestId('comments-toggle-2'))
+    expect(screen.getByTestId('comments-toggle-2')).toHaveTextContent('2 comments')
+
+    const theirs = within(screen.getByTestId('comment-10'))
+    expect(theirs.getByRole('button', { name: 'Bo Wrench' })).toBeInTheDocument()
+    expect(theirs.getByTestId('avatar-image')).toBeInTheDocument()
+    expect(theirs.getByText('Thanks for the notice')).toBeInTheDocument()
+    expect(theirs.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+    // No picture on file: initials, still with the name.
+    expect(within(screen.getByTestId('comment-11')).getByTestId('avatar-initials')).toHaveTextContent('AR')
+    expect(within(screen.getByTestId('comment-11')).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Write a comment'), '  On my way  ')
+    await user.click(screen.getByRole('button', { name: 'Post' }))
+    expect(state.posted).toEqual(['On my way'])
+    expect(screen.getByLabelText('Write a comment')).toHaveValue('')
+
+    await user.click(within(screen.getByTestId('comment-11')).getByRole('button', { name: 'Delete' }))
+    expect(state.deleted).toEqual([11])
   })
 
   it('says so when there are no previous announcements', async () => {

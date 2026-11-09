@@ -12,6 +12,8 @@ import { pageMain } from './ui/layout.ts'
 import { LoadingState } from './ui/states.tsx'
 import { useRealtimeNotifications } from './data/useNotifications.ts'
 import { useScrollRestoration } from './ui/useScrollRestoration.ts'
+import { PublicFooter } from './ui/PublicFooter.tsx'
+import Privacy from './pages/Privacy.tsx'
 import { useRealtimeSubteams } from './data/useRealtimeSubteams.ts'
 import { ProfileDialog } from './members/ProfileDialog.tsx'
 
@@ -94,6 +96,8 @@ function GlobalRealtime() {
 export default function App() {
   const location = useLocation()
   useScrollRestoration()
+  // The one screen a signed-out visitor may read (linked from the sign-in form and every footer).
+  if (location.pathname === '/privacy') return <Privacy />
   return (
     <RequireAuth>
       <SeasonProvider>
@@ -158,6 +162,7 @@ export default function App() {
               </Routes>
             </Suspense>
           </ErrorBoundary>
+          <PublicFooter />
         </BugReportProvider>
         </TutorialProvider>
       </SeasonProvider>

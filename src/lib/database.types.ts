@@ -103,6 +103,45 @@ export type Database = {
           },
         ]
       }
+      announcement_comments: {
+        Row: {
+          announcement_id: number
+          author_id: string | null
+          body: string
+          created_at: string
+          id: number
+        }
+        Insert: {
+          announcement_id: number
+          author_id?: string | null
+          body: string
+          created_at?: string
+          id?: number
+        }
+        Update: {
+          announcement_id?: number
+          author_id?: string | null
+          body?: string
+          created_at?: string
+          id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_comments_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcement_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attachment_purge_queue: {
         Row: {
           attachment_id: string | null

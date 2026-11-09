@@ -148,10 +148,6 @@ export function weekTicks(range: Span): Tick[] {
 export type { Progress } from '../../tasks/progress.ts'
 export const progressOf = taskProgress
 
-export function tasksInSection(tasks: Task[], sectionId: string): Task[] {
-  return tasks.filter((t) => t.section_id === sectionId)
-}
-
 // A milestone's own bar: the published submission window. Null means TBC, which
 // the screen prints as TBC rather than inventing a date to draw.
 export function milestoneSpan(milestone: Milestone): Span | null {

@@ -1,6 +1,7 @@
 import { useId, useMemo, useState, type FormEvent } from 'react'
 import { useAuth } from '../auth/context.ts'
-import { ANNOUNCEMENT_MAX, ANNOUNCEMENT_TITLE_MAX, HISTORY_SIZE, useAnnouncements, useSendAnnouncement } from '../data/useAnnouncements.ts'
+import { ANNOUNCEMENT_MAX, ANNOUNCEMENT_TITLE_MAX, HISTORY_SIZE, useAnnouncementCommentCounts, useAnnouncements, useSendAnnouncement } from '../data/useAnnouncements.ts'
+import { AnnouncementComments } from './AnnouncementComments.tsx'
 import { useMembers } from '../data/useMembers.ts'
 import { formatInstant } from '../lib/dates.ts'
 import { buttonPrimary, buttonSecondary } from '../ui/buttons.ts'
@@ -131,6 +132,7 @@ function History({ onClose }: { onClose: () => void }) {
   const members = useMembers()
   const names = useMemo(() => new Map((members.data ?? []).map((m) => [m.id, m.full_name])), [members.data])
   const rows = list.data ?? []
+  const counts = useAnnouncementCommentCounts(useMemo(() => rows.map((a) => a.id), [rows]))
 
   return (
     <div data-testid="announce-history">
@@ -155,6 +157,7 @@ function History({ onClose }: { onClose: () => void }) {
                 </p>
                 {a.title && <p className="mt-1 text-sm font-semibold break-words text-slate-900">{a.title}</p>}
                 <p className="mt-1 text-sm break-words whitespace-pre-line text-slate-900">{a.body}</p>
+                <AnnouncementComments announcementId={a.id} count={counts.data?.get(a.id) ?? 0} />
               </li>
             ))}
           </ul>

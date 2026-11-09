@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
+import { SHELL } from './layout.ts'
 
 // Footer for the screens a signed-out visitor can see: the sign-in form and the
 // privacy policy. Kept to what someone needs before they have an account.
 export function PublicFooter() {
   return (
     <footer className="border-t border-slate-200 bg-surface">
-      <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3 text-xs text-slate-600 sm:px-6">
+      <div className={`${SHELL} flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3 text-xs text-slate-600`}>
         <p>Reqon · SDU Motorbike Club</p>
         <nav aria-label="Legal">
           <NavLink

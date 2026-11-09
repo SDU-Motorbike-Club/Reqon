@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { PublicFooter } from '../ui/PublicFooter.tsx'
 import { useAuth } from './context.ts'
 
 // Accounts are created by the board in the Supabase dashboard. There is
@@ -30,6 +31,7 @@ export default function Login() {
   }
 
   return (
+    <>
     <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
       <form
         onSubmit={handleSubmit}
@@ -87,5 +89,7 @@ export default function Login() {
         </p>
       </form>
     </main>
+    <PublicFooter />
+    </>
   )
 }

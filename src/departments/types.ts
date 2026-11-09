@@ -27,16 +27,6 @@ export function activeCount(departments: readonly Pick<Department, 'archived_at'
   return departments.filter(isActive).length
 }
 
-// "Department" and "Head of Department" everywhere a person reads this app
-// (source §53) — the database's own "subteams"/"lead_id" naming never
-// surfaces in the UI.
-export const DEPARTMENT_LABEL = 'Department'
-export const DEPARTMENT_HEAD_LABEL = 'Head of Department'
-
-export function headshipLabel(department: Pick<Department, 'lead_id'>): string {
-  return department.lead_id === null ? 'No Head appointed' : DEPARTMENT_HEAD_LABEL
-}
-
 // is_parked keeps its own competition meaning ("these rules only bite at
 // the Final Event") and is independent of archived_at — a parked department
 // still counts toward the cap until it is explicitly archived (ADR-0001).
