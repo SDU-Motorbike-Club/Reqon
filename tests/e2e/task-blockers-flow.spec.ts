@@ -82,7 +82,10 @@ test.describe('blockers and prerequisites (Phase 3)', () => {
     const panelB = page.getByTestId(`task-details-${t2}`)
     await expect(panelB).toBeVisible()
     await panelB.getByRole('combobox', { name: /Add a prerequisite/ }).fill(T1)
-    await expect(panelB.getByRole('option', { name: T1 })).toHaveCount(0)
+    // Only T1 matches this text, so with the circle left out the picker reports no match and renders no list.
+    // (An unscoped getByRole('option') also hits the panel's parent-task <select>, which holds every task.)
+    await expect(panelB.getByText(/No task matches/)).toBeVisible()
+    await expect(panelB.getByRole('listbox', { name: /Add a prerequisite/ })).toHaveCount(0)
     expect(runSql(`select count(*) from task_dependencies where task_id = '${t2}'`).trim()).toBe('0')
   })
 
