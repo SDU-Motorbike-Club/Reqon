@@ -136,7 +136,7 @@ test.describe('starting a season (Phase 4)', () => {
     let newId = ''
     try {
       await login(page, m.users.developer.email, m.password)
-      await page.goto('/settings')
+      await page.goto('/settings?section=seasons')
       await page.locator('#new-season-label').fill(label)
       await expect(page.getByTestId('copy-structure')).toBeEnabled({ timeout: 10_000 })
       await expect(page.getByTestId('copy-structure')).toBeChecked()
@@ -177,7 +177,7 @@ test.describe('starting a season (Phase 4)', () => {
   test('a member is not offered season creation', async ({ page }) => {
     const m = readManifest()
     await login(page, m.users.member.email, m.password)
-    await page.goto('/settings')
+    await page.goto('/settings?section=seasons')
     await expect(page.getByRole('button', { name: 'Create season' })).toHaveCount(0)
   })
 })

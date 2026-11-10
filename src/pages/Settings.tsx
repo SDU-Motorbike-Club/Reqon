@@ -1,7 +1,11 @@
-import { useMemo, useRef, type ReactNode } from 'react'
+import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { PageHeader } from '../ui/PageHeader.tsx'
 import { usePermissions } from '../auth/usePermissions.ts'
 import { pageMain } from '../ui/layout.ts'
+import { mergeSearchParams } from '../lib/searchParams.ts'
+import { useUrlParams } from '../lib/useUrlParams.ts'
+import { isOffered, MORE_PAGES } from '../ui/navItems.ts'
 import { ProfileSection } from './settings/ProfileSection.tsx'
 import { RosterSettings } from './settings/RosterSettings.tsx'
 import { AccessGuide } from './settings/AccessGuide.tsx'
@@ -101,10 +105,16 @@ function Notice({ children }: { children: ReactNode }) {
 
 const GROUP_LABEL: Record<SectionGroup, string> = { personal: 'Personal', admin: 'Club admin' }
 
+const menuItem = (active: boolean) =>
+  `flex min-h-11 w-full items-center rounded px-3 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0 sm:py-1.5 ${
+    active ? 'bg-slate-100 font-semibold text-slate-950' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+  }`
+
 type Entry = SectionMeta & { title: string; tutorialId?: string; node: ReactNode }
 
 export default function Settings() {
-  const { canAdminister, canManageRoles, canManageDepartments, canManageSeasons, canViewClubCredentials, canReadBugReports, roles: myRoles } = usePermissions()
+  const permissions = usePermissions()
+  const { canAdminister, canManageRoles, canManageDepartments, canManageSeasons, canViewClubCredentials, canReadBugReports, roles: myRoles } = permissions
   const restriction = canManageRoles && canManageSeasons
     ? null
     : canManageRoles
@@ -181,11 +191,25 @@ export default function Settings() {
     record(id)
   }
 
+  // One section at a time, named in the address (?section=roster) so Back, a bookmark and the tutorial can open it.
+  const [params, setParams] = useUrlParams()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuId = useId()
+  const flat = [...ordered.personal, ...ordered.admin]
+  const current = (flat.find((s) => s.id === params.get('section')) ?? flat[0])?.id
+  const currentEntry = current ? byId.get(current) : undefined
+  const morePages = MORE_PAGES.filter((page) => isOffered(page, permissions))
+  const choose = (id: string) => {
+    onUse(id)
+    setMenuOpen(false)
+    setParams((c) => mergeSearchParams(c, { section: id }))
+  }
+
   return (
-    <main id="main-content" tabIndex={-1} className={pageMain('reading')}>
+    <main id="main-content" tabIndex={-1} className={pageMain('wide')}>
       <PageHeader
         title="Settings"
-        description="Your account, the roster, departments, milestone dates, handover notes and seasons. The sections you use most come first."
+        description="Pick a section from the menu. Your account and the roster are first; the club pages you open less often are under More pages."
         tutorialId="settings-overview"
       />
 
@@ -193,52 +217,81 @@ export default function Settings() {
           to be missing. What they can do is not listed: the forms are simply there. */}
       {restriction && <Notice>{restriction}</Notice>}
 
-      <nav aria-label="Settings sections" className="mb-2 flex flex-wrap gap-1.5 text-xs" data-testid="settings-jump">
-        {(['personal', 'admin'] as const).flatMap((group) =>
-          ordered[group].map((section) => {
-            const entry = byId.get(section.id) as Entry
-            return (
-              <a
-                key={section.id}
-                href={`#s-${entry.title.replace(/\s+/g, '-')}`}
-                onClick={(event) => {
-                  onUse(section.id)
-                  // Scroll to the section and put focus on its heading, without adding a history entry for every chip
-                  // clicked (Back would otherwise walk through them).
-                  const heading = document.getElementById(`s-${entry.title.replace(/\s+/g, '-')}`)
-                  if (!heading) return
-                  event.preventDefault()
-                  heading.tabIndex = -1
-                  heading.scrollIntoView?.({ block: 'start' })
-                  heading.focus({ preventScroll: true })
-                }}
-                className="inline-flex min-h-11 items-center gap-1 rounded-full border border-slate-300 bg-surface px-3 text-slate-800 hover:bg-slate-50 sm:min-h-0 sm:py-1"
-              >
-                {entry.title}
-                {attention.ids.has(section.id) && <span className="text-amber-800"> · needs attention</span>}
-              </a>
-            )
-          }),
-        )}
-      </nav>
-
-      {(['personal', 'admin'] as const).map((group) =>
-        ordered[group].length === 0 ? null : (
-          <div key={group} role="group" aria-labelledby={`settings-group-${group}`}>
-            <p id={`settings-group-${group}`} className="mt-6 border-b border-slate-200 pb-1 text-xs font-medium tracking-wide text-slate-500 uppercase">
-              {GROUP_LABEL[group]}
-            </p>
-            {ordered[group].map((section) => {
-              const entry = byId.get(section.id) as Entry
-              return (
-                <Section key={section.id} id={section.id} title={entry.title} tutorialId={entry.tutorialId} attention={attention.ids.has(section.id)} onUse={onUse}>
-                  {entry.node}
-                </Section>
-              )
-            })}
+      <div className="mt-3 sm:flex sm:items-start sm:gap-6">
+        <nav aria-label="Settings sections" className="shrink-0 sm:sticky sm:top-4 sm:w-60" data-testid="settings-jump">
+          {/* The burger: on a phone the list is folded away behind this one button and shows what is open. */}
+          <button
+            type="button"
+            aria-expanded={menuOpen}
+            aria-controls={menuId}
+            onClick={() => setMenuOpen((v) => !v)}
+            className="flex min-h-11 w-full items-center justify-between gap-2 rounded border border-slate-300 bg-surface px-3 text-sm font-medium text-slate-900 sm:hidden"
+          >
+            <span className="flex items-center gap-2">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
+                <path d="M4 7h16M4 12h16M4 17h16" />
+              </svg>
+              {currentEntry?.title ?? 'Sections'}
+            </span>
+            <span className="text-xs text-slate-500">{menuOpen ? 'Close' : 'Sections'}</span>
+          </button>
+          <div id={menuId} className={`${menuOpen ? 'mt-2 block' : 'hidden'} sm:mt-0 sm:block`}>
+            {(['personal', 'admin'] as const).map((group) =>
+              ordered[group].length === 0 ? null : (
+                <div key={group} role="group" aria-labelledby={`settings-group-${group}`} className="mb-3">
+                  <p id={`settings-group-${group}`} className="mb-1 px-1 text-xs font-medium tracking-wide text-slate-500 uppercase">
+                    {GROUP_LABEL[group]}
+                  </p>
+                  <ul className="space-y-0.5">
+                    {ordered[group].map((section) => {
+                      const entry = byId.get(section.id) as Entry
+                      const active = section.id === current
+                      return (
+                        <li key={section.id}>
+                          <button
+                            type="button"
+                            aria-current={active ? 'page' : undefined}
+                            data-section={section.id}
+                            onClick={() => choose(section.id)}
+                            className={menuItem(active)}
+                          >
+                            {entry.title}
+                            {attention.ids.has(section.id) && <span className="ml-1 text-amber-800"> · needs attention</span>}
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              ),
+            )}
+            {morePages.length > 0 && (
+              <div role="group" aria-labelledby="settings-group-more" className="mb-3">
+                <p id="settings-group-more" className="mb-1 px-1 text-xs font-medium tracking-wide text-slate-500 uppercase">
+                  More pages
+                </p>
+                <ul className="space-y-0.5">
+                  {morePages.map((page) => (
+                    <li key={page.to}>
+                      <Link to={page.to} className={menuItem(false)} title={page.about}>
+                        {page.label} <span aria-hidden="true">→</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
-        ),
-      )}
+        </nav>
+
+        <div className="min-w-0 flex-1">
+          {currentEntry && (
+            <Section key={currentEntry.id} id={currentEntry.id} title={currentEntry.title} tutorialId={currentEntry.tutorialId} attention={attention.ids.has(currentEntry.id)} onUse={onUse}>
+              {currentEntry.node}
+            </Section>
+          )}
+        </div>
+      </div>
     </main>
   )
 }

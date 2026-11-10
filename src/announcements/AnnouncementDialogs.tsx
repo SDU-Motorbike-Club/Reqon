@@ -1,4 +1,5 @@
-import { useId, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useId, useMemo, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/context.ts'
 import { ANNOUNCEMENT_MAX, ANNOUNCEMENT_TITLE_MAX, HISTORY_SIZE, useAnnouncementCommentCounts, useAnnouncements, useSendAnnouncement } from '../data/useAnnouncements.ts'
 import { AnnouncementComments } from './AnnouncementComments.tsx'
@@ -131,7 +132,13 @@ function History({ onClose }: { onClose: () => void }) {
   const list = useAnnouncements(true)
   const members = useMembers()
   const names = useMemo(() => new Map((members.data ?? []).map((m) => [m.id, m.full_name])), [members.data])
+  // Coming from one announcement (?announcement=<id>): its comments are open and it is scrolled into view.
+  const [params] = useSearchParams()
+  const focused = Number(params.get('announcement')) || null
   const rows = list.data ?? []
+  useEffect(() => {
+    if (focused && list.data) document.querySelector(`[data-testid="announcement-${focused}"]`)?.scrollIntoView?.({ block: 'nearest' })
+  }, [focused, list.data])
   const counts = useAnnouncementCommentCounts(useMemo(() => rows.map((a) => a.id), [rows]))
 
   return (
@@ -157,7 +164,7 @@ function History({ onClose }: { onClose: () => void }) {
                 </p>
                 {a.title && <p className="mt-1 text-sm font-semibold break-words text-slate-900">{a.title}</p>}
                 <p className="mt-1 text-sm break-words whitespace-pre-line text-slate-900">{a.body}</p>
-                <AnnouncementComments announcementId={a.id} count={counts.data?.get(a.id) ?? 0} />
+                <AnnouncementComments announcementId={a.id} count={counts.data?.get(a.id) ?? 0} defaultOpen={a.id === focused} />
               </li>
             ))}
           </ul>

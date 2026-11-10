@@ -367,7 +367,11 @@ const { useSetCurrentSeason } = await import('../data/useSeasons.ts')
 const { useApplyRoleChanges } = await import('../roles/useMemberRoles.ts')
 const { SeasonProvider } = await import('../season/SeasonProvider.tsx')
 
+// Settings shows one section at a time (?section=…); each describe says which one its tests are about.
+let openSection = 'roster'
+
 function renderSettings(url = '/settings') {
+  if (url === '/settings') url = `/settings?section=${openSection}`
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
@@ -394,16 +398,19 @@ beforeEach(reset)
 
 // --- Who sees what -----------------------------------------------------------
 
+// An entry of the section menu (a button), or null.
+const menuItem = (name: string) => within(screen.getByTestId('settings-jump')).queryByRole('button', { name })
+
 const changeRolesButtons = () => screen.queryAllByRole('button', { name: /^Change roles for/ })
 
 describe('who sees what', () => {
+  beforeEach(() => {
+    openSection = 'roster'
+  })
   it('the president sees every admin control, and a role button for each member', async () => {
     renderSettings()
     expect(await screen.findByText('Add someone to the roster')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Departments' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Milestone dates and points' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Requirements Book' })).toBeInTheDocument()
-    expect(screen.getByText('Start a new season')).toBeInTheDocument()
+    for (const name of ['Departments', 'Milestone dates and points', 'Requirements Book', 'Seasons']) expect(menuItem(name)).toBeInTheDocument()
     // The roster rows arrive with the members query, after the forms.
     expect(await screen.findByRole('button', { name: 'Change roles for Bo Wrench' })).toBeInTheDocument()
     expect(changeRolesButtons()).toHaveLength(db.members.length)
@@ -417,10 +424,14 @@ describe('who sees what', () => {
   it('the vice-president sees the admin controls and role management, but no season controls', async () => {
     caller = VP
     renderSettings()
+    const user = userEvent.setup()
     expect(await screen.findByText('Add someone to the roster')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Departments' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Milestone dates and points' })).toBeInTheDocument()
+    expect(menuItem('Departments')).toBeInTheDocument()
+    expect(menuItem('Milestone dates and points')).toBeInTheDocument()
+    await user.click(menuItem('Seasons') as HTMLElement)
+    expect(await screen.findByRole('heading', { name: 'Seasons' })).toBeInTheDocument()
     expect(screen.queryByText('Start a new season')).not.toBeInTheDocument()
+    await user.click(menuItem('Roster') as HTMLElement)
     await screen.findByTestId('member-m2')
     expect(changeRolesButtons().length).toBeGreaterThan(0)
     expect(await within(screen.getByTestId('member-m1')).findByText('President')).toBeInTheDocument()
@@ -458,13 +469,12 @@ describe('who sees what', () => {
       expect(screen.queryByText(/Your access/)).not.toBeInTheDocument()
       await screen.findByTestId('member-m2')
       expect(screen.queryByText('Add someone to the roster')).not.toBeInTheDocument()
-      expect(screen.queryByRole('heading', { name: 'Departments' })).not.toBeInTheDocument()
-      expect(screen.queryByRole('heading', { name: 'Requirements Book' })).not.toBeInTheDocument()
-      expect(screen.queryByText('Start a new season')).not.toBeInTheDocument()
+      expect(menuItem('Departments')).not.toBeInTheDocument()
+      expect(menuItem('Requirements Book')).not.toBeInTheDocument()
       expect(screen.queryByTestId('make-current-sb')).not.toBeInTheDocument()
       expect(changeRolesButtons()).toHaveLength(0)
       // Handover notes stay open to everyone.
-      expect(screen.getByRole('heading', { name: 'Handover notes' })).toBeInTheDocument()
+      expect(menuItem('Handover notes')).toBeInTheDocument()
     })
   }
 
@@ -472,9 +482,9 @@ describe('who sees what', () => {
     caller = DEV
     renderSettings()
     expect(await screen.findByText('Add someone to the roster')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Departments' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Milestone dates and points' })).toBeInTheDocument()
-    expect(screen.getByText('Start a new season')).toBeInTheDocument()
+    expect(menuItem('Departments')).toBeInTheDocument()
+    expect(menuItem('Milestone dates and points')).toBeInTheDocument()
+    expect(menuItem('Seasons')).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: 'Change roles for Bo Wrench' })).toBeInTheDocument()
     expect(changeRolesButtons()).toHaveLength(db.members.length)
     // Nothing is restricted, so no note about access is shown at all.
@@ -509,6 +519,9 @@ async function openRoles(user: ReturnType<typeof userEvent.setup>, name: string)
 }
 
 describe('role management', () => {
+  beforeEach(() => {
+    openSection = 'roster'
+  })
   it('a harmless change saves straight away and shows up in the roster', async () => {
     const user = userEvent.setup()
     renderSettings()
@@ -708,6 +721,9 @@ describe('role management', () => {
 // --- Database backstops for administration -----------------------------------
 
 describe('administration is enforced by the database', () => {
+  beforeEach(() => {
+    openSection = 'roster'
+  })
   it('allows the season switch for a developer', async () => {
     caller = DEV
     const setCurrent = hook(() => useSetCurrentSeason())
@@ -728,6 +744,9 @@ describe('administration is enforced by the database', () => {
 // --- Roster ------------------------------------------------------------------
 
 describe('roster', () => {
+  beforeEach(() => {
+    openSection = 'roster'
+  })
   it('retires a member to alumni instead of deleting them', async () => {
     const user = userEvent.setup()
     const before = db.members.length
@@ -947,6 +966,9 @@ describe('roster', () => {
 // --- Subteams, milestones, notes ---------------------------------------------
 
 describe('departments', () => {
+  beforeEach(() => {
+    openSection = 'departments'
+  })
   it('renames and assigns a Head in one explicit save, without touching the key', async () => {
     const user = userEvent.setup()
     renderSettings()
@@ -996,7 +1018,7 @@ describe('departments', () => {
   })
 
   it('opens the exact editor from a link (?edit=department:KEY), and says so when that department is archived', async () => {
-    renderSettings('/settings?edit=department:RACEOP&keep=1')
+    renderSettings('/settings?section=departments&edit=department:RACEOP&keep=1')
     const row = await screen.findByTestId('department-row-RACEOP')
     expect(await within(row).findByLabelText('Name for RACEOP')).toHaveFocus()
     expect(within(screen.getByTestId('department-row-GEOM')).queryByLabelText('Name for GEOM')).not.toBeInTheDocument()
@@ -1004,18 +1026,18 @@ describe('departments', () => {
 
   it('says a linked department is archived instead of opening nothing', async () => {
     db.subteams[1] = { ...db.subteams[1], archived_at: '2026-09-01T00:00:00Z', archive_reason: 'merged' }
-    renderSettings('/settings?edit=department:RACEOP')
+    renderSettings('/settings?section=departments&edit=department:RACEOP')
     expect(await screen.findByTestId('department-edit-missing')).toHaveTextContent('RACEOP is archived. Restore it below to edit it.')
   })
 
   it('keeps job title, access role and department headship apart on the roster', async () => {
     db.subteams[0] = { ...db.subteams[0], lead_id: 'm2' }
-    renderSettings()
+    renderSettings('/settings?section=roster')
     const row = await screen.findByTestId('member-m2')
     const headship = await within(row).findByTestId('headship-m2')
     expect(headship).toHaveTextContent('Head of Department: Design Envelope')
     // A contextual Edit link opens that department's own editor.
-    expect(within(headship).getByRole('link', { name: 'Edit Design Envelope' })).toHaveAttribute('href', '/settings?edit=department%3AGEOM')
+    expect(within(headship).getByRole('link', { name: 'Edit Design Envelope' })).toHaveAttribute('href', '/settings?section=departments&edit=department%3AGEOM')
   })
 
   it('shows Edit on hover and keyboard focus, and always on touch screens', async () => {
@@ -1114,13 +1136,17 @@ describe('departments', () => {
 
   it('a non-admin does not see the Departments section at all', async () => {
     caller = CREW
-    renderSettings()
+    renderSettings('/settings?section=roster')
     await screen.findByTestId('member-m2')
+    expect(menuItem('Departments')).not.toBeInTheDocument()
     expect(screen.queryByTestId('department-row-GEOM')).not.toBeInTheDocument()
   })
 })
 
 describe('milestone administration', () => {
+  beforeEach(() => {
+    openSection = 'milestones'
+  })
   it('edits points, and accepts a blank due date as a real value', async () => {
     const user = userEvent.setup()
     renderSettings()
@@ -1139,6 +1165,9 @@ describe('milestone administration', () => {
 })
 
 describe('handover notes', () => {
+  beforeEach(() => {
+    openSection = 'handover'
+  })
   it('saves one note per department into handover_notes', async () => {
     const user = userEvent.setup()
     renderSettings()
@@ -1157,6 +1186,9 @@ describe('handover notes', () => {
 // --- Seasons -----------------------------------------------------------------
 
 describe('Requirements Book source', () => {
+  beforeEach(() => {
+    openSection = 'book'
+  })
   const saveButton = () => screen.findByRole('button', { name: /save requirements book source/i })
 
   it('lets an administrator point the current season\'s edition at an https document', async () => {
@@ -1193,6 +1225,9 @@ describe('Requirements Book source', () => {
 })
 
 describe('seasons', () => {
+  beforeEach(() => {
+    openSection = 'seasons'
+  })
   it('creates a new season that is NOT current', async () => {
     const user = userEvent.setup()
     renderSettings()
@@ -1231,6 +1266,9 @@ describe('seasons', () => {
 // --- Export ------------------------------------------------------------------
 
 describe('export', () => {
+  beforeEach(() => {
+    openSection = 'export'
+  })
   beforeEach(() => {
     db.clause_status = [{ id: 'cs1', season_id: 'sa', clause_key: 'B.2.1.2', state: 'compliant' }]
     db.tasks = [
@@ -1279,6 +1317,9 @@ describe('export', () => {
 // three (members, subteams, milestones) ask is_admin() to tell the two apart,
 // the same pattern useFinances.ts / useMeetings.ts / useTasks.ts already use.
 describe('protected updates distinguish forbidden from vanished', () => {
+  beforeEach(() => {
+    openSection = 'roster'
+  })
   it('a non-admin editing someone else is refused, not silently ignored', async () => {
     caller = CREW // no privileged role
     const update = hook(() => useUpdateMember())
@@ -1333,10 +1374,13 @@ describe('protected updates distinguish forbidden from vanished', () => {
 
 // --- The order of the sections ----------------------------------------------------------------------------------
 
-const order = () => Array.from(document.querySelectorAll('[data-section]')).map((el) => el.getAttribute('data-section') as string)
+const order = () => Array.from(document.querySelectorAll('[data-testid="settings-jump"] [data-section]')).map((el) => el.getAttribute('data-section') as string)
 const use = (score: number, days = 0) => ({ score, scoredAt: new Date(Date.now() - days * 86_400_000).toISOString() })
 
 describe('the order of the sections follows how you use them', () => {
+  beforeEach(() => {
+    openSection = 'roster'
+  })
   it('starts in the fixed order, Your account first and the club admin sections after the personal ones', async () => {
     renderSettings()
     await screen.findByText('Add someone to the roster')
@@ -1383,38 +1427,41 @@ describe('the order of the sections follows how you use them', () => {
     expect(screen.getByText('Personal')).toBeInTheDocument()
   })
 
-  it('lifts a section that needs attention to the top of its group, marks it, and says so in the jump links', async () => {
+  it('lifts a section that needs attention to the top of its group, marks it, and says so in the menu', async () => {
     habits.attention = new Set(['milestones'])
     habits.usage = new Map([['departments', use(30)]])
-    renderSettings()
-    await screen.findByText('Add someone to the roster')
+    renderSettings('/settings?section=milestones')
+    await screen.findByTestId('attention-milestones')
     const ids = order()
     const admin = ids.slice(ids.indexOf('milestones') - 0)
     expect(ids.indexOf('milestones')).toBeLessThan(ids.indexOf('departments'))
     expect(admin[0]).toBe('milestones')
     expect(screen.getByTestId('attention-milestones')).toHaveTextContent('Needs attention')
-    expect(within(screen.getByTestId('settings-jump')).getByRole('link', { name: /Milestone dates and points.*needs attention/ })).toBeInTheDocument()
+    expect(within(screen.getByTestId('settings-jump')).getByRole('button', { name: /Milestone dates and points.*needs attention/ })).toBeInTheDocument()
   })
 })
 
 describe('remembering what you use', () => {
-  it('records a section the first time you click inside it, once, and not for sections you only scrolled past', async () => {
+  beforeEach(() => {
+    openSection = 'roster'
+  })
+  it('records a section the first time you open it, once, and not for sections you only look past in the menu', async () => {
     const user = userEvent.setup()
     renderSettings()
     await screen.findByText('Add someone to the roster')
     expect(habits.recorded).toEqual([])
-    await user.click(screen.getByRole('heading', { name: 'Handover notes' }))
-    await user.click(screen.getByRole('heading', { name: 'Handover notes' }))
+    await user.click(menuItem('Handover notes') as HTMLElement)
+    await user.click(menuItem('Handover notes') as HTMLElement)
     expect(habits.recorded).toEqual(['handover'])
-    await user.click(screen.getByRole('heading', { name: 'Seasons' }))
+    await user.click(menuItem('Seasons') as HTMLElement)
     expect(habits.recorded).toEqual(['handover', 'seasons'])
   })
 
-  it('counts a jump-link click as using the section', async () => {
+  it('counts a menu click as using the section', async () => {
     const user = userEvent.setup()
     renderSettings()
     await screen.findByText('Add someone to the roster')
-    await user.click(within(screen.getByTestId('settings-jump')).getByRole('link', { name: 'Export' }))
+    await user.click(within(screen.getByTestId('settings-jump')).getByRole('button', { name: 'Export' }))
     expect(habits.recorded).toContain('export')
   })
 
@@ -1423,8 +1470,55 @@ describe('remembering what you use', () => {
     renderSettings()
     await screen.findByText('Add someone to the roster')
     const before = order()
-    await user.click(screen.getByRole('heading', { name: 'Export' }))
-    await user.click(screen.getByRole('heading', { name: 'Seasons' }))
+    await user.click(menuItem('Export') as HTMLElement)
+    await user.click(menuItem('Seasons') as HTMLElement)
     expect(order()).toEqual(before)
   })
+})
+
+describe('the section menu', () => {
+  it('shows one section at a time, picked from the menu and named in the address', async () => {
+    const user = userEvent.setup()
+    // (any address but plain /settings, which the helper points at the describe's own section)
+    renderSettings('/settings?')
+    // Opens on Your account (the first entry); the roster form is not on the page.
+    expect(await screen.findByRole('heading', { name: 'Your account' })).toBeInTheDocument()
+    expect(screen.queryByText('Add someone to the roster')).not.toBeInTheDocument()
+    expect(menuItem('Your account')).toHaveAttribute('aria-current', 'page')
+
+    await user.click(menuItem('Handover notes') as HTMLElement)
+    expect(await screen.findByRole('heading', { name: 'Handover notes' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Your account' })).not.toBeInTheDocument()
+    expect(menuItem('Handover notes')).toHaveAttribute('aria-current', 'page')
+    expect(menuItem('Your account')).not.toHaveAttribute('aria-current')
+  })
+
+  it('falls back to the first section for a name that does not exist', async () => {
+    renderSettings('/settings?section=nope')
+    expect(await screen.findByRole('heading', { name: 'Your account' })).toBeInTheDocument()
+  })
+
+  it('folds the list behind a burger button on a phone, which names the open section', async () => {
+    const user = userEvent.setup()
+    renderSettings('/settings?section=export')
+    const burger = within(screen.getByTestId('settings-jump')).getAllByRole('button')[0]
+    expect(burger).toHaveTextContent('Export')
+    expect(burger).toHaveAttribute('aria-expanded', 'false')
+    await user.click(burger)
+    expect(burger).toHaveAttribute('aria-expanded', 'true')
+    // Choosing a section closes it again.
+    await user.click(within(screen.getByTestId('settings-jump')).getByRole('button', { name: 'Handover notes' }))
+    expect(within(screen.getByTestId('settings-jump')).getAllByRole('button')[0]).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('lists the pages that left the header under More pages, as links', async () => {
+    renderSettings('/settings')
+    const menu = within(await screen.findByTestId('settings-jump'))
+    expect(menu.getByRole('group', { name: 'More pages' })).toBeInTheDocument()
+    expect(menu.getByRole('link', { name: /Contributions/ })).toHaveAttribute('href', '/contributions')
+    // Contacts and Finances stayed in the header; they are not repeated here.
+    expect(menu.queryByRole('link', { name: /Contacts/ })).not.toBeInTheDocument()
+    expect(menu.queryByRole('link', { name: /Finances/ })).not.toBeInTheDocument()
+  })
+
 })

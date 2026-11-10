@@ -36,6 +36,7 @@ const supabase = {
       return { data: { subscription: { unsubscribe: vi.fn() } } }
     }),
     signInWithPassword: vi.fn(async () => state.signInResult),
+    setSession: vi.fn(async () => ({ error: null })),
     signOut: vi.fn(async (options?: { scope?: string }) => {
       // Signing out the OTHER devices leaves this one signed in.
       if (options?.scope === 'others') {
@@ -60,6 +61,8 @@ const supabase = {
           }),
         }
       }
+      // username-sign-in answers with a session; the browser adopts it.
+      if (name === 'username-sign-in') return { data: { access_token: 'a', refresh_token: 'r' }, error: null }
       // The function clears the flag once the new password is set.
       state.memberRow = { ...(state.memberRow as object), must_change_password: false }
       return { data: { ok: true }, error: null }
@@ -146,24 +149,53 @@ beforeEach(() => {
 describe('signed out', () => {
   it('shows the login form and never the protected UI', async () => {
     renderApp()
-    expect(await screen.findByLabelText('Email')).toBeInTheDocument()
+    expect(await screen.findByLabelText('Email or username')).toBeInTheDocument()
     expect(screen.getByLabelText('Password')).toBeInTheDocument()
     expect(screen.queryByText('SECRET BIKE DATA')).not.toBeInTheDocument()
   })
 
   it('offers no public sign-up and no dead password-reset link', async () => {
     renderApp()
-    await screen.findByLabelText('Email')
+    await screen.findByLabelText('Email or username')
     // The privacy policy is the one link a signed-out visitor may follow.
     expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/privacy'])
     expect(screen.queryByText(/sign up/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/forgot|reset/i)).not.toBeInTheDocument()
   })
 
+  it('signs in with a username through the server, never the e-mail sign-in, and adopts the session it returns', async () => {
+    renderApp()
+    await userEvent.type(await screen.findByLabelText('Email or username'), '  Ada.Rider ')
+    await userEvent.type(screen.getByLabelText('Password'), 'secret123')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(supabase.auth.setSession).toHaveBeenCalledWith({ access_token: 'a', refresh_token: 'r' }))
+    expect(state.invokes).toContainEqual({ name: 'username-sign-in', body: { username: 'Ada.Rider', password: 'secret123' } })
+    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled()
+  })
+
+  it('shows the server’s answer when a username or password is wrong', async () => {
+    state.invokeError = { status: 400, message: 'Invalid login credentials' }
+    renderApp()
+    await userEvent.type(await screen.findByLabelText('Email or username'), 'nobody')
+    await userEvent.type(screen.getByLabelText('Password'), 'wrong')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid login credentials')
+    expect(supabase.auth.setSession).not.toHaveBeenCalled()
+  })
+
+  it('still signs in with an e-mail the usual way', async () => {
+    renderApp()
+    await userEvent.type(await screen.findByLabelText('Email or username'), 'ada@sdu.dk')
+    await userEvent.type(screen.getByLabelText('Password'), 'secret123')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(supabase.auth.signInWithPassword).toHaveBeenCalledWith({ email: 'ada@sdu.dk', password: 'secret123' }))
+    expect(state.invokes.filter((c) => c.name === 'username-sign-in')).toHaveLength(0)
+  })
+
   it('shows the auth error when the credentials are wrong', async () => {
     state.signInResult = { error: { message: 'Invalid login credentials' } }
     renderApp()
-    await userEvent.type(await screen.findByLabelText('Email'), 'nobody@sdu.dk')
+    await userEvent.type(await screen.findByLabelText('Email or username'), 'nobody@sdu.dk')
     await userEvent.type(screen.getByLabelText('Password'), 'wrong')
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid login credentials')
@@ -241,7 +273,7 @@ describe('signed in with a temporary password', () => {
     const user = userEvent.setup()
     renderApp()
     await user.click(await screen.findByRole('button', { name: 'Sign out' }))
-    expect(await screen.findByLabelText('Email')).toBeInTheDocument()
+    expect(await screen.findByLabelText('Email or username')).toBeInTheDocument()
   })
 })
 
@@ -274,7 +306,7 @@ describe('signed in but NOT on the roster', () => {
   it('is not treated as signed out — it offers sign-out, not a login form', async () => {
     renderApp()
     await screen.findByText(/not on the club roster/)
-    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Email or username')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
 })
@@ -316,7 +348,7 @@ describe('sign out', () => {
     const { supabase: client } = await import('../lib/supabase.ts')
     await client.auth.signOut()
 
-    await waitFor(() => expect(screen.getByLabelText('Email')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByLabelText('Email or username')).toBeInTheDocument())
     expect(screen.queryByText('SECRET BIKE DATA')).not.toBeInTheDocument()
     // The previous user's rows must not survive into the next session.
     expect(queryClient.getQueryData(['tasks'])).toBeUndefined()
@@ -338,7 +370,7 @@ describe('sign out when the network is down', () => {
     void _p
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
 
-    await waitFor(() => expect(screen.getByLabelText('Email')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByLabelText('Email or username')).toBeInTheDocument())
     expect(screen.queryByText('SECRET BIKE DATA')).not.toBeInTheDocument()
     expect(queryClient.getQueryData(['tasks'])).toBeUndefined()
     expect(container).toBeTruthy()

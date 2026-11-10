@@ -91,15 +91,17 @@ begin
   select id into ann_id from announcements where author_id = vp;
   select * into lines, failures from pg_temp.note(lines, failures, 'the announcement is recorded, trimmed, with its title and author', ann_id is not null
     and exists (select 1 from announcements where id = ann_id and title = 'Workshop closed' and body = 'Back on Monday.'));
-  select * into lines, failures from pg_temp.note(lines, failures, 'every active and trial member got exactly one inbox row',
-    (select count(*) from notifications where kind = 'announcement' and entity_id = ann_id::text) = expected
+  select * into lines, failures from pg_temp.note(lines, failures, 'every active and trial member got exactly one inbox row, and the author one more',
+    (select count(*) from notifications where kind = 'announcement' and entity_id = ann_id::text) = expected + 1
     and exists (select 1 from notifications where member_id = mem and kind = 'announcement')
     and exists (select 1 from notifications where member_id = mem2 and kind = 'announcement')
     and exists (select 1 from notifications where member_id = tri and kind = 'announcement'));
-  select * into lines, failures from pg_temp.note(lines, failures, 'the author and the retired member got none',
-    not exists (select 1 from notifications where kind = 'announcement' and member_id in (vp, old)));
+  select * into lines, failures from pg_temp.note(lines, failures, 'the author has a copy that is already read, and the retired member got none',
+    exists (select 1 from notifications where kind = 'announcement' and member_id = vp and read_at is not null)
+    and not exists (select 1 from notifications where kind = 'announcement' and member_id = old));
   select * into lines, failures from pg_temp.note(lines, failures, 'each row names the author, carries the title and text, is unread and has no activity row',
     not exists (select 1 from notifications where kind = 'announcement' and entity_id = ann_id::text
+                and member_id <> vp
                 and (actor_id is distinct from vp or title is distinct from 'Workshop closed'
                      or body is distinct from 'Back on Monday.' or read_at is not null
                      or activity_id is not null or entity <> 'announcement')));

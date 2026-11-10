@@ -25,6 +25,11 @@ export async function invokeEdgeFunction<T>(name: string, body: Record<string, u
         // Not JSON (a gateway error page): fall back to the generic wording.
       }
     }
+    // No HTTP answer at all: the browser could not reach the function (offline, blocked, or the function is not
+    // deployed on this project, which the browser also reports as a failed request). Say so in plain words.
+    if (!(response instanceof Response)) {
+      throw new DataError(`Could not reach the server to ${what}. Check your connection and try again. If it keeps failing, tell the developer: the “${name}” function may not be deployed.`, null)
+    }
     // 401 is an expired or missing session, not a refusal: say so instead
     // of "you don't have permission".
     if (status === 401) throw new DataError(message ?? 'Your session has expired. Sign in again.', null)

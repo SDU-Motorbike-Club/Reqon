@@ -64,7 +64,7 @@ describe('describeNotification', () => {
   it('labels an announcement, which no ordinary notice is', () => {
     expect(describeNotification({ kind: 'announcement', title: null, entity_id: '4', body: 'Workshop closed Friday.' }, 'Ada Rider')).toEqual({
       text: 'Ada Rider: Workshop closed Friday.',
-      to: '/inbox?announcements=1',
+      to: '/inbox?announcements=1&announcement=4',
       label: 'Announcement',
     })
     // Its title is the headline above the description.

@@ -56,9 +56,10 @@ export function TutorialProvider({
       // Opening the step's screen is part of moving to the step, so it happens
       // here in the click handler — never in an effect that could fight a user
       // who presses the browser's Back button.
-      if (step.route && step.route !== location.pathname) navigate(step.route)
+      // A route with a query (a Settings section) is compared whole; a plain one by its path, so a screen's own filters stay.
+      if (step.route && step.route !== (step.route.includes('?') ? location.pathname + location.search : location.pathname)) navigate(step.route)
     },
-    [location.pathname, navigate],
+    [location.pathname, location.search, navigate],
   )
 
   const end = useCallback(

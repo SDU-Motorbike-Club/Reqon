@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { AnnouncementHistoryDialog, AnnouncementTag, NewAnnouncementDialog } from '../announcements/AnnouncementDialogs.tsx'
 import { usePermissions } from '../auth/usePermissions.ts'
 import { useMembers } from '../data/useMembers.ts'
+import { useAnnouncements } from '../data/useAnnouncements.ts'
 import { INBOX_SIZE, useMarkNotificationsRead, useNotifications } from '../data/useNotifications.ts'
 import { formatInstant } from '../lib/dates.ts'
 import { mergeSearchParams } from '../lib/searchParams.ts'
@@ -12,6 +13,8 @@ import { buttonPrimary, buttonSecondary } from '../ui/buttons.ts'
 import { pageMain } from '../ui/layout.ts'
 import { PageHeader } from '../ui/PageHeader.tsx'
 import { ActionError, EmptyState, ErrorState, LoadingState } from '../ui/states.tsx'
+
+const ANNOUNCEMENTS_IN_INBOX = 10
 
 // "This needs you": what the database noticed for the signed-in person — a task
 // handed to them, a proposal waiting for their review, their own proposal
@@ -27,11 +30,24 @@ export default function Inbox() {
   const [params, setParams] = useUrlParams()
   const historyOpen = params.get('announcements') === '1'
   const setHistory = (open: boolean) =>
-    setParams((current) => mergeSearchParams(current, { announcements: open ? '1' : null }), { replace: !open })
+    setParams((current) => mergeSearchParams(current, { announcements: open ? '1' : null, ...(open ? {} : { announcement: null }) }), { replace: !open })
   const [composing, setComposing] = useState(false)
   const names = new Map((members.data ?? []).map((m) => [m.id, m.full_name]))
 
-  const rows = notifications.data ?? []
+  // The latest announcements join the list at their place in time, so the one you sent yourself (the database sends
+  // none to its author) and one already purged from your notices still sit beside them. An announcement that
+  // reached you as a notice is not shown twice. Opening one goes to the same history as the notice does.
+  const history = useAnnouncements(true)
+  const noticed = new Set((notifications.data ?? []).filter((n) => n.kind === 'announcement').map((n) => n.entity_id))
+  const joined: Notification[] = (history.data ?? [])
+    .filter((a) => !noticed.has(String(a.id)))
+    .slice(0, ANNOUNCEMENTS_IN_INBOX)
+    .map((a) => ({
+      // Negative, so it cannot collide with a notification id; read_at is set, so it is never "new" and never marked.
+      id: -a.id, member_id: '', season_id: null, kind: 'announcement', entity: 'announcement', entity_id: String(a.id),
+      actor_id: a.author_id, activity_id: null, title: a.title, body: a.body, created_at: a.created_at, read_at: a.created_at,
+    }))
+  const rows = [...(notifications.data ?? []), ...joined].sort((a, b) => b.created_at.localeCompare(a.created_at))
   const unread = rows.filter((n) => n.read_at === null)
   const earlier = rows.filter((n) => n.read_at !== null)
 

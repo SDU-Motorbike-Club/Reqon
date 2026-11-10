@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -144,6 +144,48 @@ describe('sharing a meeting', () => {
     await user.click(screen.getByText('Share this meeting'))
     await user.click(screen.getByRole('button', { name: 'Copy WhatsApp text' }))
     expect(await screen.findByText(/Could not copy on its own/)).toBeInTheDocument()
+  })
+})
+
+describe('opening a meeting', () => {
+  it('opens from anywhere on the card, not only the title', async () => {
+    const user = userEvent.setup()
+    // An upcoming (large) card: click its summary text.
+    state.meetings = [meeting({ agenda: '## Agenda\n\n- Frame', held_on: '2999-01-01' })]
+    const first = renderPage()
+    await user.click(screen.getByTestId('meeting-summary-m1'))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    first.unmount()
+    // A past (compact) row: click its date.
+    state.meetings = [meeting({ id: 'm2', title: 'Old review', held_on: '2020-01-01' })]
+    renderPage()
+    await user.click(within(screen.getByTestId('meeting-m2')).getByText(/2020|20\/01\/01|01\/01/, { selector: 'time' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('still opens from the title with the keyboard', async () => {
+    state.meetings = [meeting({ agenda: '## Agenda\n\n- Frame' })]
+    const user = userEvent.setup()
+    renderPage()
+    screen.getByRole('button', { name: 'Weekly build' }).focus()
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('does not open while words on the card are selected, so they can be copied', async () => {
+    state.meetings = [meeting({ agenda: '## Agenda\n\n- Frame' })]
+    renderPage()
+    const summary = screen.getByTestId('meeting-summary-m1')
+    const range = document.createRange()
+    range.selectNodeContents(summary)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+    // A drag-select ends in a click with the words still selected (a plain click would have cleared them).
+    fireEvent.click(summary)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    window.getSelection()?.removeAllRanges()
+    fireEvent.click(summary)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 })
 

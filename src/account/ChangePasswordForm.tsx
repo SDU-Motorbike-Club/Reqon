@@ -2,7 +2,7 @@ import { useId, useRef, useState, type FormEvent } from 'react'
 import { flushSync } from 'react-dom'
 import { useAuth } from '../auth/context.ts'
 import { changePassword, PasswordChangeError } from '../auth/changePassword.ts'
-import { buttonPrimary } from '../ui/buttons.ts'
+import { buttonPrimary, buttonSecondary } from '../ui/buttons.ts'
 
 type Field = 'current' | 'next' | 'confirm'
 type Values = Record<Field, string>
@@ -28,7 +28,16 @@ function validate({ current, next, confirm }: Values): Partial<Record<Field, str
 
 // Anyone signed in can change their own password here. It is not tied to a
 // role: it is your account, not club administration.
-export function ChangePasswordForm() {
+export function ChangePasswordForm({
+  embedded = false,
+  onChanged,
+  onCancel,
+}: {
+  // Inside an account row: no card or heading of its own (the row names it), a Cancel button, and `onChanged` to close.
+  embedded?: boolean
+  onChanged?: (message: string) => void
+  onCancel?: () => void
+} = {}) {
   const auth = useAuth()
   const email = auth.status === 'member' ? (auth.user.email ?? '') : ''
   const ids = useId()
@@ -67,11 +76,11 @@ export function ChangePasswordForm() {
       })
       setValues(EMPTY)
       setShow(false)
-      setStatus(
-        otherDevicesSignedOut
-          ? 'Password changed. You stay signed in here; any other devices have been signed out.'
-          : 'Password changed. You stay signed in here.',
-      )
+      const message = otherDevicesSignedOut
+        ? 'Password changed. You stay signed in here; any other devices have been signed out.'
+        : 'Password changed. You stay signed in here.'
+      setStatus(message)
+      onChanged?.(message)
     } catch (err) {
       failure = err
     }
@@ -114,15 +123,19 @@ export function ChangePasswordForm() {
   )
 
   return (
-    <form onSubmit={submit} noValidate className="rounded-lg border border-slate-200 bg-surface p-3">
-      <h3 className="text-sm font-medium text-slate-900">Change your password</h3>
-      <p className="mt-0.5 text-xs text-slate-600">
-        Signed in as <span className="font-medium text-slate-900">{email}</span>.
-      </p>
+    <form onSubmit={submit} noValidate className={embedded ? '' : 'rounded-lg border border-slate-200 bg-surface p-3'}>
+      {!embedded && (
+        <>
+          <h3 className="text-sm font-medium text-slate-900">Change your password</h3>
+          <p className="mt-0.5 text-xs text-slate-600">
+            Signed in as <span className="font-medium text-slate-900">{email}</span>.
+          </p>
+        </>
+      )}
       {/* Lets a password manager know which account the new password belongs to. */}
       <input hidden readOnly name="username" autoComplete="username" value={email} />
 
-      <fieldset className="mt-3 grid gap-3 sm:max-w-sm" disabled={busy}>
+      <fieldset className={`${embedded ? '' : 'mt-3 '}grid gap-3 sm:max-w-sm`} disabled={busy}>
         {field('current', 'Current password', 'current-password')}
         {field('next', 'New password', 'new-password')}
         <p id={`${ids}-rule`} className="-mt-2 text-xs text-slate-600">
@@ -150,12 +163,21 @@ export function ChangePasswordForm() {
           {formError}
         </p>
       )}
-      <button ref={submitRef} type="submit" disabled={busy} className={`mt-3 ${buttonPrimary}`}>
-        {busy ? 'Changing…' : 'Change password'}
-      </button>
-      <p role="status" className="mt-2 min-h-5 text-sm text-emerald-800">
-        {status}
-      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button ref={submitRef} type="submit" disabled={busy} className={buttonPrimary}>
+          {busy ? 'Changing…' : embedded ? 'Save new password' : 'Change password'}
+        </button>
+        {embedded && (
+          <button type="button" disabled={busy} className={buttonSecondary} onClick={onCancel}>
+            Cancel
+          </button>
+        )}
+      </div>
+      {!embedded && (
+        <p role="status" className="mt-2 min-h-5 text-sm text-emerald-800">
+          {status}
+        </p>
+      )}
     </form>
   )
 }

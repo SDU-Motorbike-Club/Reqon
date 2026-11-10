@@ -63,7 +63,7 @@ describe('the real Developer guide: content', () => {
 
   it('points only at things that exist on the Settings screen or nothing at all', () => {
     for (const step of GUIDE) {
-      expect(step.route, step.id).toBe('/settings')
+      expect(step.route, step.id).toMatch(/^\/settings(\?section=backups)?$/)
       if (step.target) expect(['settings-backups', 'backups-status', 'backups-copies', 'backups-guide', 'backups-download']).toContain(step.target)
     }
   })

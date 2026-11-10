@@ -97,12 +97,13 @@ test.describe('Files page', () => {
     await expect(box).toBeHidden()
   })
 
-  test('the Files item is in the menu', async ({ page }) => {
+  test('Files is opened from Settings, under More pages', async ({ page }) => {
     const m = readManifest()
     await login(page, m.users.member.email, m.password)
-    const menu = page.getByRole('button', { name: 'Menu' })
-    if (await menu.isVisible().catch(() => false)) await menu.click()
-    await page.getByRole('link', { name: 'Files', exact: true }).first().click()
+    await page.goto('/settings')
+    const burger = page.getByRole('button', { name: /Sections/ })
+    if (await burger.isVisible().catch(() => false)) await burger.click()
+    await page.getByTestId('settings-jump').getByRole('link', { name: /Files/ }).click()
     await expect(page).toHaveURL(/\/files/)
   })
 })

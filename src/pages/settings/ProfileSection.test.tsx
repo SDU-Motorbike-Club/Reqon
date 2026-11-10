@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // picture go through the hooks with what the image helper produced. The canvas work itself is a browser matter
 // (account/avatarImage.test.ts covers which part of a photo is kept).
 const state = vi.hoisted(() => ({
-  member: { id: 'm1', full_name: 'Ada Rider', role: 'Team lead', status: 'active' as 'active' | 'trial' | 'alumni' },
+  member: { id: 'm1', full_name: 'Ada Rider', role: 'Team lead', status: 'active' as 'active' | 'trial' | 'alumni', username: null as string | null },
   roles: ['president'] as string[],
   image: null as string | null,
   saved: [] as string[],
@@ -16,9 +16,34 @@ const state = vi.hoisted(() => ({
   picked: [] as unknown[],
 }))
 
-vi.mock('../../auth/context.ts', () => ({ useAuth: () => ({ status: 'member', member: state.member, user: { id: 'm1' } }) }))
+vi.mock('../../auth/context.ts', () => ({ useAuth: () => ({ status: 'member', member: state.member, user: { id: 'm1', email: 'ada@club.test' } }) }))
 vi.mock('../../auth/usePermissions.ts', () => ({ usePermissions: () => ({ roles: state.roles }) }))
-vi.mock('../../account/ChangePasswordForm.tsx', () => ({ ChangePasswordForm: () => <p>Password form</p> }))
+// The three forms are tested on their own; here each is a stand-in that can finish or cancel its row.
+vi.mock('../../account/ChangePasswordForm.tsx', () => ({
+  ChangePasswordForm: ({ onChanged, onCancel }: { onChanged?: (m: string) => void; onCancel?: () => void }) => (
+    <div>
+      <p>Password form</p>
+      <button onClick={() => onChanged?.('Password changed.')}>finish password</button>
+      <button onClick={onCancel}>cancel password</button>
+    </div>
+  ),
+}))
+vi.mock('../../account/ChangeLoginForm.tsx', () => ({
+  ChangeLoginForm: ({ currentEmail, onDone }: { currentEmail: string; onDone: (m: string) => void }) => (
+    <div>
+      <p>Email form for {currentEmail}</p>
+      <button onClick={() => onDone('Email changed.')}>finish email</button>
+    </div>
+  ),
+}))
+vi.mock('../../account/UsernameForm.tsx', () => ({
+  UsernameForm: ({ current, onDone }: { current: string | null; onDone: (m: string) => void }) => (
+    <div>
+      <p>Username form (now {current ?? 'none'})</p>
+      <button onClick={() => onDone('Username saved.')}>finish username</button>
+    </div>
+  ),
+}))
 vi.mock('../../account/avatarImage.ts', () => ({
   pictureToAvatar: async (file: unknown) => {
     state.picked.push(file)
@@ -51,7 +76,7 @@ const { ProfileSection } = await import('./ProfileSection.tsx')
 const photo = (name = 'me.jpg') => new File(['x'], name, { type: 'image/jpeg' })
 
 beforeEach(() => {
-  state.member = { id: 'm1', full_name: 'Ada Rider', role: 'Team lead', status: 'active' }
+  state.member = { id: 'm1', full_name: 'Ada Rider', role: 'Team lead', status: 'active', username: null }
   state.roles = ['president']
   state.image = null
   state.saved = []
@@ -62,12 +87,12 @@ beforeEach(() => {
 })
 
 describe('who you are', () => {
-  it('shows your name, your job title and your roles on one card, with the password form under it', () => {
+  it('shows your name, your job title and your roles at the top, with the sign-in list under them', () => {
     render(<ProfileSection />)
     expect(screen.getByTestId('profile-name')).toHaveTextContent('Ada Rider')
     expect(screen.getByTestId('profile-title')).toHaveTextContent('Team lead')
     expect(screen.getByText('President')).toBeInTheDocument()
-    expect(screen.getByText('Password form')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Sign-in and security' })).toBeInTheDocument()
   })
 
   it('does not offer to edit the job title here, since the roster is where it is set', () => {
@@ -145,5 +170,56 @@ describe('the picture', () => {
     render(<ProfileSection />)
     expect(screen.queryByRole('button', { name: /photo/i })).not.toBeInTheDocument()
     expect(screen.queryByTestId('profile-photo-input')).not.toBeInTheDocument()
+  })
+})
+
+describe('sign-in and security', () => {
+  it('lists the username, the email and the password, each with its own button and no form until asked', () => {
+    render(<ProfileSection />)
+    expect(screen.getByTestId('account-row-username')).toHaveTextContent('Not set')
+    expect(screen.getByRole('button', { name: 'Add username' })).toBeInTheDocument()
+    expect(screen.getByTestId('account-row-email')).toHaveTextContent('ada@club.test')
+    expect(screen.getByRole('button', { name: 'Change email' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Change password' })).toBeInTheDocument()
+    expect(screen.queryByText('Password form')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Username form/)).not.toBeInTheDocument()
+  })
+
+  it('shows the username you have and offers to change it', () => {
+    state.member.username = 'ada.rider'
+    render(<ProfileSection />)
+    expect(screen.getByTestId('account-row-username')).toHaveTextContent('ada.rider')
+    expect(screen.getByRole('button', { name: 'Change username' })).toBeInTheDocument()
+  })
+
+  it('opens a row’s form in place, and opening another folds the first', async () => {
+    const user = userEvent.setup()
+    render(<ProfileSection />)
+    await user.click(screen.getByRole('button', { name: 'Change password' }))
+    expect(screen.getByText('Password form')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel password' })).toHaveAttribute('aria-expanded', 'true')
+    await user.click(screen.getByRole('button', { name: 'Add username' }))
+    expect(screen.queryByText('Password form')).not.toBeInTheDocument()
+    expect(screen.getByText('Username form (now none)')).toBeInTheDocument()
+  })
+
+  it('folds a row when its own button is pressed again', async () => {
+    const user = userEvent.setup()
+    render(<ProfileSection />)
+    await user.click(screen.getByRole('button', { name: 'Change email' }))
+    expect(screen.getByText('Email form for ada@club.test')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel email' }))
+    expect(screen.queryByText(/Email form/)).not.toBeInTheDocument()
+  })
+
+  it('folds the row when it is saved and says so on that row until another is opened', async () => {
+    const user = userEvent.setup()
+    render(<ProfileSection />)
+    await user.click(screen.getByRole('button', { name: 'Change password' }))
+    await user.click(screen.getByRole('button', { name: 'finish password' }))
+    expect(screen.queryByText('Password form')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('account-row-password')).getByRole('status')).toHaveTextContent('Password changed.')
+    await user.click(screen.getByRole('button', { name: 'Add username' }))
+    expect(screen.queryByText('Password changed.')).not.toBeInTheDocument()
   })
 })

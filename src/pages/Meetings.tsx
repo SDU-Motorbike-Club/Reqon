@@ -158,13 +158,18 @@ export default function Meetings() {
               const clock = start ? (time(meeting.ends_at) ? `${start}–${time(meeting.ends_at)}` : start) : null
               const where = [meeting.location, meeting.subteam_key ? `For ${departmentName(meeting.subteam_key)}` : null].filter(Boolean).join(' · ')
               const weekday = new Date(`${meeting.held_on}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long' })
-              // The title is the real button and its ::after stretches over the whole card, so the whole card is the
-              // click target and nothing else sits on it (Share, Edit and Delete live in the detail dialog).
+              // The whole card opens the meeting: the click handler is on the card itself, so it works wherever the
+              // pointer lands (unless words are being selected to copy). The title stays a real button for the keyboard
+              // and screen readers; its click bubbles to the card, and its ::after draws the focus ring around it all.
+              // Nothing else sits on the card (Share, Edit and Delete live in the detail dialog).
+              const openCard = () => {
+                if (window.getSelection()?.toString()) return
+                setViewing({ meeting, upcoming: isUpcoming })
+              }
               const open = (
                 <button
                   type="button"
                   className="cursor-pointer rounded text-left after:absolute after:inset-0 after:rounded-[inherit] after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-accent-ring"
-                  onClick={() => setViewing({ meeting, upcoming: isUpcoming })}
                 >
                   {meeting.title}
                 </button>
@@ -174,7 +179,8 @@ export default function Meetings() {
               return isUpcoming ? (
                 <li
                   key={meeting.id}
-                  className="pc-lift relative rounded-xl border border-accent/40 bg-surface p-5 transition-colors duration-150 ease-out hover:bg-slate-50/40 sm:p-7"
+                  className="pc-lift relative cursor-pointer rounded-xl border border-accent/40 bg-surface p-5 transition-colors duration-150 ease-out hover:bg-slate-50/40 sm:p-7"
+                  onClick={openCard}
                   data-testid={`meeting-${meeting.id}`}
                 >
                   <div className="flex items-start justify-between gap-5">
@@ -211,7 +217,8 @@ export default function Meetings() {
               ) : (
                 <li
                   key={meeting.id}
-                  className="pc-lift relative rounded-lg border border-slate-200 bg-surface px-4 py-3 transition-colors duration-150 ease-out hover:bg-slate-50/40"
+                  className="pc-lift relative cursor-pointer rounded-lg border border-slate-200 bg-surface px-4 py-3 transition-colors duration-150 ease-out hover:bg-slate-50/40"
+                  onClick={openCard}
                   data-testid={`meeting-${meeting.id}`}
                 >
                   <div className="flex items-baseline justify-between gap-4">

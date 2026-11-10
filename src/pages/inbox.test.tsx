@@ -68,9 +68,9 @@ function Where() {
   return <output data-testid="where">{l.pathname + l.search}</output>
 }
 
-function renderInbox() {
+function renderInbox(at = '/inbox') {
   return render(
-    <MemoryRouter initialEntries={['/inbox']}>
+    <MemoryRouter initialEntries={[at]}>
       <Routes>
         <Route path="/inbox" element={<Inbox />} />
         <Route path="*" element={<Where />} />
@@ -182,9 +182,30 @@ describe('Inbox announcements', () => {
     // The title is the headline, the description follows it, with the sender.
     expect(within(announcement).getByText('Workshop closed')).toHaveClass('font-semibold')
     expect(announcement).toHaveTextContent('Bo Wrench: Back on Monday.')
-    expect(announcement).toHaveAttribute('href', '/inbox?announcements=1')
+    expect(announcement).toHaveAttribute('href', '/inbox?announcements=1&announcement=3')
     // An ordinary notice carries no such label.
     expect(within(screen.getByTestId('notification-4')).queryByText('Announcement')).not.toBeInTheDocument()
+  })
+
+  it('lists an announcement you sent yourself among the notices, by time, and never twice', () => {
+    state.rows = [
+      row(5, 'announcement', { entity: 'announcement', entity_id: '3', actor_id: 'm2', title: 'Workshop closed', body: 'Back on Monday.', created_at: '2026-10-24T08:00:00Z', read_at: '2026-10-24T08:30:00Z' }),
+      row(4, 'task_assigned', { created_at: '2026-10-24T09:00:00Z' }),
+    ]
+    state.past = [
+      { id: 9, author_id: 'm1', title: 'Pit day', body: 'Bring gloves.', created_at: '2026-10-24T10:00:00Z' },
+      { id: 3, author_id: 'm2', title: 'Workshop closed', body: 'Back on Monday.', created_at: '2026-10-24T08:00:00Z' },
+    ]
+    renderInbox()
+    const mine = screen.getByTestId('notification--9')
+    expect(within(mine).getByText('Announcement')).toBeInTheDocument()
+    expect(mine).toHaveAttribute('href', '/inbox?announcements=1&announcement=9')
+    // Never "new", so it is under Earlier; announcement 3 reached me as notice 5 and is not repeated.
+    expect(within(screen.getByRole('region', { name: 'Earlier' })).getByTestId('notification--9')).toBeInTheDocument()
+    expect(screen.queryByTestId('notification--3')).not.toBeInTheDocument()
+    // New first, then Earlier newest first: the notice (09:00) is new, my announcement (10:00) precedes the older notice (08:00).
+    const order = screen.getAllByRole('link').map((a) => a.getAttribute('data-testid'))
+    expect(order).toEqual(['notification-4', 'notification--9', 'notification-5'])
   })
 
   it('offers everyone the history, even when the inbox is empty, and only the leadership the New button', () => {
@@ -246,6 +267,19 @@ describe('Inbox announcements', () => {
 
     await user.click(within(screen.getByTestId('comment-11')).getByRole('button', { name: 'Delete' }))
     expect(state.deleted).toEqual([11])
+  })
+
+  it('opens the comments of the announcement you came from, without a click', () => {
+    state.past = [
+      { id: 2, author_id: 'm2', title: 'Workshop', body: 'Closed Monday.', created_at: '2026-11-02T09:00:00Z' },
+      { id: 1, author_id: 'm2', title: 'Older', body: 'Old news.', created_at: '2026-11-01T09:00:00Z' },
+    ]
+    state.comments = [{ id: 10, announcement_id: 2, author_id: 'm2', body: 'Thanks for the notice', created_at: '2026-11-02T10:00:00Z' }]
+    renderInbox('/inbox?announcements=1&announcement=2')
+    expect(screen.getByTestId('comments-toggle-2')).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Thanks for the notice')).toBeInTheDocument()
+    // Only that one: the others stay folded until asked for.
+    expect(screen.getByTestId('comments-toggle-1')).toHaveAttribute('aria-expanded', 'false')
   })
 
   it('says so when there are no previous announcements', async () => {

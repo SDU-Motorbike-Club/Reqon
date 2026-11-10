@@ -128,12 +128,12 @@ test.describe('Phase 14 UI against the real database', () => {
     const m = readManifest()
     const key = m.departments.headA.key
     await login(page, m.users.member.email, m.password)
-    await page.goto(`/settings?edit=department:${key}`)
+    await page.goto(`/settings?section=departments&edit=department:${key}`)
     await expect(page.getByTestId(`department-row-${key}`)).toHaveCount(0)
 
     const before = runSql(`select name, lead_id, is_parked, coalesce(description, '') from subteams where key = '${key}'`).trim()
     await login(page, m.users.developer.email, m.password)
-    await page.goto(`/settings?edit=department:${key}`)
+    await page.goto(`/settings?section=departments&edit=department:${key}`)
     const editor = page.getByTestId(`department-editor-${key}`)
     await expect(editor.getByLabel(`Name for ${key}`)).toBeFocused()
     await editor.getByLabel(`Name for ${key}`).fill('Something else entirely')

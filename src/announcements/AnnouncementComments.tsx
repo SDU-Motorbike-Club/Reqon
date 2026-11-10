@@ -7,14 +7,15 @@ import { useMembers } from '../data/useMembers.ts'
 import { formatInstant } from '../lib/dates.ts'
 import { ProfileLink } from '../members/ProfileLink.tsx'
 import { Avatar } from '../ui/Avatar.tsx'
+import { buttonPrimary, buttonSecondary } from '../ui/buttons.ts'
 import { ActionError, ErrorState, LoadingState } from '../ui/states.tsx'
 
 const FORMER = 'A former member'
 
 // The group-chat thread under one announcement: every comment with its author's picture and name, oldest first, and a
 // box to add yours. Anyone the database lets read announcements may comment (the database checks again).
-export function AnnouncementComments({ announcementId, count }: { announcementId: number; count: number }) {
-  const [open, setOpen] = useState(false)
+export function AnnouncementComments({ announcementId, count, defaultOpen = false }: { announcementId: number; count: number; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen)
   const panelId = useId()
   return (
     <div className="mt-2">
@@ -23,7 +24,7 @@ export function AnnouncementComments({ announcementId, count }: { announcementId
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((v) => !v)}
-        className="rounded text-xs font-medium text-slate-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
+        className={buttonSecondary}
         data-testid={`comments-toggle-${announcementId}`}
       >
         {count === 0 ? 'Comment' : `${count} ${count === 1 ? 'comment' : 'comments'}`}
@@ -116,7 +117,7 @@ function Thread({ announcementId }: { announcementId: number }) {
           <button
             type="submit"
             disabled={post.isPending || !text.trim()}
-            className="min-h-11 shrink-0 rounded-full px-3 text-sm font-medium text-accent hover:underline disabled:opacity-50 sm:min-h-0"
+            className={`${buttonPrimary} shrink-0 rounded-full px-4`}
           >
             {post.isPending ? 'Posting…' : 'Post'}
           </button>

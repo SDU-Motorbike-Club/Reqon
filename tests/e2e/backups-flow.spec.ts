@@ -57,7 +57,7 @@ test.describe('Settings → Backups', () => {
   test('the Vice President sees the destinations, a failure in words, and downloads the newest file', async ({ page }) => {
     const m = readManifest()
     await login(page, m.users.vicepresident.email, m.password)
-    await page.goto('/settings')
+    await page.goto('/settings?section=backups')
     const panel = page.getByTestId('backups-panel')
     await expect(panel).toBeVisible()
 
@@ -79,7 +79,7 @@ test.describe('Settings → Backups', () => {
   test('a Developer sees it too', async ({ page }) => {
     const m = readManifest()
     await login(page, m.users.developer.email, m.password)
-    await page.goto('/settings')
+    await page.goto('/settings?section=backups')
     await expect(page.getByTestId('backups-panel')).toBeVisible()
   })
 

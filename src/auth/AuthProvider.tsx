@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { queryKeys } from '../data/queryKeys.ts'
 import { supabase } from '../lib/supabase.ts'
+import { isUsername, signInWithUsername } from './usernameSignIn.ts'
 import { AuthContext, type AuthState, type Member } from './context.ts'
 import type { PrivilegedRole } from './permissions.ts'
 import type { AuthenticatedUser } from './types.ts'
@@ -115,8 +116,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   })
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+  // `login` is an e-mail, or a username (no "@"): a username goes through the username-sign-in function.
+  const signIn = useCallback(async (login: string, password: string) => {
+    const typed = login.trim()
+    if (isUsername(typed)) return { error: await signInWithUsername(typed, password) }
+    const { error } = await supabase.auth.signInWithPassword({ email: typed, password })
     return { error: error ? error.message : null }
   }, [])
 

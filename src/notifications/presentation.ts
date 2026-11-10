@@ -75,8 +75,8 @@ export function describeNotification(n: Pick<Notification, 'kind' | 'title' | 'e
       // Person to person (send_message, 20260154000000). entity_id is the sender: opening it shows their profile, where the reply box is.
       return { text: `${who}: ${n.body ?? ''}`, to: `/inbox?profile=${encodeURIComponent(n.entity_id)}` }
     case 'announcement':
-      // To the whole club (send_announcement, 20260155000000). Opening it shows the history, where it sits with the others.
-      return { text: `${who}: ${n.body ?? ''}`, to: '/inbox?announcements=1', label: 'Announcement', heading: n.title ?? undefined }
+      // To the whole club (send_announcement, 20260155000000). Opening it shows the history with this one's comments already open.
+      return { text: `${who}: ${n.body ?? ''}`, to: `/inbox?announcements=1&announcement=${encodeURIComponent(n.entity_id)}`, label: 'Announcement', heading: n.title ?? undefined }
     default:
       return { text: `${who}: ${n.kind.replaceAll('_', ' ')}${n.title ? ` — ${n.title}` : ''}.`, to: '/' }
   }

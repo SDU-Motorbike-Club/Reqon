@@ -1,4 +1,3 @@
-import { attachmentsEnabled } from '../attachments/flag.ts'
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/context.ts'
@@ -8,11 +7,12 @@ import { useMyAvatar } from '../data/useAvatars.ts'
 import { useBugReport } from '../bugs/bugReportContext.ts'
 import { useCurrentSeason } from '../data/useCurrentSeason.ts'
 import { useUnreadCount } from '../data/useNotifications.ts'
+import { GlobalSearch } from '../search/GlobalSearch.tsx'
 import { useTutorial } from '../tutorial/context.ts'
 import { Avatar } from './Avatar.tsx'
 import { buttonSecondary } from './buttons.ts'
 import { SHELL } from './layout.ts'
-import { NAV_ITEMS } from './navItems.ts'
+import { isOffered, NAV_ITEMS } from './navItems.ts'
 
 // Active screen: a bright label with an accent rule under it, AND aria-current="page" — never colour alone. The
 // red fill is kept for the one thing you came to do on a screen (its primary button), so the menu does not
@@ -72,7 +72,7 @@ export function AppHeader() {
   // screens will let you do.
   const roleText = sortRoles(can.roles).map((role) => ROLE_LABELS[role]).join(', ')
   // Screens that would show this person nothing are left out of the menu.
-  const items = NAV_ITEMS.filter((item) => !item.requires || (item.requires === 'attachmentsEnabled' ? attachmentsEnabled() : can[item.requires]))
+  const items = NAV_ITEMS.filter((item) => isOffered(item, can))
   const signOut = () => void auth.signOut()
   const openTour = () => {
     // From the phone menu: close it and park focus on the Menu button, which
@@ -87,7 +87,7 @@ export function AppHeader() {
 
   return (
     <header className="border-b border-slate-200 bg-surface">
-      <div className={`${SHELL} flex items-center gap-2 py-2`}>
+      <div className={`${SHELL} flex flex-wrap items-center gap-2 py-2`}>
         <Link
           to="/"
           className="rounded text-base font-semibold tracking-tight text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
@@ -104,6 +104,11 @@ export function AppHeader() {
             {season.data.label}
           </span>
         )}
+
+        {/* A full row of its own on a phone (order-last + basis-full), beside the logo from tablet width up. */}
+        <div className="order-last flex basis-full sm:order-none sm:basis-auto sm:flex-1 sm:justify-start" data-tutorial="global-search">
+          <GlobalSearch key={location.pathname + location.search} />
+        </div>
 
         {/* Visible on every width, outside the phone menu: the count is the
             point, so it must not hide behind a button. */}

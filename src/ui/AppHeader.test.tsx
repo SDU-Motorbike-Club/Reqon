@@ -24,6 +24,9 @@ vi.mock('../data/useNotifications.ts', () => ({
   useUnreadCount: () => ({ data: inbox.unread }),
 }))
 
+// The search box has its own tests (search/globalSearch.test.tsx); here it only needs to be in the header.
+vi.mock('../search/GlobalSearch.tsx', () => ({ GlobalSearch: () => <input type="search" aria-label="Search the whole site" /> }))
+
 const { AppHeader } = await import('./AppHeader.tsx')
 const { TutorialProvider } = await import('../tutorial/TutorialProvider.tsx')
 
@@ -89,10 +92,10 @@ describe('main navigation', () => {
   it('lists every screen, grouped by how people use it', () => {
     renderHeader()
     const labels = within(desktopNav()).getAllByRole('link').map((a) => a.textContent)
-    // Now · daily work · planning · competition rules · records · admin. (Files shows only with attachments on,
-    // Finances only for people who may see money.) Proposals are an overlay on the Board, not a screen.
+    // Now · daily work · planning · competition rules · Contacts · Finances (money roles only) · Settings. Files
+    // and Contributions are opened from Settings. Proposals are an overlay on the Board, not a screen.
     expect(labels).toEqual([
-      'Now', 'Board', 'Tasks', 'Meetings', 'Tools', 'Milestones', 'Gantt', 'Register', 'Book', 'Spec sheet', 'Contacts', 'Contributions', 'Settings',
+      'Now', 'Board', 'Tasks', 'Meetings', 'Tools', 'Milestones', 'Gantt', 'Register', 'Book', 'Spec sheet', 'Contacts', 'Settings',
     ])
   })
 
@@ -180,10 +183,12 @@ describe('tutorial entry point', () => {
 })
 
 describe('permission-aware navigation', () => {
-  it('offers Finances only to the roles that can see money', () => {
+  it('offers Finances only to the roles that can see money, next to Settings', () => {
     for (const roles of [['president'], ['vicepresident'], ['treasurer'], ['developer']]) {
       who.roles = roles
       const { unmount } = renderHeader()
+      const labels = within(desktopNav()).getAllByRole('link').map((a) => a.textContent)
+      expect(labels.slice(-3)).toEqual(['Contacts', 'Finances', 'Settings'])
       expect(within(desktopNav()).getByRole('link', { name: 'Finances' })).toHaveAttribute('href', '/finances')
       unmount()
     }
@@ -191,6 +196,22 @@ describe('permission-aware navigation', () => {
     who.roles = []
     renderHeader()
     expect(within(desktopNav()).queryByRole('link', { name: 'Finances' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the occasional pages (Files, Contributions) out of the header for everyone', () => {
+    for (const roles of [['president'], ['treasurer'], []]) {
+      who.roles = roles
+      const { unmount } = renderHeader()
+      for (const name of ['Files', 'Contributions']) {
+        expect(within(desktopNav()).queryByRole('link', { name })).not.toBeInTheDocument()
+      }
+      unmount()
+    }
+  })
+
+  it('has the search box in the header', () => {
+    renderHeader()
+    expect(screen.getByRole('searchbox', { name: 'Search the whole site' })).toBeInTheDocument()
   })
 
   it('shows your roles beside your name, in words', () => {

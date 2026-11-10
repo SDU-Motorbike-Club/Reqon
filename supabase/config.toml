@@ -403,6 +403,16 @@ verify_jwt = true
 [functions.set-own-password]
 verify_jwt = true
 
+# The login form, when a username is typed instead of an e-mail. Called while signed OUT, so the gateway cannot
+# demand a user JWT; the function answers every failure the same way and returns only session tokens (username-sign-in).
+[functions.username-sign-in]
+verify_jwt = false
+
+# Settings -> Your account -> "Change login". The caller proves it with their current password; the e-mail is
+# changed at once, with no confirmation mail (this club has no mailer) (change-own-login).
+[functions.change-own-login]
+verify_jwt = true
+
 # Settings -> Roster -> "Reset password". The database decides, as the caller,
 # through mark_password_reset() (supabase/functions/reset-member-password).
 [functions.reset-member-password]

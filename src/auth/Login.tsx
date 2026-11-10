@@ -42,13 +42,17 @@ export default function Login() {
           Sign in with your club account.
         </p>
 
-        <label htmlFor="email" className="block text-sm font-medium text-slate-700">
-          Email
+        <label htmlFor="login" className="block text-sm font-medium text-slate-700">
+          Email or username
         </label>
         <input
-          id="email"
-          name="email"
-          type="email"
+          id="login"
+          name="username"
+          type="text"
+          inputMode="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           autoComplete="username"
           required
           value={email}

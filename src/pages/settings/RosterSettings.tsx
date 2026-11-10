@@ -111,7 +111,7 @@ function RosterRow({
             heads.map((d) => (
               <Link
                 key={d.key}
-                to={`/settings?${mergeSearchParams(new URLSearchParams(), { edit: `department:${d.key}` }).toString()}`}
+                to={`/settings?${mergeSearchParams(new URLSearchParams(), { section: 'departments', edit: `department:${d.key}` }).toString()}`}
                 aria-label={`Edit ${d.name}`}
                 className="underline underline-offset-2 transition-opacity sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100 pointer-coarse:opacity-100"
               >

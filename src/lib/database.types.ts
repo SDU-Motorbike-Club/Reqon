@@ -1224,6 +1224,7 @@ export type Database = {
           status: Database["public"]["Enums"]["member_state"]
           study_year: string | null
           updated_at: string
+          username: string | null
         }
         Insert: {
           created_at?: string
@@ -1238,6 +1239,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["member_state"]
           study_year?: string | null
           updated_at?: string
+          username?: string | null
         }
         Update: {
           created_at?: string
@@ -1252,6 +1254,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["member_state"]
           study_year?: string | null
           updated_at?: string
+          username?: string | null
         }
         Relationships: []
       }
@@ -4108,6 +4111,7 @@ export type Database = {
         Returns: boolean
       }
       set_current_season: { Args: { p_season_id: string }; Returns: undefined }
+      set_my_username: { Args: { p_username: string }; Returns: string }
       set_meeting_attendees: {
         Args: { p_meeting: string; p_members: string[] }
         Returns: undefined
