@@ -646,7 +646,7 @@ export default function Board() {
                 {/* Whose task it is, with their face, so a task opened from a link is never anonymous. */}
                 {openTask.owner_id && (
                   <p className="mt-1 flex items-center gap-2 text-sm text-slate-700" data-testid="task-dialog-owner">
-                    <Avatar name={memberName.get(openTask.owner_id) ?? 'Someone'} image={avatars.data?.get(openTask.owner_id) ?? null} size="sm" />
+                    <Avatar name={memberName.get(openTask.owner_id) ?? 'Someone'} image={avatars.data?.get(openTask.owner_id) ?? null} size="sm" memberId={openTask.owner_id} />
                     {memberName.get(openTask.owner_id) ?? 'Someone no longer on the roster'}
                   </p>
                 )}

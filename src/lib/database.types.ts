@@ -1216,6 +1216,7 @@ export type Database = {
           full_name: string
           id: string
           initials: string | null
+          last_seen_at: string | null
           must_change_password: boolean
           notes: string | null
           phone: string | null
@@ -1231,6 +1232,7 @@ export type Database = {
           full_name: string
           id: string
           initials?: string | null
+          last_seen_at?: string | null
           must_change_password?: boolean
           notes?: string | null
           phone?: string | null
@@ -1246,6 +1248,7 @@ export type Database = {
           full_name?: string
           id?: string
           initials?: string | null
+          last_seen_at?: string | null
           must_change_password?: boolean
           notes?: string | null
           phone?: string | null
@@ -3628,6 +3631,7 @@ export type Database = {
       delete_archived_task: { Args: { p_task_id: string }; Returns: undefined }
       delete_attachment: { Args: { p_attachment_id: string }; Returns: boolean }
       department_authority: { Args: { p_key: string }; Returns: string }
+      end_presence: { Args: never; Returns: undefined }
       enqueue_attachment_purge: {
         Args: {
           p_after: string
@@ -3746,6 +3750,7 @@ export type Database = {
         Args: { p_include_developers?: boolean }
         Returns: number
       }
+      online_member_ids: { Args: never; Returns: string[] }
       pgp_armor_headers: {
         Args: { "": string }
         Returns: Record<string, unknown>[]
@@ -4382,6 +4387,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      touch_presence: { Args: never; Returns: undefined }
       unlink_task_requirement: {
         Args: { p_clause_key: string; p_task_id: string }
         Returns: boolean

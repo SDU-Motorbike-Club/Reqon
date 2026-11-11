@@ -4,6 +4,7 @@ import RequireAuth from './auth/RequireAuth.tsx'
 import NotFound from './pages/NotFound.tsx'
 import { SeasonGate } from './season/SeasonGate.tsx'
 import { SeasonProvider } from './season/SeasonProvider.tsx'
+import { PresenceProvider } from './presence/PresenceProvider.tsx'
 import { TutorialProvider } from './tutorial/TutorialProvider.tsx'
 import { BugReportProvider } from './bugs/BugReportProvider.tsx'
 import { AppHeader } from './ui/AppHeader.tsx'
@@ -100,6 +101,7 @@ export default function App() {
   if (location.pathname === '/privacy') return <Privacy />
   return (
     <RequireAuth>
+     <PresenceProvider>
       <SeasonProvider>
         <TutorialProvider>
          <BugReportProvider>
@@ -166,6 +168,7 @@ export default function App() {
         </BugReportProvider>
         </TutorialProvider>
       </SeasonProvider>
+     </PresenceProvider>
     </RequireAuth>
   )
 }

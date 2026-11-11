@@ -66,6 +66,7 @@ export function AppHeader() {
   }, [menuOpen])
 
   const name = auth.status === 'member' ? auth.member.full_name : ''
+  const myId = auth.status === 'member' ? auth.member.id : null
   // Only your own picture, one row: the header is on every screen, so it must never load everyone's.
   const myPicture = useMyAvatar().data ?? null
   // Your roles beside your name, in words, so it is always clear what the
@@ -144,7 +145,7 @@ export function AppHeader() {
         <div className="hidden items-center gap-2 sm:flex">
           {name && (
             <span className="inline-flex items-center gap-2 text-xs text-slate-600" data-tutorial="account-roles">
-              <Avatar name={name} image={myPicture} size="sm" />
+              <Avatar name={name} image={myPicture} size="sm" memberId={myId} />
               {name}
               {roleText && <span className="text-slate-500"> · {roleText}</span>}
             </span>
@@ -207,7 +208,7 @@ export function AppHeader() {
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2">
             {name && (
               <span className="inline-flex items-center gap-2 text-xs text-slate-600">
-                <Avatar name={name} image={myPicture} size="sm" />
+                <Avatar name={name} image={myPicture} size="sm" memberId={myId} />
                 Signed in as {name}
                 {roleText && ` · ${roleText}`}
               </span>

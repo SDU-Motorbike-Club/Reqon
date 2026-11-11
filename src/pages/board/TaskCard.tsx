@@ -109,7 +109,7 @@ export function TaskCard(props: Props) {
         <div className="flex flex-wrap gap-x-2">
           <dt className="sr-only">Owner</dt>
           <dd className="inline-flex items-center gap-1.5 font-medium">
-            {props.ownerName ? <Avatar name={props.ownerName} image={props.ownerImage} size="xs" /> : null}
+            {props.ownerName ? <Avatar name={props.ownerName} image={props.ownerImage} size="xs" memberId={task.owner_id} /> : null}
             {props.ownerName && task.owner_id ? (
               <ProfileLink memberId={task.owner_id}>{props.ownerName}</ProfileLink>
             ) : (

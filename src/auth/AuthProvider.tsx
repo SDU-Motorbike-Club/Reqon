@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { queryKeys } from '../data/queryKeys.ts'
 import { supabase } from '../lib/supabase.ts'
+import { endPresence } from '../data/usePresence.ts'
 import { isUsername, signInWithUsername } from './usernameSignIn.ts'
 import { AuthContext, type AuthState, type Member } from './context.ts'
 import type { PrivilegedRole } from './permissions.ts'
@@ -126,6 +127,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
+      // Offline at once, while the session still says who is leaving. Bounded, so a slow network cannot hold up the
+      // sign-out; if it does not make it in time, the 30 minutes of inactivity take the person offline anyway.
+      await Promise.race([endPresence().catch(() => undefined), new Promise((resolve) => setTimeout(resolve, 2000))])
       await supabase.auth.signOut()
     } catch {
       // Deliberately swallowed. The server call is best-effort; what matters

@@ -69,7 +69,7 @@ function Thread({ announcementId }: { announcementId: number }) {
           {rows.length === 0 && <li className="text-xs text-slate-600">No comments yet. Be the first.</li>}
           {rows.map((c) => (
             <li key={c.id} className="flex items-start gap-2" data-testid={`comment-${c.id}`}>
-              <Avatar name={nameOf(c.author_id)} image={c.author_id ? avatars.data?.get(c.author_id) : null} size="sm" />
+              <Avatar name={nameOf(c.author_id)} image={c.author_id ? avatars.data?.get(c.author_id) : null} size="sm" memberId={c.author_id} />
               <div className="min-w-0">
                 <div className="rounded-2xl bg-slate-100 px-3 py-1.5">
                   <p className="text-xs font-semibold text-slate-900">
@@ -99,7 +99,7 @@ function Thread({ announcementId }: { announcementId: number }) {
 
       {meId && (
         <form onSubmit={submit} className="flex items-center gap-2">
-          <Avatar name={nameOf(meId)} image={avatars.data?.get(meId)} size="sm" />
+          <Avatar name={nameOf(meId)} image={avatars.data?.get(meId)} size="sm" memberId={meId} />
           <label htmlFor={inputId} className="sr-only">
             Write a comment
           </label>

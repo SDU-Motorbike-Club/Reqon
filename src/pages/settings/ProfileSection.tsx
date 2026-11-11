@@ -70,7 +70,7 @@ export function ProfileSection() {
     <div className="space-y-6" data-testid="profile-section">
       <div className="flex flex-wrap items-center gap-4">
         <div className="relative shrink-0">
-          <Avatar name={member.full_name} image={image} size="lg" />
+          <Avatar name={member.full_name} image={image} size="lg" memberId={member.id} />
           {canChangePhoto && (
             <>
               <input

@@ -19,6 +19,8 @@ const state = {
   callbacks: [] as AuthCallback[],
   signInResult: { error: null as { message: string } | null },
   signOutCalls: 0,
+  // Order of the calls that matter for leaving: presence ends before the session does.
+  calls: [] as string[],
   signOutThrows: false,
   memberQueries: 0,
   memberColumns: '',
@@ -44,12 +46,17 @@ const supabase = {
         return { error: null }
       }
       state.signOutCalls += 1
+      state.calls.push('signOut')
       if (state.signOutThrows) throw new Error('offline')
       state.session = null
       state.callbacks.forEach((cb) => cb('SIGNED_OUT', null))
       return { error: null }
     }),
   },
+  rpc: vi.fn(async (name: string) => {
+    state.calls.push(name)
+    return { data: null, error: null }
+  }),
   functions: {
     invoke: vi.fn(async (name: string, { body }: { body: unknown }) => {
       state.invokes.push({ name, body })
@@ -135,6 +142,7 @@ beforeEach(() => {
   state.callbacks = []
   state.signInResult = { error: null }
   state.signOutCalls = 0
+  state.calls = []
   state.signOutThrows = false
   state.memberQueries = 0
   state.memberColumns = ''
@@ -274,6 +282,14 @@ describe('signed in with a temporary password', () => {
     renderApp()
     await user.click(await screen.findByRole('button', { name: 'Sign out' }))
     expect(await screen.findByLabelText('Email or username')).toBeInTheDocument()
+  })
+
+  it('goes offline on sign-out: end_presence is sent first, while the session still says who is leaving', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await screen.findByLabelText('Email or username')
+    expect(state.calls.filter((c) => c === 'end_presence' || c === 'signOut')).toEqual(['end_presence', 'signOut'])
   })
 })
 

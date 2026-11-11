@@ -51,7 +51,7 @@ function Profile({ memberId, onClose }: { memberId: string; onClose: () => void 
   return (
     <div data-testid="profile-dialog">
       <div className="flex flex-col items-center text-center">
-        <Avatar name={member.full_name} image={avatars.data?.get(member.id)} size="lg" />
+        <Avatar name={member.full_name} image={avatars.data?.get(member.id)} size="lg" memberId={member.id} />
         <h2 id="profile-dialog-title" className="mt-3 max-w-full text-lg font-semibold break-words text-slate-900">
           {member.full_name}
         </h2>

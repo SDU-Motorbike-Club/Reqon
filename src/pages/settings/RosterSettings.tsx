@@ -66,7 +66,7 @@ function RosterRow({
   return (
     <li className="px-3 py-2" data-testid={`member-${member.id}`}>
       <div className="flex flex-wrap items-center gap-2">
-        <Avatar name={member.full_name} image={image} size="sm" />
+        <Avatar name={member.full_name} image={image} size="sm" memberId={member.id} />
         <ProfileLink memberId={member.id} className={`text-sm font-medium ${retired ? 'text-slate-500' : 'text-slate-900'}`}>
           {member.full_name}
         </ProfileLink>
