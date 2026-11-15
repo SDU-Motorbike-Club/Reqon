@@ -101,6 +101,8 @@ test.describe('Files page', () => {
     const m = readManifest()
     await login(page, m.users.member.email, m.password)
     await page.goto('/settings')
+    // isVisible() does not wait, so let the menu render first or the phone burger is skipped.
+    await page.getByTestId('settings-jump').waitFor()
     const burger = page.getByRole('button', { name: /Sections/ })
     if (await burger.isVisible().catch(() => false)) await burger.click()
     await page.getByTestId('settings-jump').getByRole('link', { name: /Files/ }).click()

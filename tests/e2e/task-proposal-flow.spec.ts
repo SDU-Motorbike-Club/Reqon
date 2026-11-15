@@ -92,7 +92,7 @@ test.describe('full task/proposal flow (R9-R16, R37-R38, R42-R43)', () => {
     await page.goto('/gantt')
     await expect(page.getByRole('button', { name: new RegExp(m.milestoneKey) }).first()).toBeVisible()
     await page.goto('/register')
-    await page.getByLabel('Search').fill('F.13.3.1')
+    await page.getByRole('searchbox', { name: 'Search', exact: true }).fill('F.13.3.1')
     await expect(page.getByText('F.13.3.1', { exact: false }).first()).toBeVisible()
 
     // ---- 6. Owner (member) may update their own task; server confirms the write --------

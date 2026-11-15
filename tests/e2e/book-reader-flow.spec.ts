@@ -41,7 +41,7 @@ async function openRule(page: Page, clauseKey: string, search: string) {
   if (isNarrow(page) && (await page.getByTestId('register-reader').count()) > 0) {
     await page.getByTestId('register-reader-close').click()
   }
-  await page.getByLabel('Search').fill(search)
+  await page.getByRole('searchbox', { name: 'Search', exact: true }).fill(search)
   await page.getByTestId(`book-link-${clauseKey}`).click()
   return page.getByTestId('register-reader')
 }
@@ -113,13 +113,13 @@ test.describe('Book reader (R22-R23)', () => {
 
     // A refresh keeps the search, the rule and the page.
     await page.reload()
-    await expect(page.getByLabel('Search')).toHaveValue('H.6.3.4')
+    await expect(page.getByRole('searchbox', { name: 'Search', exact: true })).toHaveValue('H.6.3.4')
     await expect(drawn(page.getByTestId('register-reader'))).toHaveAttribute('data-rendered-page', '213', { timeout: 20_000 })
 
     // Closing returns to the list with the search intact and focus on the rule.
     await page.getByTestId('register-reader-close').click()
     await expect(page.getByTestId('register-reader')).toHaveCount(0)
-    await expect(page.getByLabel('Search')).toHaveValue('H.6.3.4')
+    await expect(page.getByRole('searchbox', { name: 'Search', exact: true })).toHaveValue('H.6.3.4')
     await expect(page.getByTestId('book-link-H.6.3.4')).toBeFocused()
   })
 

@@ -30,8 +30,8 @@ test.describe('announcements', () => {
 
     expect(runSql(`select count(*) from announcements where title = '${title}' and body = '${body}' and author_id = '${m.users.vicepresident.id}'`).trim()).toBe('1')
     expect(runSql(`select count(*) from notifications where kind = 'announcement' and body = '${body}' and member_id = '${m.users.member.id}'`).trim()).toBe('1')
-    // The sender does not announce to themselves.
-    expect(runSql(`select count(*) from notifications where kind = 'announcement' and body = '${body}' and member_id = '${m.users.vicepresident.id}'`).trim()).toBe('0')
+    // The sender gets their own copy, already read, so it is never counted as new.
+    expect(runSql(`select count(*) from notifications where kind = 'announcement' and body = '${body}' and member_id = '${m.users.vicepresident.id}' and read_at is not null`).trim()).toBe('1')
 
     await login(page, m.users.member.email, m.password)
     await page.goto('/inbox')
