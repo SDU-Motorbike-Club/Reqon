@@ -28,6 +28,7 @@ export const CHAPTERS = [
   { id: 'specs', label: 'Spec sheet' },
   { id: 'files', label: 'Files' },
   { id: 'contacts', label: 'Contacts' },
+  { id: 'public', label: 'Public website' },
   { id: 'contributions', label: 'Contributions' },
   { id: 'archive', label: 'Archive' },
   { id: 'finances', label: 'Finances' },
@@ -77,6 +78,10 @@ export const AUDIENCES = {
   head: { label: 'Head of a department', includes: (can) => can.isHeadOfDepartment },
   // Whoever may review proposals (can_review_proposal): the Head of the proposal's department, the
   // President or Vice President (every department since the role hierarchy, 20260130000000), or a Developer.
+  publicSite: {
+    label: 'Recruitment and Blog',
+    includes: (can) => can.canManagePublicSite,
+  },
   proposalReviewer: {
     label: 'A department Head, the President or Vice President',
     includes: (can) => can.isHeadOfDepartment || can.hasRole('president') || can.hasRole('vicepresident') || can.hasRole('developer'),
@@ -416,6 +421,17 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     body: 'People who can help, by area: what each knows and how to reach them. Pick a category or search for a skill. Department Heads, the President and the Vice President keep it up to date.',
   },
 
+  // -------------------------------------------------------------------- Public
+  {
+    id: 'public',
+    chapter: 'public',
+    route: '/public',
+    target: 'public-overview',
+    audience: 'publicSite',
+    title: 'Public — the club’s website',
+    body: 'Applicants: the questions the website’s application form asks, and everyone who applied. Blog: posts go live on the website the moment you save them.',
+  },
+
   // --------------------------------------------------------------------- Tools
   {
     id: 'team',
@@ -588,7 +604,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     target: 'settings-roster',
     audience: 'vicePresident',
     title: 'Which roles you manage',
-    body: 'As Vice President you give or take away the Treasurer and Documentation roles. President and Vice President roles, and switching seasons, belong to the President.',
+    body: 'As Vice President you give or take away the Treasurer, Documentation, Recruitment and Blog roles. President and Vice President roles, and switching seasons, belong to the President.',
   },
   {
     id: 'change-roles',
@@ -597,7 +613,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     target: 'change-roles',
     audience: 'president',
     title: 'Giving and taking away roles',
-    body: 'The President manages the President and Vice President roles; the Vice President manages Treasurer and Documentation. “Change roles” opens a checklist; big changes ask you to confirm first.',
+    body: 'The President manages the President and Vice President roles; the Vice President manages Treasurer, Documentation, Recruitment and Blog. “Change roles” opens a checklist; big changes ask you to confirm first.',
   },
   {
     id: 'role-rules',

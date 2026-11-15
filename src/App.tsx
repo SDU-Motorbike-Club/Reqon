@@ -41,6 +41,7 @@ const Inbox = lazy(() => import('./pages/Inbox.tsx'))
 const Contacts = lazy(() => import('./pages/Contacts.tsx'))
 const Contributions = lazy(() => import('./pages/Contributions.tsx'))
 const Team = lazy(() => import('./pages/Team.tsx'))
+const Public = lazy(() => import('./pages/Public.tsx'))
 
 // What a person sees while a route's chunk is still downloading. Same shell
 // shape as every page (`#main-content`, the skip-link target) so the layout
@@ -153,6 +154,8 @@ export default function App() {
                 <Route path="/inbox" element={<Inbox />} />
                 {/* Not season-scoped either: the people you can ask outlive a season. */}
                 <Route path="/contacts" element={<Contacts />} />
+                {/* The public website's application form and blog: not season data either. */}
+                <Route path="/public" element={<Public />} />
                 {/* Across seasons by design: it is a person's record, not a season's. */}
                 <Route path="/contributions" element={<Contributions />} />
                 {/* Your first steps and the club's tools outlive a season too. */}

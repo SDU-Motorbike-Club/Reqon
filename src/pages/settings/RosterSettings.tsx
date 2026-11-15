@@ -479,7 +479,7 @@ export function RosterSettings() {
         {canManageRoles && canManageSeasons
           ? 'You can give or take away the roles available to you, and the club always keeps at least one President.'
           : canManageRoles
-            ? 'You can give or take away the Treasurer and Documentation roles; the President handles the others.'
+            ? 'You can give or take away the Treasurer, Documentation, Recruitment and Blog roles; the President handles the others.'
             : 'Roles are given and taken away by the President or Vice President.'}
       </p>
       <p role="status" className="mt-1 min-h-4 text-xs font-medium text-emerald-800">

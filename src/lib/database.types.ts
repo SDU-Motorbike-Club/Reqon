@@ -329,6 +329,104 @@ export type Database = {
           },
         ]
       }
+      application_questions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          help: string | null
+          id: string
+          kind: string
+          position: number
+          prompt: string
+          required: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          help?: string | null
+          id?: string
+          kind?: string
+          position?: number
+          prompt: string
+          required?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          help?: string | null
+          id?: string
+          kind?: string
+          position?: number
+          prompt?: string
+          required?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_questions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blog_posts: {
+        Row: {
+          author_name: string
+          category: Database["public"]["Enums"]["blog_category"]
+          content: string
+          cover_image_alt: string | null
+          cover_image_url: string | null
+          created_at: string
+          excerpt: string | null
+          id: string
+          is_featured: boolean
+          published_at: string | null
+          reading_minutes: number | null
+          slug: string
+          status: Database["public"]["Enums"]["blog_post_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author_name?: string
+          category?: Database["public"]["Enums"]["blog_category"]
+          content?: string
+          cover_image_alt?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          is_featured?: boolean
+          published_at?: string | null
+          reading_minutes?: number | null
+          slug: string
+          status?: Database["public"]["Enums"]["blog_post_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author_name?: string
+          category?: Database["public"]["Enums"]["blog_category"]
+          content?: string
+          cover_image_alt?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          is_featured?: boolean
+          published_at?: string | null
+          reading_minutes?: number | null
+          slug?: string
+          status?: Database["public"]["Enums"]["blog_post_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       bug_reports: {
         Row: {
           created_at: string
@@ -1258,6 +1356,42 @@ export type Database = {
           study_year?: string | null
           updated_at?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      membership_applications: {
+        Row: {
+          answers: Json
+          consent: boolean
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          notes: string | null
+          phone: string | null
+          status: Database["public"]["Enums"]["membership_application_status"]
+        }
+        Insert: {
+          answers?: Json
+          consent: boolean
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          notes?: string | null
+          phone?: string | null
+          status?: Database["public"]["Enums"]["membership_application_status"]
+        }
+        Update: {
+          answers?: Json
+          consent?: boolean
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          notes?: string | null
+          phone?: string | null
+          status?: Database["public"]["Enums"]["membership_application_status"]
         }
         Relationships: []
       }
@@ -3499,7 +3633,9 @@ export type Database = {
       can_manage_departments: { Args: never; Returns: boolean }
       can_manage_finances: { Args: never; Returns: boolean }
       can_manage_milestone_structure: { Args: never; Returns: boolean }
+      can_manage_applicants: { Args: never; Returns: boolean }
       can_manage_roles: { Args: never; Returns: boolean }
+      can_post_blog: { Args: never; Returns: boolean }
       can_manage_seasons: { Args: never; Returns: boolean }
       can_manage_spec_evidence: {
         Args: { p_spec_id: string }
@@ -4338,6 +4474,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      submit_application: {
+        Args: {
+          p_answers: Json
+          p_consent: boolean
+          p_email: string
+          p_full_name: string
+          p_phone: string
+        }
+        Returns: string
+      }
       submit_proposal: {
         Args: {
           p_clause_keys: string[]
@@ -4403,15 +4549,24 @@ export type Database = {
       }
     }
     Enums: {
+      blog_category: "ride" | "track" | "news" | "tech"
+      blog_post_status: "draft" | "published"
       clause_state: "open" | "wip" | "compliant" | "verified" | "blocked" | "na"
       finance_kind: "income" | "expense"
       member_state: "active" | "alumni" | "trial"
+      membership_application_status:
+        | "new"
+        | "contacted"
+        | "accepted"
+        | "rejected"
       privileged_role:
         | "developer"
         | "treasurer"
         | "president"
         | "vicepresident"
         | "documentation"
+        | "recruitment"
+        | "blog"
       proposal_outcome: "approved" | "rejected"
       task_priority: "normal" | "urgent"
       task_state: "todo" | "wip" | "blocked" | "done" | "cancelled"
@@ -4555,15 +4710,25 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      blog_category: ["ride", "track", "news", "tech"],
+      blog_post_status: ["draft", "published"],
       clause_state: ["open", "wip", "compliant", "verified", "blocked", "na"],
       finance_kind: ["income", "expense"],
       member_state: ["active", "alumni", "trial"],
+      membership_application_status: [
+        "new",
+        "contacted",
+        "accepted",
+        "rejected",
+      ],
       privileged_role: [
         "developer",
         "treasurer",
         "president",
         "vicepresident",
         "documentation",
+        "recruitment",
+        "blog",
       ],
       proposal_outcome: ["approved", "rejected"],
       task_priority: ["normal", "urgent"],

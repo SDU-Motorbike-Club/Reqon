@@ -333,7 +333,7 @@ describe('what each role is taught', () => {
     expect(steps.filter((s) => s.audience)).toEqual([])
     const chapters = new Set(steps.map((s) => s.chapter))
     for (const chapter of CHAPTERS) {
-      expect(chapters.has(chapter.id), chapter.id).toBe(chapter.id !== 'finances')
+      expect(chapters.has(chapter.id), chapter.id).toBe(chapter.id !== 'finances' && chapter.id !== 'public')
     }
     expect(tourMenu(TUTORIAL_STEPS, viewerFor([])).role).toBeNull()
   })
