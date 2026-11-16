@@ -54,10 +54,11 @@ exception when duplicate_object then null; end $$;
 do $$ begin create type membership_application_status as enum ('new', 'contacted', 'accepted', 'rejected');
 exception when duplicate_object then null; end $$;
 
+-- Matches the hosted table: reading_minutes is GENERATED there, so nothing may write it.
 create table if not exists blog_posts (
   id               uuid primary key default gen_random_uuid(),
-  slug             text not null unique,
-  title            text not null,
+  slug             text not null unique check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  title            text not null check (btrim(title) <> ''),
   excerpt          text,
   content          text not null default '',
   category         blog_category not null default 'news',
@@ -65,7 +66,8 @@ create table if not exists blog_posts (
   cover_image_alt  text,
   author_name      text not null default '',
   is_featured      boolean not null default false,
-  reading_minutes  integer,
+  reading_minutes  integer generated always as (greatest(1::numeric, ceil(coalesce(array_length(
+                     regexp_split_to_array(btrim(content), '\s+'), 1), 0)::numeric / 200.0))::integer) stored,
   status           blog_post_status not null default 'draft',
   published_at     timestamptz,
   created_at       timestamptz not null default now(),
@@ -78,7 +80,7 @@ create table if not exists membership_applications (
   email       text not null,
   phone       text,
   consent     boolean not null,
-  answers     jsonb not null default '{}',
+  answers     jsonb not null default '{}' check (jsonb_typeof(answers) = 'object' and octet_length(answers::text) <= 20000),
   status      membership_application_status not null default 'new',
   notes       text,
   created_at  timestamptz not null default now()

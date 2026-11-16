@@ -1,5 +1,5 @@
 -- =============================================================================
---  Public site checks for Reqon (application_questions, membership_applications, blog_posts,
+--  Public site checks for Reqon (membership_applications, blog_posts,
 --  submit_application(); migration 20260162000100).
 --
 --  SAFE TO RUN AGAINST THE REAL PROJECT. Everything happens inside one block
@@ -47,12 +47,10 @@ declare
   rec      uuid := gen_random_uuid();
   blogger  uuid := gen_random_uuid();
   mem      uuid := gen_random_uuid();
-  q_req    uuid;
   app      uuid;
   post     uuid;
   c        record;
   got      text;
-  snap     jsonb;
   author   text;
   ok_apply text;
   lines    text[] := '{}';
@@ -63,17 +61,14 @@ begin
   insert into members (id, full_name, role, status) values
     (rec, 'Pub Recruiter', 'Team', 'active'), (blogger, 'Pub Blogger', 'Team', 'active'), (mem, 'Pub Member', 'Team', 'active');
   insert into member_roles (member_id, role) values (rec, 'recruitment'), (blogger, 'blog');
-  insert into application_questions (prompt, required, position) values ('Why join?', true, 1) returning id into q_req;
   insert into membership_applications (full_name, email, consent) values ('Seed', 'seed@example.com', true) returning id into app;
   insert into blog_posts (slug, title, content, status) values ('pub-hello', 'Hello', 'First post', 'published') returning id into post;
   insert into blog_posts (slug, title, content) values ('pub-secret', 'Secret', 'Not yet');
 
-  ok_apply := format('select count(*) from (select submit_application(''Ann'', ''ann@example.com'', null, true, %L::jsonb)) s',
-    jsonb_build_object(q_req::text, 'Bikes'));
+  ok_apply := 'select count(*) from (select submit_application(''Ann'', ''ann@example.com'', null, true, ''{}''::jsonb)) s';
 
   create temp table checks (n serial, label text, who uuid, stmt text, kind text, expected text);
   insert into checks (label, who, stmt, kind, expected) values
-    ('anon          reads questions',          null,    'select count(*) from application_questions', 'read', 'ALLOWED'),
     ('anon          reads published posts',    null,    'select count(*) from blog_posts where slug = ''pub-hello''', 'read', 'ALLOWED'),
     ('anon          reads drafts',             null,    'select count(*) from blog_posts where slug = ''pub-secret''', 'read', 'DENIED'),
     ('member        reads drafts',             mem,     'select count(*) from blog_posts where slug = ''pub-secret''', 'read', 'DENIED'),
@@ -81,14 +76,9 @@ begin
     ('member        reads applications',       mem,     'select count(*) from membership_applications', 'read', 'DENIED'),
     ('blogger       reads applications',       blogger, 'select count(*) from membership_applications', 'read', 'DENIED'),
     ('recruiter     reads applications',       rec,     'select count(*) from membership_applications', 'read', 'ALLOWED'),
-    ('anon          applies, missing answer',  null,    'select count(*) from (select submit_application(''Ann'', ''ann@example.com'', null, true, ''{}''::jsonb)) s', 'read', 'ERROR 23502'),
     ('anon          applies without consent',  null,    replace(ok_apply, 'null, true', 'null, false'), 'read', 'ERROR 23514'),
     ('anon          applies, bad email',       null,    replace(ok_apply, 'ann@example.com', 'nope'), 'read', 'ERROR 23514'),
     ('anon          applies',                  null,    ok_apply, 'read', 'ALLOWED'),
-    ('member        adds a question',          mem,     'insert into application_questions (prompt) values (''Q'')', 'write', 'DENIED'),
-    ('blogger       adds a question',          blogger, 'insert into application_questions (prompt) values (''Q'')', 'write', 'DENIED'),
-    ('recruiter     adds a question',          rec,     'insert into application_questions (prompt, kind) values (''Your year?'', ''short'')', 'write', 'ALLOWED'),
-    ('recruiter     adds a bad kind',          rec,     'insert into application_questions (prompt, kind) values (''Q'', ''essay'')', 'write', 'ERROR 23514'),
     ('member        sets a status',            mem,     format('update membership_applications set status = ''accepted'' where id = %L', app), 'write', 'DENIED'),
     ('recruiter     sets a status',            rec,     format('update membership_applications set status = ''contacted'' where id = %L', app), 'write', 'ALLOWED'),
     ('recruiter     adds a post',              rec,     'insert into blog_posts (slug, title, content) values (''pub-t'', ''T'', ''B'')', 'write', 'DENIED'),
@@ -108,14 +98,6 @@ begin
       failures := failures || format('%s: expected %s, got %s', c.label, c.expected, got);
     end if;
   end loop;
-
-  -- The application keeps the question's wording, so editing the form later does not change it.
-  update application_questions set prompt = 'Why do you want to join?' where id = q_req;
-  select answers into snap from membership_applications where email = 'ann@example.com';
-  if snap is distinct from jsonb_build_array(jsonb_build_object('question', 'Why join?', 'answer', 'Bikes')) then
-    failures := failures || format('application answers not snapshotted: %s', snap);
-  end if;
-  lines := lines || '  -> answers are stored with the question text';
 
   -- The database, not the browser, names the writer and dates the post.
   select author_name into author from blog_posts where slug = 'pub-news' and published_at > now() - interval '1 minute';

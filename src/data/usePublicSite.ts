@@ -6,21 +6,19 @@ import { supabase } from '../lib/supabase.ts'
 import { unwrap } from './errors.ts'
 import { queryKeys } from './queryKeys.ts'
 
-// The public website reads these same tables with the anon key (20260162000100): a saved question, or a post
-// switched to published, is live there at once. Drafts never leave the app.
+// The public website reads these same tables with the anon key (20260162000100): a post switched to published
+// is live there at once. Drafts never leave the app.
 
 type Public = Database['public']
-export type ApplicationQuestion = Public['Tables']['application_questions']['Row']
 export type BlogPost = Public['Tables']['blog_posts']['Row']
 export type BlogCategory = Public['Enums']['blog_category']
 export type ApplicationStatus = Public['Enums']['membership_application_status']
 export type ApplicationAnswer = { question: string; answer: string | null }
 export type Application = Omit<Public['Tables']['membership_applications']['Row'], 'answers'> & { answers: ApplicationAnswer[] }
 
-export type QuestionInput = Pick<ApplicationQuestion, 'prompt' | 'help' | 'kind' | 'required' | 'position'>
 export type BlogPostInput = Pick<
   BlogPost,
-  'title' | 'slug' | 'excerpt' | 'content' | 'category' | 'cover_image_url' | 'cover_image_alt' | 'is_featured' | 'reading_minutes' | 'status'
+  'title' | 'slug' | 'excerpt' | 'content' | 'category' | 'cover_image_url' | 'cover_image_alt' | 'is_featured' | 'status'
 >
 
 export const BLOG_CATEGORIES: readonly BlogCategory[] = ['news', 'ride', 'track', 'tech']
@@ -56,18 +54,42 @@ export function slugify(title: string): string {
     .slice(0, 80)
 }
 
-// About 200 words a minute, never less than one.
-export function readingMinutes(markdown: string): number {
-  const words = markdown.split(/\s+/).filter(Boolean).length
-  return Math.max(1, Math.round(words / 200))
+// Listing orders on the Public page. Ties fall back to newest first.
+export type ApplicationSort = 'newest' | 'oldest' | 'name' | 'status'
+export type PostSort = 'drafts' | 'newest' | 'oldest' | 'title' | 'category'
+const newestFirst = (a: string, b: string) => b.localeCompare(a)
+
+export function orderApplications(list: readonly Application[], sort: ApplicationSort): Application[] {
+  const rank = (a: Application) => APPLICATION_STATUSES.indexOf(a.status)
+  return [...list].sort(
+    (a, b) =>
+      (sort === 'oldest'
+        ? a.created_at.localeCompare(b.created_at)
+        : sort === 'name'
+          ? a.full_name.localeCompare(b.full_name)
+          : sort === 'status'
+            ? rank(a) - rank(b)
+            : 0) || newestFirst(a.created_at, b.created_at),
+  )
 }
 
-export function useApplicationQuestions(): UseQueryResult<ApplicationQuestion[], Error> {
-  return useQuery({
-    queryKey: queryKeys.applicationQuestions,
-    queryFn: async () =>
-      unwrap('load the application questions', await supabase.from('application_questions').select('*').order('position').order('created_at')),
-  })
+// A post's date is when it went out, or for a draft when it was last edited.
+const postDate = (p: BlogPost) => p.published_at ?? p.updated_at
+
+export function orderPosts(list: readonly BlogPost[], sort: PostSort): BlogPost[] {
+  const rank = (p: BlogPost) => BLOG_CATEGORIES.indexOf(p.category)
+  return [...list].sort(
+    (a, b) =>
+      (sort === 'drafts'
+        ? Number(a.status === 'published') - Number(b.status === 'published')
+        : sort === 'oldest'
+          ? postDate(a).localeCompare(postDate(b))
+          : sort === 'title'
+            ? a.title.localeCompare(b.title)
+            : sort === 'category'
+              ? rank(a) - rank(b)
+              : 0) || newestFirst(postDate(a), postDate(b)),
+  )
 }
 
 // Recruitment or a Developer (reqon_applications_read); anyone else gets an empty list.
@@ -108,20 +130,6 @@ function useWrite<T>(what: string, key: QueryKey, write: (input: T) => PromiseLi
   })
 }
 
-export function useSaveQuestion() {
-  return useWrite<QuestionInput & { id?: string }>('save that question', queryKeys.applicationQuestions, ({ id, ...row }) =>
-    id
-      ? supabase.from('application_questions').update(row).eq('id', id).select('id')
-      : supabase.from('application_questions').insert(row).select('id'),
-  )
-}
-
-export function useDeleteQuestion() {
-  return useWrite<string>('delete that question', queryKeys.applicationQuestions, (id) =>
-    supabase.from('application_questions').delete().eq('id', id).select('id'),
-  )
-}
-
 export function useSetApplicationStatus() {
   return useWrite<{ id: string; status: ApplicationStatus }>('change that application', queryKeys.applications, ({ id, status }) =>
     supabase.from('membership_applications').update({ status }).eq('id', id).select('id'),
@@ -132,6 +140,25 @@ export function useDeleteApplication() {
   return useWrite<string>('delete that application', queryKeys.applications, (id) =>
     supabase.from('membership_applications').delete().eq('id', id).select('id'),
   )
+}
+
+// Cover images live in the website's public `blog-images` bucket (20260163000100); the post keeps the public URL.
+export const COVER_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif'] as const
+export const COVER_MAX_BYTES = 10 * 1024 * 1024
+
+export function coverProblem(file: File): string | null {
+  if (!(COVER_TYPES as readonly string[]).includes(file.type)) return 'The cover must be a JPEG, PNG, WebP, AVIF or GIF image.'
+  if (file.size > COVER_MAX_BYTES) return 'The cover image is larger than 10 MB. Pick a smaller one.'
+  return null
+}
+
+export async function uploadBlogCover(file: File): Promise<string> {
+  const ext = file.name.includes('.') ? file.name.split('.').pop()!.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+  const path = `covers/${crypto.randomUUID()}${ext ? `.${ext}` : ''}`
+  const bucket = supabase.storage.from('blog-images')
+  const { error } = await bucket.upload(path, file, { contentType: file.type, cacheControl: '31536000' })
+  if (error) throw new DataError(`Could not upload the cover image: ${error.message}`, null)
+  return bucket.getPublicUrl(path).data.publicUrl
 }
 
 // A full post to create or replace, or just { id, status } to publish or unpublish one.

@@ -1,23 +1,25 @@
-import { useId, useState, type FormEvent } from 'react'
+import { useEffect, useId, useMemo, useState, type FormEvent } from 'react'
 import { usePermissions } from '../auth/usePermissions.ts'
 import {
   APPLICATION_STATUSES,
   BLOG_CATEGORIES,
-  readingMinutes,
+  coverProblem,
+  orderApplications,
+  orderPosts,
   slugify,
-  useApplicationQuestions,
   useApplications,
   useBlogPosts,
   useDeleteApplication,
   useDeleteBlogPost,
-  useDeleteQuestion,
   useSaveBlogPost,
-  useSaveQuestion,
+  uploadBlogCover,
   useSetApplicationStatus,
-  type ApplicationQuestion,
+  type ApplicationSort,
   type ApplicationStatus,
   type BlogCategory,
   type BlogPost,
+  type PostSort,
+  COVER_TYPES,
 } from '../data/usePublicSite.ts'
 import { formatInstant } from '../lib/dates.ts'
 import { mergeSearchParams } from '../lib/searchParams.ts'
@@ -30,9 +32,8 @@ import { buttonDanger, buttonPrimary, buttonSecondary } from '../ui/buttons.ts'
 import { pageMain } from '../ui/layout.ts'
 import { ActionError, EmptyState, ErrorState, LoadingState } from '../ui/states.tsx'
 
-// The club's public website, run from here: the application form's questions and the applications people send
-// (Recruitment, can_manage_applicants()), and the blog (Blog, can_post_blog()). The website reads the same rows,
-// so a saved question or post is live there at once. The database checks every write (20260162000100).
+// The club's public website, run from here: the applications people send (Recruitment, can_manage_applicants())
+// and the blog (Blog, can_post_blog()). The website reads the same rows, so a saved post is live there at once. The database checks every write (20260162000100).
 
 const input =
   'mt-1 block min-h-11 w-full rounded border border-slate-300 bg-surface px-2.5 text-base text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-9 sm:text-sm'
@@ -45,6 +46,55 @@ const card = 'rounded-lg border border-slate-200 bg-surface p-3'
 const blankToNull = (value: FormDataEntryValue | null) => (typeof value === 'string' && value.trim() !== '' ? value.trim() : null)
 
 type Section = 'applicants' | 'blog'
+
+// Filters and order live in the address (?app_status=new&app_sort=name), so a filtered list survives a reload or a shared link.
+const pick = <T extends string>(value: string | null, labels: Record<T, string>): T | null =>
+  value !== null && Object.hasOwn(labels, value) ? (value as T) : null
+
+function ChipFilter<T extends string>({
+  label: name,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: T | null
+  options: { id: T | null; label: string; count: number }[]
+  onChange: (value: T | null) => void
+}) {
+  return (
+    <div role="group" aria-label={name} className="flex flex-wrap items-center gap-1.5">
+      <span className="text-sm text-slate-600">{name}:</span>
+      {options.map((o) => (
+        <button key={o.id ?? 'all'} type="button" aria-pressed={value === o.id} className={chip(value === o.id)} onClick={() => onChange(o.id)}>
+          {o.label} <span className="text-xs text-slate-500">{o.count}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function SortSelect<T extends string>({ value, labels, onChange }: { value: T; labels: Record<T, string>; onChange: (value: T) => void }) {
+  return (
+    <label className="flex items-center gap-2 text-sm font-medium text-slate-900">
+      Order
+      <select value={value} onChange={(e) => onChange(e.target.value as T)} className={`${input} mt-0 w-auto`}>
+        {(Object.keys(labels) as T[]).map((k) => (
+          <option key={k} value={k}>{labels[k]}</option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+function NoMatch({ what, onClear }: { what: string; onClear: () => void }) {
+  return (
+    <p className="py-3 text-sm text-slate-600">
+      No {what} match these filters.{' '}
+      <button type="button" className="font-medium text-slate-900 underline" onClick={onClear}>Show all</button>
+    </p>
+  )
+}
 
 export default function Public() {
   const can = usePermissions()
@@ -83,6 +133,7 @@ export default function Public() {
 // ------------------------------------------------------------------ applicants
 
 const STATUS_LABELS: Record<ApplicationStatus, string> = { new: 'New', contacted: 'Contacted', accepted: 'Accepted', rejected: 'Rejected' }
+const APPLICATION_SORT_LABELS: Record<ApplicationSort, string> = { newest: 'Newest first', oldest: 'Oldest first', name: 'Name (A–Z)', status: 'By status' }
 const applicationBadge = (status: ApplicationStatus) =>
   `inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${
     {
@@ -93,19 +144,20 @@ const applicationBadge = (status: ApplicationStatus) =>
     }[status]
   }`
 
-type ApplicantsEditing =
-  | { kind: 'question'; question: ApplicationQuestion | null }
-  | { kind: 'delete-question'; question: ApplicationQuestion }
-  | { kind: 'delete-application'; id: string; name: string }
+type ApplicantsEditing = { kind: 'delete-application'; id: string; name: string }
 
 function Applicants() {
-  const questions = useApplicationQuestions()
   const applications = useApplications()
-  const deleteQuestion = useDeleteQuestion()
   const deleteApplication = useDeleteApplication()
   const setStatus = useSetApplicationStatus()
   const [editing, setEditing] = useState<ApplicantsEditing | null>(null)
   const [message, setMessage] = useState('')
+  const [params, setParams] = useUrlParams()
+  const setFilter = (patch: Record<string, string | null>) => setParams((c) => mergeSearchParams(c, patch), { replace: true })
+  const status = pick(params.get('app_status'), STATUS_LABELS)
+  const sort = pick(params.get('app_sort'), APPLICATION_SORT_LABELS) ?? 'newest'
+  const all = applications.data ?? []
+  const shown = orderApplications(status ? all.filter((a) => a.status === status) : all, sort)
   const open = (next: ApplicantsEditing) => {
     setMessage('')
     setEditing(next)
@@ -114,66 +166,42 @@ function Applicants() {
     setEditing(null)
     setMessage(text)
   }
-  const list = questions.data ?? []
 
   return (
     <div className="space-y-8">
       <p role="status" className="min-h-5 text-sm text-emerald-800">{message}</p>
-
-      <section aria-labelledby="questions-title">
-        <div className="flex flex-wrap items-end justify-between gap-2 border-b border-slate-200 pb-1.5">
-          <div>
-            <h2 id="questions-title" className="text-base font-semibold text-slate-900">Application form</h2>
-            <p className="text-sm text-slate-600">Everyone who applies gives their name, email and (optionally) phone, then answers these, in this order.</p>
-          </div>
-          <button type="button" className={buttonPrimary} onClick={() => open({ kind: 'question', question: null })}>New question</button>
-        </div>
-        {questions.error ? (
-          <ErrorState title="Could not load the questions" error={questions.error} onRetry={() => void questions.refetch()} />
-        ) : questions.isPending ? (
-          <LoadingState label="Loading questions…" />
-        ) : list.length === 0 ? (
-          <p className="py-3 text-sm text-slate-600">No questions yet: the form asks only for a name and an email.</p>
-        ) : (
-          <ol className="mt-2 space-y-2">
-            {list.map((q) => (
-              <li key={q.id} className={`${card} flex flex-wrap items-start justify-between gap-2`}>
-                <div className="min-w-0">
-                  <p className="font-medium text-slate-900">
-                    {q.prompt}
-                    {q.required && <span className="font-normal text-slate-600"> · required</span>}
-                  </p>
-                  <p className="text-sm text-slate-600">
-                    {q.kind === 'long' ? 'Paragraph' : 'One line'}
-                    {q.help && ` · ${q.help}`}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button type="button" aria-label={`Edit ${q.prompt}`} className={buttonSecondary} onClick={() => open({ kind: 'question', question: q })}>Edit</button>
-                  <button type="button" aria-label={`Delete ${q.prompt}`} className={buttonSecondary} onClick={() => open({ kind: 'delete-question', question: q })}>Delete</button>
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
 
       <section aria-labelledby="applications-title">
         <div className="border-b border-slate-200 pb-1.5">
           <h2 id="applications-title" className="text-base font-semibold text-slate-900">
             Applications {applications.data && <span className="font-normal text-slate-600">({applications.data.length})</span>}
           </h2>
-          <p className="text-sm text-slate-600">Newest first. Each shows the questions as they were worded when the person applied.</p>
         </div>
+        {all.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <ChipFilter
+              label="Status"
+              value={status}
+              onChange={(v) => setFilter({ app_status: v })}
+              options={[
+                { id: null, label: 'All', count: all.length },
+                ...APPLICATION_STATUSES.map((s) => ({ id: s, label: STATUS_LABELS[s], count: all.filter((a) => a.status === s).length })),
+              ]}
+            />
+            <SortSelect value={sort} labels={APPLICATION_SORT_LABELS} onChange={(v) => setFilter({ app_sort: v === 'newest' ? null : v })} />
+          </div>
+        )}
         {applications.error ? (
           <ErrorState title="Could not load the applications" error={applications.error} onRetry={() => void applications.refetch()} />
         ) : applications.isPending ? (
           <LoadingState label="Loading applications…" />
-        ) : applications.data.length === 0 ? (
+        ) : all.length === 0 ? (
           <p className="py-3 text-sm text-slate-600">Nobody has applied yet.</p>
+        ) : shown.length === 0 ? (
+          <NoMatch what="applications" onClear={() => setFilter({ app_status: null })} />
         ) : (
           <ul className="mt-2 space-y-2">
-            {applications.data.map((a) => (
+            {shown.map((a) => (
               <li key={a.id} className={card}>
                 <details>
                   <summary className="flex cursor-pointer flex-wrap items-baseline gap-x-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring">
@@ -221,22 +249,7 @@ function Applicants() {
         <ActionError error={setStatus.error} className="mt-3" />
       </section>
 
-      <Dialog open={editing?.kind === 'question'} onClose={() => setEditing(null)} labelledBy="question-dialog-title">
-        {editing?.kind === 'question' && (
-          <QuestionForm question={editing.question} nextPosition={list.length === 0 ? 1 : Math.max(...list.map((q) => q.position)) + 1} onCancel={() => setEditing(null)} onSaved={done} />
-        )}
-      </Dialog>
-      <Dialog open={editing?.kind === 'delete-question' || editing?.kind === 'delete-application'} onClose={() => setEditing(null)} labelledBy="delete-dialog-title">
-        {editing?.kind === 'delete-question' && (
-          <ConfirmDelete
-            what={`the question “${editing.question.prompt}”`}
-            detail="The website stops asking it. Applications already sent keep their answer to it."
-            remove={deleteQuestion}
-            id={editing.question.id}
-            onCancel={() => setEditing(null)}
-            onDeleted={() => done('Question deleted.')}
-          />
-        )}
+      <Dialog open={editing?.kind === 'delete-application'} onClose={() => setEditing(null)} labelledBy="delete-dialog-title">
         {editing?.kind === 'delete-application' && (
           <ConfirmDelete
             what={`${editing.name}’s application`}
@@ -249,70 +262,6 @@ function Applicants() {
         )}
       </Dialog>
     </div>
-  )
-}
-
-function QuestionForm({
-  question,
-  nextPosition,
-  onCancel,
-  onSaved,
-}: {
-  question: ApplicationQuestion | null
-  nextPosition: number
-  onCancel: () => void
-  onSaved: (message: string) => void
-}) {
-  const save = useSaveQuestion()
-  const id = useId()
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const form = new FormData(event.currentTarget)
-    try {
-      await save.mutateAsync({
-        id: question?.id,
-        prompt: blankToNull(form.get('prompt')) ?? '',
-        help: blankToNull(form.get('help')),
-        kind: form.get('kind') === 'long' ? 'long' : 'short',
-        required: form.get('required') === 'on',
-        position: Number(form.get('position')) || 0,
-      })
-      onSaved(question ? 'Question saved. The website shows it now.' : 'Question added. The website asks it now.')
-    } catch {
-      // Shown below.
-    }
-  }
-  return (
-    <form onSubmit={(e) => void submit(e)}>
-      <h2 id="question-dialog-title" className="text-base font-semibold text-slate-900">{question ? 'Edit question' : 'New question'}</h2>
-      <fieldset disabled={save.isPending} className="mt-3 grid gap-3 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <label htmlFor={`${id}-prompt`} className={label}>Question</label>
-          <input id={`${id}-prompt`} name="prompt" required maxLength={300} defaultValue={question?.prompt ?? ''} placeholder="Why do you want to join?" className={input} />
-        </div>
-        <div className="sm:col-span-2">
-          <label htmlFor={`${id}-help`} className={label}>Hint <span className="font-normal text-slate-500">(optional)</span></label>
-          <input id={`${id}-help`} name="help" maxLength={500} defaultValue={question?.help ?? ''} placeholder="A few sentences is enough" className={input} />
-        </div>
-        <div>
-          <label htmlFor={`${id}-kind`} className={label}>Answer</label>
-          <select id={`${id}-kind`} name="kind" defaultValue={question?.kind ?? 'short'} className={input}>
-            <option value="short">One line</option>
-            <option value="long">Paragraph</option>
-          </select>
-        </div>
-        <div>
-          <label htmlFor={`${id}-position`} className={label}>Order</label>
-          <input id={`${id}-position`} name="position" type="number" step={1} defaultValue={question?.position ?? nextPosition} className={input} />
-        </div>
-        <label className="flex min-h-11 items-center gap-2 text-sm text-slate-900 sm:col-span-2 sm:min-h-0">
-          <input type="checkbox" name="required" defaultChecked={question?.required ?? false} className="size-4" />
-          Required
-        </label>
-      </fieldset>
-      <ActionError error={save.error} className="mt-3" />
-      <FormButtons busy={save.isPending} onCancel={onCancel} submit={question ? 'Save question' : 'Add question'} />
-    </form>
   )
 }
 
@@ -335,6 +284,9 @@ function PublishSwitch({ checked, onChange, disabled, label }: { checked: boolea
 }
 
 const CATEGORY_LABELS: Record<BlogCategory, string> = { news: 'News', ride: 'Ride', track: 'Track', tech: 'Tech' }
+const POST_SORT_LABELS: Record<PostSort, string> = { drafts: 'Drafts first', newest: 'Newest first', oldest: 'Oldest first', title: 'Title (A–Z)', category: 'By category' }
+const POST_SHOW_LABELS = { draft: 'Drafts', published: 'Published', featured: 'Featured' } as const
+type PostShow = keyof typeof POST_SHOW_LABELS
 
 const statusBadge = (published: boolean) =>
   `inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${
@@ -361,6 +313,16 @@ function Blog() {
   const [editing, setEditing] = useState<BlogEditing | null>(null)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [params, setParams] = useUrlParams()
+  const setFilter = (patch: Record<string, string | null>) => setParams((c) => mergeSearchParams(c, patch), { replace: true })
+  const category = pick(params.get('post_category'), CATEGORY_LABELS)
+  const show = pick(params.get('post_show'), POST_SHOW_LABELS)
+  const sort = pick(params.get('post_sort'), POST_SORT_LABELS) ?? 'drafts'
+  const all = posts.data ?? []
+  // Each group's counts follow the other group's choice, so a number always says how many posts that chip would show.
+  const inCategory = (p: BlogPost, c = category) => c === null || p.category === c
+  const isShown = (p: BlogPost, s: PostShow | null = show) => s === null || (s === 'featured' ? p.is_featured : p.status === s)
+  const shown = orderPosts(all.filter((p) => inCategory(p) && isShown(p)), sort)
   const open = (next: BlogEditing) => {
     setMessage('')
     setEditing(next)
@@ -379,16 +341,47 @@ function Blog() {
         </div>
         <button type="button" className={buttonPrimary} onClick={() => open({ kind: 'post', post: null })}>New post</button>
       </div>
+      {all.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-2">
+          <div className="space-y-1.5">
+            <ChipFilter
+              label="Category"
+              value={category}
+              onChange={(v) => setFilter({ post_category: v })}
+              options={[
+                { id: null, label: 'All', count: all.filter((p) => isShown(p)).length },
+                ...BLOG_CATEGORIES.map((c) => ({ id: c, label: CATEGORY_LABELS[c], count: all.filter((p) => isShown(p) && inCategory(p, c)).length })),
+              ]}
+            />
+            <ChipFilter
+              label="Show"
+              value={show}
+              onChange={(v) => setFilter({ post_show: v })}
+              options={[
+                { id: null, label: 'All', count: all.filter((p) => inCategory(p)).length },
+                ...(Object.keys(POST_SHOW_LABELS) as PostShow[]).map((s) => ({
+                  id: s,
+                  label: POST_SHOW_LABELS[s],
+                  count: all.filter((p) => inCategory(p) && isShown(p, s)).length,
+                })),
+              ]}
+            />
+          </div>
+          <SortSelect value={sort} labels={POST_SORT_LABELS} onChange={(v) => setFilter({ post_sort: v === 'drafts' ? null : v })} />
+        </div>
+      )}
       <p role="status" className="my-2 min-h-5 text-sm text-emerald-800">{message}</p>
       {posts.error ? (
         <ErrorState title="Could not load the posts" error={posts.error} onRetry={() => void posts.refetch()} />
       ) : posts.isPending ? (
         <LoadingState label="Loading posts…" />
-      ) : posts.data.length === 0 ? (
+      ) : all.length === 0 ? (
         <EmptyState title="No posts yet">Start with “New post”. Save it as a draft, or switch it to Published to put it on the website.</EmptyState>
+      ) : shown.length === 0 ? (
+        <NoMatch what="posts" onClear={() => setFilter({ post_category: null, post_show: null })} />
       ) : (
         <ul className="space-y-2">
-          {posts.data.map((post) => (
+          {shown.map((post) => (
             <li key={post.id} className={card}>
               <details>
                 <summary className="cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring">
@@ -466,6 +459,14 @@ function PostForm({
   const wasPublished = post?.status === 'published'
   const [published, setPublished] = useState(wasPublished)
   const [missingBody, setMissingBody] = useState(false)
+  const [cover, setCover] = useState<File | null>(null)
+  const [coverError, setCoverError] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const busy = save.isPending || uploading
+  const preview = useMemo(() => (cover ? URL.createObjectURL(cover) : (post?.cover_image_url ?? null)), [cover, post])
+  useEffect(() => () => {
+    if (preview?.startsWith('blob:')) URL.revokeObjectURL(preview)
+  }, [preview])
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
@@ -474,8 +475,25 @@ function PostForm({
       return
     }
     setMissingBody(false)
+    if (!cover && !post?.cover_image_url) {
+      setCoverError('Upload a cover image for the post.')
+      return
+    }
+    setCoverError(null)
     onBusy(true)
     try {
+      let coverUrl = post?.cover_image_url ?? null
+      if (cover) {
+        setUploading(true)
+        try {
+          coverUrl = await uploadBlogCover(cover)
+        } catch (error) {
+          setCoverError(error instanceof Error ? error.message : 'Could not upload the cover image.')
+          return
+        } finally {
+          setUploading(false)
+        }
+      }
       await save.mutateAsync({
         id: post?.id,
         title: title.trim(),
@@ -483,10 +501,9 @@ function PostForm({
         excerpt: blankToNull(form.get('excerpt')),
         content: body,
         category: String(form.get('category')) as BlogCategory,
-        cover_image_url: blankToNull(form.get('cover_image_url')),
+        cover_image_url: coverUrl,
         cover_image_alt: blankToNull(form.get('cover_image_alt')),
         is_featured: form.get('is_featured') === 'on',
-        reading_minutes: readingMinutes(body),
         status: published ? 'published' : 'draft',
       })
       onSaved(
@@ -507,10 +524,11 @@ function PostForm({
   return (
     <form onSubmit={(e) => void submit(e)}>
       <h2 id="post-dialog-title" className="text-base font-semibold text-slate-900">{post ? 'Edit post' : 'New post'}</h2>
-      <fieldset disabled={save.isPending} className="mt-3 grid gap-3 sm:grid-cols-2">
+      <fieldset disabled={busy} className="mt-3 grid gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <label htmlFor={`${id}-title`} className={label}>Title</label>
-          <input id={`${id}-title`} name="title" required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} className={input} />
+          <input id={`${id}-title`} name="title" required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} aria-describedby={`${id}-title-hint`} className={input} />
+          <p id={`${id}-title-hint`} className="mt-1 text-xs text-slate-600">Short and specific, under about 70 characters, e.g. “First track day of the season at the Hungaroring”.</p>
         </div>
         <div>
           <label htmlFor={`${id}-slug`} className={label}>Web address</label>
@@ -526,8 +544,10 @@ function PostForm({
               setSlugEdited(true)
               setSlug(e.target.value)
             }}
+            aria-describedby={`${id}-slug-hint`}
             className={input}
           />
+          <p id={`${id}-slug-hint`} className="mt-1 text-xs text-slate-600">Filled in from the title. Avoid changing it once published: old links would stop working.</p>
         </div>
         <div>
           <label htmlFor={`${id}-category`} className={label}>Category</label>
@@ -539,25 +559,50 @@ function PostForm({
         </div>
         <div className="sm:col-span-2">
           <label htmlFor={`${id}-excerpt`} className={label}>Excerpt <span className="font-normal text-slate-500">(optional, shown in the list of posts)</span></label>
-          <input id={`${id}-excerpt`} name="excerpt" maxLength={500} defaultValue={post?.excerpt ?? ''} className={input} />
+          <input id={`${id}-excerpt`} name="excerpt" maxLength={500} defaultValue={post?.excerpt ?? ''} aria-describedby={`${id}-excerpt-hint`} className={input} />
+          <p id={`${id}-excerpt-hint`} className="mt-1 text-xs text-slate-600">One or two sentences that make people want to read on.</p>
         </div>
-        <div>
-          <label htmlFor={`${id}-cover`} className={label}>Cover image link <span className="font-normal text-slate-500">(optional)</span></label>
-          <input id={`${id}-cover`} name="cover_image_url" type="url" maxLength={500} defaultValue={post?.cover_image_url ?? ''} placeholder="https://…" className={input} />
+        <div className="sm:col-span-2">
+          <label htmlFor={`${id}-cover`} className={label}>
+            Cover image <span className="font-normal text-slate-500">(JPEG, PNG, WebP, AVIF or GIF, up to 10 MB)</span>
+          </label>
+          {preview && <img src={preview} alt="" className="mt-1 max-h-48 rounded border border-slate-200 object-cover" />}
+          <input
+            id={`${id}-cover`}
+            type="file"
+            accept={COVER_TYPES.join(',')}
+            aria-describedby={coverError ? `${id}-cover-hint ${id}-cover-error` : `${id}-cover-hint`}
+            onChange={(e) => {
+              const file = e.target.files?.[0] ?? null
+              const problem = file && coverProblem(file)
+              setCoverError(problem)
+              setCover(problem ? null : file)
+              if (problem) e.target.value = ''
+            }}
+            className="mt-1 block w-full text-sm text-slate-900 file:mr-3 file:min-h-9 file:rounded file:border file:border-slate-300 file:bg-surface file:px-3 file:text-sm"
+          />
+          <p id={`${id}-cover-hint`} className="mt-1 text-xs text-slate-600">
+            Landscape works best: 1600 × 900 px (16:9) or larger. Keep the subject near the centre, since smaller previews crop the edges. Under 1 MB loads fastest.
+          </p>
+          {coverError && <p id={`${id}-cover-error`} role="alert" className="mt-1 text-sm text-red-800">{coverError}</p>}
         </div>
-        <div>
+        <div className="sm:col-span-2">
           <label htmlFor={`${id}-alt`} className={label}>Cover image description <span className="font-normal text-slate-500">(for screen readers)</span></label>
-          <input id={`${id}-alt`} name="cover_image_alt" maxLength={300} defaultValue={post?.cover_image_alt ?? ''} className={input} />
+          <input id={`${id}-alt`} name="cover_image_alt" required maxLength={300} defaultValue={post?.cover_image_alt ?? ''} aria-describedby={`${id}-alt-hint`} className={input} />
+          <p id={`${id}-alt-hint`} className="mt-1 text-xs text-slate-600">Say what the picture shows, e.g. “The team pushing the car out of the pit garage”. Skip “image of”.</p>
         </div>
         <label className="flex min-h-11 items-center gap-2 text-sm text-slate-900 sm:col-span-2 sm:min-h-0">
           <input type="checkbox" name="is_featured" defaultChecked={post?.is_featured ?? false} className="size-4" />
-          Featured on the website
+          <span>
+            Featured on the website <span className="text-xs text-slate-600">(highlighted above the other posts; use it for big news)</span>
+          </span>
         </label>
         <div className="sm:col-span-2">
-        <RichTextField id={`${id}-body`} label="Post" value={body} onChange={setBody} disabled={save.isPending} placeholder="Write the post…" />
+        <RichTextField id={`${id}-body`} label="Post" value={body} onChange={setBody} disabled={busy} placeholder="Write the post…"
+          note="Open with the news, then the details. Use headings to split longer posts. Readers see about one minute per 200 words." />
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:col-span-2">
-          <PublishSwitch checked={published} onChange={setPublished} disabled={save.isPending} label="Published on the public website" />
+          <PublishSwitch checked={published} onChange={setPublished} disabled={busy} label="Published on the public website" />
           <p className="text-sm text-slate-600">{published ? 'Saving puts it on the public website.' : 'Only people in the app see it.'}</p>
         </div>
       </fieldset>
@@ -565,7 +610,7 @@ function PostForm({
         <p role="alert" className="mt-3 rounded border border-red-300 bg-red-50 p-2 text-sm text-red-800">Write something in the post before publishing it.</p>
       )}
       <ActionError error={save.error} className="mt-3" />
-      <FormButtons busy={save.isPending} onCancel={onCancel} submit={published ? (wasPublished ? 'Save post' : 'Publish post') : 'Save draft'} />
+      <FormButtons busy={busy} onCancel={onCancel} submit={published ? (wasPublished ? 'Save post' : 'Publish post') : 'Save draft'} />
     </form>
   )
 }

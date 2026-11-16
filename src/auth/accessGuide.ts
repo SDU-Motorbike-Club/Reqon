@@ -51,7 +51,7 @@ const ROLE_CARDS: Record<PrivilegedRole, Omit<AccessCard, 'id' | 'title'>> = {
   },
   recruitment: {
     who: 'Finds new members.',
-    can: ['Edit the questions on the public website’s application form', 'Read and delete the applications people send'],
+    can: ['Read and delete the applications people send from the public website'],
     cannot: ['Write blog posts', 'See finances'],
   },
   blog: {

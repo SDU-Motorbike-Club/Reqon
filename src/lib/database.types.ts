@@ -329,50 +329,6 @@ export type Database = {
           },
         ]
       }
-      application_questions: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          help: string | null
-          id: string
-          kind: string
-          position: number
-          prompt: string
-          required: boolean
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          help?: string | null
-          id?: string
-          kind?: string
-          position?: number
-          prompt: string
-          required?: boolean
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          help?: string | null
-          id?: string
-          kind?: string
-          position?: number
-          prompt?: string
-          required?: boolean
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "application_questions_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "members"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       blog_posts: {
         Row: {
           author_name: string

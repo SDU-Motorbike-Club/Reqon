@@ -41,8 +41,7 @@ export const queryKeys = {
   meetingOccurrences: ['meeting_occurrences'] as const,
   // The contacts directory, categories and contacts together. Not season-scoped.
   contacts: ['contacts'] as const,
-  // The public website: application questions, applications, blog posts. Not season-scoped.
-  applicationQuestions: ['application_questions'] as const,
+  // The public website: applications, blog posts. Not season-scoped.
   applications: ['applications'] as const,
   blogPosts: ['blog_posts'] as const,
 
