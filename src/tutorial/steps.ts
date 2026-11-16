@@ -429,7 +429,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     target: 'public-overview',
     audience: 'publicSite',
     title: 'Public — the club’s website',
-    body: 'Applicants: everyone who applied through the website. Blog: posts go live on the website the moment you save them.',
+    body: 'Applicants: everyone who applied through the website. Blog and Events: posts and events go live on the website the moment you save them.',
   },
 
   // --------------------------------------------------------------------- Tools

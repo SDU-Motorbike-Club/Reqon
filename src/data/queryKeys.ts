@@ -41,9 +41,10 @@ export const queryKeys = {
   meetingOccurrences: ['meeting_occurrences'] as const,
   // The contacts directory, categories and contacts together. Not season-scoped.
   contacts: ['contacts'] as const,
-  // The public website: applications, blog posts. Not season-scoped.
+  // The public website: applications, blog posts, events. Not season-scoped.
   applications: ['applications'] as const,
   blogPosts: ['blog_posts'] as const,
+  events: ['events'] as const,
 
   // The season prefix itself. Rarely used directly — see rule 2 above — but
   // kept so a whole-season invalidation stays exactly this one call.

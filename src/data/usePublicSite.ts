@@ -6,13 +6,16 @@ import { supabase } from '../lib/supabase.ts'
 import { unwrap } from './errors.ts'
 import { queryKeys } from './queryKeys.ts'
 
-// The public website reads these same tables with the anon key (20260162000100): a post switched to published
-// is live there at once. Drafts never leave the app.
+// The public website reads these same tables with the anon key (20260162000100, 20260163000200): a post switched
+// to published, or a shown event, is live there at once. Drafts and hidden events never leave the app.
 
 type Public = Database['public']
 export type BlogPost = Public['Tables']['blog_posts']['Row']
 export type BlogCategory = Public['Enums']['blog_category']
 export type ApplicationStatus = Public['Enums']['membership_application_status']
+export type ClubEvent = Public['Tables']['events']['Row']
+export type EventType = Public['Enums']['club_event_type']
+export type EventInput = Pick<ClubEvent, 'title' | 'type' | 'starts_at' | 'location' | 'signup_url' | 'is_published'>
 export type ApplicationAnswer = { question: string; answer: string | null }
 export type Application = Omit<Public['Tables']['membership_applications']['Row'], 'answers'> & { answers: ApplicationAnswer[] }
 
@@ -23,6 +26,7 @@ export type BlogPostInput = Pick<
 
 export const BLOG_CATEGORIES: readonly BlogCategory[] = ['news', 'ride', 'track', 'tech']
 export const APPLICATION_STATUSES: readonly ApplicationStatus[] = ['new', 'contacted', 'accepted', 'rejected']
+export const EVENT_TYPES: readonly EventType[] = ['ride', 'track', 'meeting', 'workshop', 'social']
 
 // submit_application() stores [{question, answer}]; an application sent another way may hold a plain
 // {question: answer} object. Both read the same here.
@@ -57,6 +61,7 @@ export function slugify(title: string): string {
 // Listing orders on the Public page. Ties fall back to newest first.
 export type ApplicationSort = 'newest' | 'oldest' | 'name' | 'status'
 export type PostSort = 'drafts' | 'newest' | 'oldest' | 'title' | 'category'
+export type EventSort = 'soonest' | 'latest' | 'title'
 const newestFirst = (a: string, b: string) => b.localeCompare(a)
 
 export function orderApplications(list: readonly Application[], sort: ApplicationSort): Application[] {
@@ -90,6 +95,21 @@ export function orderPosts(list: readonly BlogPost[], sort: PostSort): BlogPost[
               ? rank(a) - rank(b)
               : 0) || newestFirst(postDate(a), postDate(b)),
   )
+}
+
+export function orderEvents(list: readonly ClubEvent[], sort: EventSort): ClubEvent[] {
+  return [...list].sort(
+    (a, b) =>
+      (sort === 'title' ? a.title.localeCompare(b.title) : 0) ||
+      (sort === 'latest' ? b.starts_at.localeCompare(a.starts_at) : a.starts_at.localeCompare(b.starts_at)),
+  )
+}
+
+// The website lists an event from the start of the day it is on (fetchUpcomingEvents), so "upcoming" here does too.
+export function isUpcoming(event: ClubEvent, now = new Date()): boolean {
+  const today = new Date(now)
+  today.setHours(0, 0, 0, 0)
+  return new Date(event.starts_at) >= today
 }
 
 // Recruitment or a Developer (reqon_applications_read); anyone else gets an empty list.
@@ -166,6 +186,25 @@ export function useSaveBlogPost() {
   return useWrite<(BlogPostInput & { id?: string }) | { id: string; status: BlogPost['status'] }>('save that post', queryKeys.blogPosts, ({ id, ...row }) =>
     id ? supabase.from('blog_posts').update(row).eq('id', id).select('id') : supabase.from('blog_posts').insert(row as BlogPostInput).select('id'),
   )
+}
+
+// Blog or a Developer sees hidden events too (reqon_events_write); anyone else only the shown ones.
+export function useEvents(): UseQueryResult<ClubEvent[], Error> {
+  return useQuery({
+    queryKey: queryKeys.events,
+    queryFn: async () => unwrap('load the events', await supabase.from('events').select('*').order('starts_at')),
+  })
+}
+
+// A full event to create or replace, or just { id, is_published } to show or hide one.
+export function useSaveEvent() {
+  return useWrite<(EventInput & { id?: string }) | { id: string; is_published: boolean }>('save that event', queryKeys.events, ({ id, ...row }) =>
+    id ? supabase.from('events').update(row).eq('id', id).select('id') : supabase.from('events').insert(row as EventInput).select('id'),
+  )
+}
+
+export function useDeleteEvent() {
+  return useWrite<string>('delete that event', queryKeys.events, (id) => supabase.from('events').delete().eq('id', id).select('id'))
 }
 
 export function useDeleteBlogPost() {

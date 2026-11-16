@@ -1,5 +1,5 @@
 -- =============================================================================
---  Public site checks for Reqon (membership_applications, blog_posts,
+--  Public site checks for Reqon (membership_applications, blog_posts, events,
 --  submit_application(); migration 20260162000100).
 --
 --  SAFE TO RUN AGAINST THE REAL PROJECT. Everything happens inside one block
@@ -49,6 +49,7 @@ declare
   mem      uuid := gen_random_uuid();
   app      uuid;
   post     uuid;
+  ev       uuid;
   c        record;
   got      text;
   author   text;
@@ -64,6 +65,8 @@ begin
   insert into membership_applications (full_name, email, consent) values ('Seed', 'seed@example.com', true) returning id into app;
   insert into blog_posts (slug, title, content, status) values ('pub-hello', 'Hello', 'First post', 'published') returning id into post;
   insert into blog_posts (slug, title, content) values ('pub-secret', 'Secret', 'Not yet');
+  insert into events (title, starts_at) values ('Pub meetup', now() + interval '1 day') returning id into ev;
+  insert into events (title, starts_at, is_published) values ('Pub hidden', now() + interval '2 days', false);
 
   ok_apply := 'select count(*) from (select submit_application(''Ann'', ''ann@example.com'', null, true, ''{}''::jsonb)) s';
 
@@ -87,7 +90,15 @@ begin
     ('member        edits a post',             mem,     format('update blog_posts set title = ''x'' where id = %L', post), 'write', 'DENIED'),
     ('blogger       edits a post',             blogger, format('update blog_posts set title = ''Hello again'' where id = %L', post), 'write', 'ALLOWED'),
     ('blogger       deletes an application',   blogger, format('delete from membership_applications where id = %L', app), 'write', 'DENIED'),
-    ('recruiter     deletes an application',   rec,     format('delete from membership_applications where id = %L', app), 'write', 'ALLOWED');
+    ('recruiter     deletes an application',   rec,     format('delete from membership_applications where id = %L', app), 'write', 'ALLOWED'),
+    ('anon          reads published events',   null,    'select count(*) from events where title = ''Pub meetup''', 'read', 'ALLOWED'),
+    ('anon          reads hidden events',      null,    'select count(*) from events where title = ''Pub hidden''', 'read', 'DENIED'),
+    ('blogger       reads hidden events',      blogger, 'select count(*) from events where title = ''Pub hidden''', 'read', 'ALLOWED'),
+    ('member        adds an event',            mem,     'insert into events (title, starts_at) values (''X'', now())', 'write', 'DENIED'),
+    ('blogger       adds an event',            blogger, 'insert into events (title, type, starts_at, signup_url) values (''Ride'', ''ride'', now(), ''https://example.com/a'')', 'write', 'ALLOWED'),
+    ('blogger       adds a script link',       blogger, 'insert into events (title, starts_at, signup_url) values (''Bad'', now(), ''javascript:alert(1)'')', 'write', 'ERROR 23514'),
+    ('member        edits an event',           mem,     format('update events set title = ''x'' where id = %L', ev), 'write', 'DENIED'),
+    ('blogger       deletes an event',         blogger, format('delete from events where id = %L', ev), 'write', 'ALLOWED');
 
   for c in select * from checks order by n loop
     got := pg_temp.attempt(c.who, c.stmt, c.kind);

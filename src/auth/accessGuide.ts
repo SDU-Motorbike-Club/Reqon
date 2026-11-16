@@ -56,7 +56,7 @@ const ROLE_CARDS: Record<PrivilegedRole, Omit<AccessCard, 'id' | 'title'>> = {
   },
   blog: {
     who: 'Writes for the public website.',
-    can: ['Write, edit and delete blog posts; they are published on the public website when saved'],
+    can: ['Write, edit and delete blog posts; they are published on the public website when saved', 'Add, edit, hide and delete the website’s events'],
     cannot: ['Read applications', 'See finances'],
   },
   developer: {

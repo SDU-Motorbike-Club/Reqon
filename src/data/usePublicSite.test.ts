@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { coverProblem, orderApplications, orderPosts, readAnswers, slugify, type Application, type BlogPost } from './usePublicSite.ts'
+import { coverProblem, isUpcoming, orderApplications, orderEvents, orderPosts, readAnswers, slugify, type Application, type BlogPost, type ClubEvent } from './usePublicSite.ts'
 
 describe('public site helpers', () => {
   it('reads answers stored by submit_application() and by a plain {question: answer} form', () => {
@@ -43,5 +43,17 @@ describe('public site helpers', () => {
     expect(titles('oldest')).toEqual(['Draft', 'Old', 'New'])
     expect(titles('title')).toEqual(['Draft', 'New', 'Old'])
     expect(titles('category')).toEqual(['New', 'Draft', 'Old'])
+  })
+
+  it('orders events and counts today as upcoming, as the website does', () => {
+    const ev = (title: string, starts_at: string) => ({ title, starts_at }) as ClubEvent
+    const events = [ev('B', '2026-03-01T10:00:00Z'), ev('A', '2026-04-01T10:00:00Z'), ev('C', '2026-02-01T10:00:00Z')]
+    expect(orderEvents(events, 'soonest').map((e) => e.title)).toEqual(['C', 'B', 'A'])
+    expect(orderEvents(events, 'latest').map((e) => e.title)).toEqual(['A', 'B', 'C'])
+    expect(orderEvents(events, 'title').map((e) => e.title)).toEqual(['A', 'B', 'C'])
+
+    const now = new Date(2026, 2, 10, 15, 0)
+    expect(isUpcoming(ev('morning', new Date(2026, 2, 10, 8, 0).toISOString()), now)).toBe(true)
+    expect(isUpcoming(ev('yesterday', new Date(2026, 2, 9, 23, 0).toISOString()), now)).toBe(false)
   })
 })

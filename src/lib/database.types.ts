@@ -813,6 +813,42 @@ export type Database = {
           },
         ]
       }
+      events: {
+        Row: {
+          created_at: string
+          id: string
+          is_published: boolean
+          location: string | null
+          signup_url: string | null
+          starts_at: string
+          title: string
+          type: Database["public"]["Enums"]["club_event_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          location?: string | null
+          signup_url?: string | null
+          starts_at: string
+          title: string
+          type?: Database["public"]["Enums"]["club_event_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          location?: string | null
+          signup_url?: string | null
+          starts_at?: string
+          title?: string
+          type?: Database["public"]["Enums"]["club_event_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       finance_entries: {
         Row: {
           amount_cents: number
@@ -4508,6 +4544,7 @@ export type Database = {
       blog_category: "ride" | "track" | "news" | "tech"
       blog_post_status: "draft" | "published"
       clause_state: "open" | "wip" | "compliant" | "verified" | "blocked" | "na"
+      club_event_type: "ride" | "track" | "meeting" | "workshop" | "social"
       finance_kind: "income" | "expense"
       member_state: "active" | "alumni" | "trial"
       membership_application_status:
@@ -4669,6 +4706,7 @@ export const Constants = {
       blog_category: ["ride", "track", "news", "tech"],
       blog_post_status: ["draft", "published"],
       clause_state: ["open", "wip", "compliant", "verified", "blocked", "na"],
+      club_event_type: ["ride", "track", "meeting", "workshop", "social"],
       finance_kind: ["income", "expense"],
       member_state: ["active", "alumni", "trial"],
       membership_application_status: [

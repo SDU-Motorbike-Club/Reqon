@@ -32,8 +32,8 @@ export const ROLE_SUMMARIES: Record<PrivilegedRole, string> = {
   vicepresident: 'Runs Settings and the Treasurer, Documentation, Recruitment and Blog roles; cannot switch seasons.',
   treasurer: 'Adds, edits and deletes financial entries.',
   documentation: 'Edits meetings, the default agenda and milestone sections. No access to finances.',
-  recruitment: 'Edits the public website’s application form and reads the applications.',
-  blog: 'Writes, edits and deletes the public website’s blog posts.',
+  recruitment: 'Reads the applications sent from the public website.',
+  blog: 'Writes, edits and deletes the public website’s blog posts and events.',
   developer: 'Full access, for maintenance: everything the other roles can do, roles included.',
 }
 

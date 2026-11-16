@@ -4,24 +4,33 @@ import {
   APPLICATION_STATUSES,
   BLOG_CATEGORIES,
   coverProblem,
+  EVENT_TYPES,
+  isUpcoming,
   orderApplications,
+  orderEvents,
   orderPosts,
   slugify,
   useApplications,
   useBlogPosts,
   useDeleteApplication,
   useDeleteBlogPost,
+  useDeleteEvent,
+  useEvents,
   useSaveBlogPost,
+  useSaveEvent,
   uploadBlogCover,
   useSetApplicationStatus,
   type ApplicationSort,
   type ApplicationStatus,
   type BlogCategory,
   type BlogPost,
+  type ClubEvent,
+  type EventSort,
+  type EventType,
   type PostSort,
   COVER_TYPES,
 } from '../data/usePublicSite.ts'
-import { formatInstant } from '../lib/dates.ts'
+import { formatInstant, toDateTimeInput } from '../lib/dates.ts'
 import { mergeSearchParams } from '../lib/searchParams.ts'
 import { useUrlParams } from '../lib/useUrlParams.ts'
 import { MeetingText } from '../meetings/MeetingText.tsx'
@@ -32,8 +41,9 @@ import { buttonDanger, buttonPrimary, buttonSecondary } from '../ui/buttons.ts'
 import { pageMain } from '../ui/layout.ts'
 import { ActionError, EmptyState, ErrorState, LoadingState } from '../ui/states.tsx'
 
-// The club's public website, run from here: the applications people send (Recruitment, can_manage_applicants())
-// and the blog (Blog, can_post_blog()). The website reads the same rows, so a saved post is live there at once. The database checks every write (20260162000100).
+// The club's public website, run from here: the applications people send (Recruitment, can_manage_applicants()),
+// the blog and the events (Blog, can_post_blog()). The website reads the same rows, so a saved post or event is live
+// there at once. The database checks every write (20260162000100, 20260163000200).
 
 const input =
   'mt-1 block min-h-11 w-full rounded border border-slate-300 bg-surface px-2.5 text-base text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-9 sm:text-sm'
@@ -45,7 +55,7 @@ const chip = (active: boolean) =>
 const card = 'rounded-lg border border-slate-200 bg-surface p-3'
 const blankToNull = (value: FormDataEntryValue | null) => (typeof value === 'string' && value.trim() !== '' ? value.trim() : null)
 
-type Section = 'applicants' | 'blog'
+type Section = 'applicants' | 'blog' | 'events'
 
 // Filters and order live in the address (?app_status=new&app_sort=name), so a filtered list survives a reload or a shared link.
 const pick = <T extends string>(value: string | null, labels: Record<T, string>): T | null =>
@@ -101,13 +111,13 @@ export default function Public() {
   const [params, setParams] = useUrlParams()
   const sections: { id: Section; label: string }[] = [
     ...(can.canManageApplicants ? [{ id: 'applicants' as const, label: 'Applicants' }] : []),
-    ...(can.canPostBlog ? [{ id: 'blog' as const, label: 'Blog' }] : []),
+    ...(can.canPostBlog ? [{ id: 'blog' as const, label: 'Blog' }, { id: 'events' as const, label: 'Events' }] : []),
   ]
   const current = sections.find((s) => s.id === params.get('section'))?.id ?? sections[0]?.id
 
   return (
     <main id="main-content" tabIndex={-1} className={pageMain('wide')}>
-      <PageHeader title="Public" tutorialId="public-overview" description="What the club’s public website shows: the application form, the people who applied, and the blog." />
+      <PageHeader title="Public" tutorialId="public-overview" description="What the club’s public website shows: the people who applied, the blog and upcoming events." />
       {current === undefined ? (
         <EmptyState title="Nothing here for you">The Recruitment and Blog roles open this page. Ask the President or Vice President for one.</EmptyState>
       ) : (
@@ -123,7 +133,7 @@ export default function Public() {
               ))}
             </ul>
           </nav>
-          {current === 'applicants' ? <Applicants /> : <Blog />}
+          {current === 'applicants' ? <Applicants /> : current === 'blog' ? <Blog /> : <Events />}
         </>
       )}
     </main>
@@ -270,7 +280,19 @@ function Applicants() {
 type BlogEditing = { kind: 'post'; post: BlogPost | null } | { kind: 'delete'; post: BlogPost }
 
 // A native checkbox announced as a switch, drawn as one. The words beside it say what each position means.
-function PublishSwitch({ checked, onChange, disabled, label }: { checked: boolean; onChange: (on: boolean) => void; disabled?: boolean; label: string }) {
+function PublishSwitch({
+  checked,
+  onChange,
+  disabled,
+  label,
+  states = ['Published', 'Draft'],
+}: {
+  checked: boolean
+  onChange: (on: boolean) => void
+  disabled?: boolean
+  label: string
+  states?: [on: string, off: string]
+}) {
   return (
     <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm text-slate-900 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 sm:min-h-8">
       <input type="checkbox" role="switch" className="peer sr-only" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} aria-label={label} />
@@ -278,7 +300,7 @@ function PublishSwitch({ checked, onChange, disabled, label }: { checked: boolea
         aria-hidden="true"
         className="relative h-5 w-9 shrink-0 rounded-full bg-slate-300 transition-colors peer-checked:bg-emerald-600 peer-focus-visible:ring-2 peer-focus-visible:ring-accent-ring after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-surface after:transition-transform peer-checked:after:translate-x-4 motion-reduce:transition-none motion-reduce:after:transition-none"
       />
-      <span>{checked ? 'Published' : 'Draft'}</span>
+      <span>{checked ? states[0] : states[1]}</span>
     </label>
   )
 }
@@ -616,6 +638,242 @@ function PostForm({
 }
 
 // ---------------------------------------------------------------------- shared
+
+// ---------------------------------------------------------------------- events
+
+// The website's own words for each type (SMC_public src/blog-data.js), so both sites say the same thing.
+const EVENT_TYPE_LABELS: Record<EventType, string> = { ride: 'Group ride', track: 'Track day', meeting: 'Club meeting', workshop: 'Workshop', social: 'Social' }
+const EVENT_SORT_LABELS: Record<EventSort, string> = { soonest: 'Soonest first', latest: 'Latest first', title: 'Title (A–Z)' }
+const EVENT_WHEN_LABELS = { upcoming: 'Upcoming', past: 'Past', all: 'All' } as const
+type EventWhen = keyof typeof EVENT_WHEN_LABELS
+const SHOWN_STATES: [string, string] = ['Shown', 'Hidden']
+
+type EventsEditing = { kind: 'event'; event: ClubEvent | null } | { kind: 'delete'; event: ClubEvent }
+
+function Events() {
+  const events = useEvents()
+  const remove = useDeleteEvent()
+  const toggle = useSaveEvent()
+  const [toggling, setToggling] = useState<string | null>(null)
+  const [editing, setEditing] = useState<EventsEditing | null>(null)
+  const [message, setMessage] = useState('')
+  const [params, setParams] = useUrlParams()
+  const setFilter = (patch: Record<string, string | null>) => setParams((c) => mergeSearchParams(c, patch), { replace: true })
+  const when = pick(params.get('event_when'), EVENT_WHEN_LABELS) ?? 'upcoming'
+  const type = pick(params.get('event_type'), EVENT_TYPE_LABELS)
+  const sort = pick(params.get('event_sort'), EVENT_SORT_LABELS) ?? 'soonest'
+  const all = events.data ?? []
+  // As with the blog, each group's counts follow the other group's choice.
+  const inWhen = (e: ClubEvent, w: EventWhen = when) => w === 'all' || isUpcoming(e) === (w === 'upcoming')
+  const ofType = (e: ClubEvent, t: EventType | null = type) => t === null || e.type === t
+  const shown = orderEvents(all.filter((e) => inWhen(e) && ofType(e)), sort)
+  const open = (next: EventsEditing) => {
+    setMessage('')
+    setEditing(next)
+  }
+  const done = (text: string) => {
+    setEditing(null)
+    setMessage(text)
+  }
+  const setShown = async (event: ClubEvent, on: boolean) => {
+    setMessage('')
+    setToggling(event.id)
+    try {
+      await toggle.mutateAsync({ id: event.id, is_published: on })
+      setMessage(on ? `“${event.title}” is on the public website now.` : `“${event.title}” is hidden: the website no longer shows it.`)
+    } catch {
+      // Shown below the list.
+    } finally {
+      setToggling(null)
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-end justify-between gap-2 border-b border-slate-200 pb-1.5">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Events</h2>
+          <p className="text-sm text-slate-600">The website’s blog page lists the next four shown events. An event drops off by itself the day after it happens.</p>
+        </div>
+        <button type="button" className={buttonPrimary} onClick={() => open({ kind: 'event', event: null })}>New event</button>
+      </div>
+      {all.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-2">
+          <div className="space-y-1.5">
+            <ChipFilter
+              label="When"
+              value={when}
+              onChange={(v) => setFilter({ event_when: v === 'upcoming' ? null : v })}
+              options={(Object.keys(EVENT_WHEN_LABELS) as EventWhen[]).map((w) => ({
+                id: w,
+                label: EVENT_WHEN_LABELS[w],
+                count: all.filter((e) => ofType(e) && inWhen(e, w)).length,
+              }))}
+            />
+            <ChipFilter
+              label="Type"
+              value={type}
+              onChange={(v) => setFilter({ event_type: v })}
+              options={[
+                { id: null, label: 'All', count: all.filter((e) => inWhen(e)).length },
+                ...EVENT_TYPES.map((t) => ({ id: t, label: EVENT_TYPE_LABELS[t], count: all.filter((e) => inWhen(e) && ofType(e, t)).length })),
+              ]}
+            />
+          </div>
+          <SortSelect value={sort} labels={EVENT_SORT_LABELS} onChange={(v) => setFilter({ event_sort: v === 'soonest' ? null : v })} />
+        </div>
+      )}
+      <p role="status" className="my-2 min-h-5 text-sm text-emerald-800">{message}</p>
+      {events.error ? (
+        <ErrorState title="Could not load the events" error={events.error} onRetry={() => void events.refetch()} />
+      ) : events.isPending ? (
+        <LoadingState label="Loading events…" />
+      ) : all.length === 0 ? (
+        <EmptyState title="No events yet">Add one with “New event”. It shows on the website as soon as you save it, unless you hide it.</EmptyState>
+      ) : shown.length === 0 ? (
+        <NoMatch what="events" onClear={() => setFilter({ event_when: 'all', event_type: null })} />
+      ) : (
+        <ul className="space-y-2">
+          {shown.map((event) => (
+            <li key={event.id} className={card}>
+              <p>
+                <span className={statusBadge(event.is_published)}>{event.is_published ? 'Shown' : 'Hidden'}</span>{' '}
+                <span className={statusBadge(false)}>{EVENT_TYPE_LABELS[event.type]}</span>{' '}
+                <span className="font-medium text-slate-900">{event.title}</span>
+              </p>
+              <p className="mt-0.5 text-sm text-slate-600">
+                {formatInstant(event.starts_at)}
+                {event.location && ` · ${event.location}`}
+                {!isUpcoming(event) && ' · past'}
+              </p>
+              {event.signup_url && (
+                <a href={event.signup_url} target="_blank" rel="noopener noreferrer" className="mt-0.5 block truncate text-sm text-slate-700 underline">
+                  {event.signup_url}
+                </a>
+              )}
+              <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+                <span className="mr-auto">
+                  <PublishSwitch
+                    checked={event.is_published}
+                    disabled={toggling !== null}
+                    label={`${event.title}: shown on the public website`}
+                    states={SHOWN_STATES}
+                    onChange={(on) => void setShown(event, on)}
+                  />
+                </span>
+                <button type="button" aria-label={`Edit ${event.title}`} className={buttonSecondary} onClick={() => open({ kind: 'event', event })}>Edit</button>
+                <button type="button" aria-label={`Delete ${event.title}`} className={buttonSecondary} onClick={() => open({ kind: 'delete', event })}>Delete</button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <ActionError error={toggle.error} className="mt-3" />
+
+      <Dialog open={editing?.kind === 'event'} onClose={() => setEditing(null)} labelledBy="event-dialog-title">
+        {editing?.kind === 'event' && <EventForm event={editing.event} onCancel={() => setEditing(null)} onSaved={done} />}
+      </Dialog>
+      <Dialog open={editing?.kind === 'delete'} onClose={() => setEditing(null)} labelledBy="delete-dialog-title">
+        {editing?.kind === 'delete' && (
+          <ConfirmDelete
+            what={`“${editing.event.title}”`}
+            detail="It is taken off the public website at once. To keep it but take it off the website, hide it instead."
+            remove={remove}
+            id={editing.event.id}
+            onCancel={() => setEditing(null)}
+            onDeleted={() => done('Event deleted.')}
+          />
+        )}
+      </Dialog>
+    </div>
+  )
+}
+
+function EventForm({ event, onCancel, onSaved }: { event: ClubEvent | null; onCancel: () => void; onSaved: (message: string) => void }) {
+  const save = useSaveEvent()
+  const id = useId()
+  const [shown, setShown] = useState(event?.is_published ?? true)
+  const hint = 'mt-1 text-xs text-slate-600'
+  async function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const form = new FormData(e.currentTarget)
+    try {
+      await save.mutateAsync({
+        id: event?.id,
+        title: String(form.get('title')).trim(),
+        type: String(form.get('type')) as EventType,
+        // datetime-local is the reader's local time; new Date() reads it the same way.
+        starts_at: new Date(String(form.get('starts_at'))).toISOString(),
+        location: blankToNull(form.get('location')),
+        signup_url: blankToNull(form.get('signup_url')),
+        is_published: shown,
+      })
+      onSaved(shown ? (event ? 'Event saved. The website shows the new version.' : 'Event added. The website shows it now.') : 'Event saved as hidden. Only the app shows it.')
+    } catch {
+      // Shown below.
+    }
+  }
+  return (
+    <form onSubmit={(e) => void submit(e)}>
+      <h2 id="event-dialog-title" className="text-base font-semibold text-slate-900">{event ? 'Edit event' : 'New event'}</h2>
+      <fieldset disabled={save.isPending} className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <label htmlFor={`${id}-title`} className={label}>Name</label>
+          <input id={`${id}-title`} name="title" required maxLength={200} defaultValue={event?.title ?? ''} aria-describedby={`${id}-title-hint`} className={input} />
+          <p id={`${id}-title-hint`} className={hint}>What people will recognise, e.g. “Sunday ride to the coast” or “Spring track day”.</p>
+        </div>
+        <div>
+          <label htmlFor={`${id}-type`} className={label}>Type</label>
+          <select id={`${id}-type`} name="type" defaultValue={event?.type ?? 'meeting'} className={input}>
+            {EVENT_TYPES.map((t) => (
+              <option key={t} value={t}>{EVENT_TYPE_LABELS[t]}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor={`${id}-start`} className={label}>Starts</label>
+          <input
+            id={`${id}-start`}
+            name="starts_at"
+            type="datetime-local"
+            required
+            defaultValue={event ? toDateTimeInput(event.starts_at) : ''}
+            aria-describedby={`${id}-start-hint`}
+            className={input}
+          />
+          <p id={`${id}-start-hint`} className={hint}>Your own time zone. The website shows the day, weekday and start time in Danish time.</p>
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor={`${id}-location`} className={label}>Where <span className="font-normal text-slate-500">(optional)</span></label>
+          <input id={`${id}-location`} name="location" maxLength={200} defaultValue={event?.location ?? ''} aria-describedby={`${id}-location-hint`} className={input} />
+          <p id={`${id}-location-hint`} className={hint}>The place, or for a ride where it starts.</p>
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor={`${id}-signup`} className={label}>Sign-up link <span className="font-normal text-slate-500">(optional)</span></label>
+          <input
+            id={`${id}-signup`}
+            name="signup_url"
+            type="url"
+            maxLength={500}
+            pattern="https?://.+"
+            title="A web address starting with https://"
+            placeholder="https://…"
+            defaultValue={event?.signup_url ?? ''}
+            aria-describedby={`${id}-signup-hint`}
+            className={input}
+          />
+          <p id={`${id}-signup-hint`} className={hint}>A form or Facebook event. With a link, the event’s name on the website becomes clickable.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:col-span-2">
+          <PublishSwitch checked={shown} onChange={setShown} disabled={save.isPending} label="Shown on the public website" states={SHOWN_STATES} />
+          <p className="text-sm text-slate-600">{shown ? 'Saving puts it on the public website.' : 'Only people in the app see it.'}</p>
+        </div>
+      </fieldset>
+      <ActionError error={save.error} className="mt-3" />
+      <FormButtons busy={save.isPending} onCancel={onCancel} submit={event ? 'Save event' : 'Add event'} />
+    </form>
+  )
+}
 
 function ConfirmDelete({
   what,
