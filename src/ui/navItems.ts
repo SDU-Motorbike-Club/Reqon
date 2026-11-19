@@ -11,7 +11,7 @@ import { attachmentsEnabled } from '../attachments/flag.ts'
 // just avoids a menu item that always leads to "nothing to show you here".
 // `group` only draws a thin divider between neighbours that differ on a wide screen; it never hides anything.
 export type NavGroup = 'home' | 'work' | 'plan' | 'rules' | 'records' | 'admin'
-export type NavItem = { to: string; label: string; group: NavGroup; end?: boolean; requires?: 'canViewFinances' | 'attachmentsEnabled' }
+export type NavItem = { to: string; label: string; group: NavGroup; end?: boolean; requires?: 'canViewFinances' | 'canManagePublicSite' | 'attachmentsEnabled' }
 
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Now', group: 'home', end: true },
@@ -25,6 +25,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/book', label: 'Book', group: 'rules' },
   { to: '/specs', label: 'Spec sheet', group: 'rules' },
   { to: '/contacts', label: 'Contacts', group: 'records' },
+  { to: '/public', label: 'Public', group: 'records', requires: 'canManagePublicSite' },
   { to: '/finances', label: 'Finances', group: 'admin', requires: 'canViewFinances' },
   { to: '/settings', label: 'Settings', group: 'admin' },
 ]
@@ -37,6 +38,6 @@ export const MORE_PAGES: { to: string; label: string; about: string; requires?: 
 ]
 
 // Leaves out what would show this person nothing (a shared rule for the header and Settings).
-export function isOffered(item: { requires?: NavItem['requires'] }, can: { canViewFinances: boolean }): boolean {
+export function isOffered(item: { requires?: NavItem['requires'] }, can: { canViewFinances: boolean; canManagePublicSite: boolean }): boolean {
   return !item.requires || (item.requires === 'attachmentsEnabled' ? attachmentsEnabled() : can[item.requires])
 }

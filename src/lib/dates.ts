@@ -64,6 +64,14 @@ export function formatInstant(iso: string): string {
   return `${ddmmyy(instant)}, ${two(instant.getHours())}:${two(instant.getMinutes())}`
 }
 
+// A stored instant as the reader-local "YYYY-MM-DDTHH:mm" an <input type="datetime-local"> wants. The input's
+// value goes back with new Date(value).toISOString(), which reads it in the same local time zone.
+export function toDateTimeInput(iso: string): string {
+  const t = new Date(iso)
+  if (Number.isNaN(t.getTime())) return ''
+  return `${toLocalDateString(t)}T${two(t.getHours())}:${two(t.getMinutes())}`
+}
+
 // The same instant, but only its reader-local calendar day: "05/09/26".
 // Unlike formatDay, this is meant for a timestamp — it deliberately reads
 // the reader's local day off a real instant instead of truncating UTC text.

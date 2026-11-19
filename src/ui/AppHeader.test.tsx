@@ -188,7 +188,7 @@ describe('permission-aware navigation', () => {
       who.roles = roles
       const { unmount } = renderHeader()
       const labels = within(desktopNav()).getAllByRole('link').map((a) => a.textContent)
-      expect(labels.slice(-3)).toEqual(['Contacts', 'Finances', 'Settings'])
+      expect(labels.slice(-2)).toEqual(['Finances', 'Settings'])
       expect(within(desktopNav()).getByRole('link', { name: 'Finances' })).toHaveAttribute('href', '/finances')
       unmount()
     }

@@ -327,6 +327,7 @@ begin
   -- ================================================== function EXECUTE surface
   perform pg_temp.expect('anon can execute no SECURITY DEFINER function in public',
     (select count(*)::text from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prosecdef
+       and p.proname <> 'submit_application'   -- the public website's Join form (20260162000100) is the one deliberate anon entry point
        and has_function_privilege('anon', p.oid, 'execute')), '0');
   perform pg_temp.expect('authenticated can execute no SECURITY DEFINER trigger function',
     (select count(*)::text from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prosecdef

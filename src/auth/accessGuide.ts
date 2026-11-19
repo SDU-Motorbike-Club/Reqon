@@ -34,7 +34,7 @@ const ROLE_CARDS: Record<PrivilegedRole, Omit<AccessCard, 'id' | 'title'>> = {
       'Everything a Head can do, in every department',
       'Roster, departments, milestones, rulebook, weekly meeting',
       'Add members and reset their passwords',
-      'Give and take away Treasurer and Documentation',
+      'Give and take away Treasurer, Documentation, Recruitment and Blog',
       'See finances',
     ],
     cannot: ['Switch seasons', 'See club accounts', 'Change finances', 'Give the President or Vice President role'],
@@ -48,6 +48,16 @@ const ROLE_CARDS: Record<PrivilegedRole, Omit<AccessCard, 'id' | 'title'>> = {
     who: 'Keeps the record.',
     can: ['Call meetings; write agenda and minutes; tick who came', 'Edit the default agenda', 'Create, rename and delete milestone sections'],
     cannot: ['See finances'],
+  },
+  recruitment: {
+    who: 'Finds new members.',
+    can: ['Read and delete the applications people send from the public website'],
+    cannot: ['Write blog posts', 'See finances'],
+  },
+  blog: {
+    who: 'Writes for the public website.',
+    can: ['Write, edit and delete blog posts; they are published on the public website when saved', 'Add, edit, hide and delete the website’s events'],
+    cannot: ['Read applications', 'See finances'],
   },
   developer: {
     who: 'Maintains the app.',

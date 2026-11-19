@@ -11,6 +11,8 @@ export const PRIVILEGED_ROLES: readonly PrivilegedRole[] = [
   'vicepresident',
   'treasurer',
   'documentation',
+  'recruitment',
+  'blog',
   'developer',
 ]
 
@@ -19,15 +21,19 @@ export const ROLE_LABELS: Record<PrivilegedRole, string> = {
   vicepresident: 'Vice President',
   treasurer: 'Treasurer',
   documentation: 'Documentation',
+  recruitment: 'Recruitment',
+  blog: 'Blog',
   developer: 'Developer',
 }
 
 // What each role may do, in one line — shown where roles are handed out.
 export const ROLE_SUMMARIES: Record<PrivilegedRole, string> = {
   president: 'Runs Settings and seasons, and manages the roles available to the President.',
-  vicepresident: 'Runs Settings and the Treasurer and Documentation roles; cannot switch seasons.',
+  vicepresident: 'Runs Settings and the Treasurer, Documentation, Recruitment and Blog roles; cannot switch seasons.',
   treasurer: 'Adds, edits and deletes financial entries.',
   documentation: 'Edits meetings, the default agenda and milestone sections. No access to finances.',
+  recruitment: 'Reads the applications sent from the public website.',
+  blog: 'Writes, edits and deletes the public website’s blog posts and events.',
   developer: 'Full access, for maintenance: everything the other roles can do, roles included.',
 }
 
@@ -133,6 +139,13 @@ export type Permissions = {
   canCreateMeeting: boolean
   canDeleteMeeting: boolean
   canEditMeetingTemplate: boolean
+  // can_manage_applicants() (20260162000100): edit the public site's application form, read applications
+  // (Recruitment, Developer).
+  canManageApplicants: boolean
+  // can_post_blog() (20260162000100): write the public site's blog (Blog, Developer).
+  canPostBlog: boolean
+  // Either of the two: opens the Public page.
+  canManagePublicSite: boolean
 }
 
 export function permissionsFor(roles: readonly PrivilegedRole[]): Permissions {
@@ -167,6 +180,9 @@ export function permissionsFor(roles: readonly PrivilegedRole[]): Permissions {
     canCreateMeeting: editsMeetings,
     canDeleteMeeting: mayDelete,
     canEditMeetingTemplate: editsMeetings,
+    canManageApplicants: hasRole('recruitment') || hasRole('developer'),
+    canPostBlog: hasRole('blog') || hasRole('developer'),
+    canManagePublicSite: hasRole('recruitment') || hasRole('blog') || hasRole('developer'),
   }
 }
 

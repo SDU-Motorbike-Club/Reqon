@@ -1,0 +1,13 @@
+-- =============================================================================
+--  Public site: give blog_posts, membership_applications and events the restore engine's tombstone trigger.
+--
+--  IMPLEMENTATION NOTE (migration policy)
+--    Purpose        The 20260162/20260163 tables were created without zz_record_tombstone, so a deleted post,
+--                   application or event could be brought back by a restore (restore_support_test.sql checks
+--                   that every public table carries it).
+--    Existing data  Untouched. Idempotent: only tables that lack the trigger get one.
+--    Locking        CREATE TRIGGER takes a brief lock on each table.
+--    Rollback       drop trigger zz_record_tombstone on the three tables.
+--    Deploy order   After 20260163000200.
+-- =============================================================================
+select restore.install_tombstone_triggers();

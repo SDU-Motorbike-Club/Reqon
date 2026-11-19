@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   NO_PERMISSIONS,
+  PRIVILEGED_ROLES,
   attachmentPermissions,
   canManageAttachment,
   ROLE_LABELS,
@@ -40,6 +41,8 @@ const MATRIX: Record<PrivilegedRole | 'member', Row> = {
   president:     { canAdminister: true,  canManageRoles: true,  canManageSeasons: true,  canViewFinances: true,  canManageFinances: false, canEditSpecTargets: true,  canCreateMeeting: true,  canDeleteMeeting: true,  canManageMilestoneStructure: true  },
   vicepresident: { canAdminister: true,  canManageRoles: true,  canManageSeasons: false, canViewFinances: true,  canManageFinances: false, canEditSpecTargets: true,  canCreateMeeting: true,  canDeleteMeeting: false, canManageMilestoneStructure: true  },
   documentation: { canAdminister: false, canManageRoles: false, canManageSeasons: false, canViewFinances: false, canManageFinances: false, canEditSpecTargets: false, canCreateMeeting: true,  canDeleteMeeting: false, canManageMilestoneStructure: true  },
+  recruitment:   { canAdminister: false, canManageRoles: false, canManageSeasons: false, canViewFinances: false, canManageFinances: false, canEditSpecTargets: false, canCreateMeeting: false, canDeleteMeeting: false, canManageMilestoneStructure: false },
+  blog:          { canAdminister: false, canManageRoles: false, canManageSeasons: false, canViewFinances: false, canManageFinances: false, canEditSpecTargets: false, canCreateMeeting: false, canDeleteMeeting: false, canManageMilestoneStructure: false },
   member:        { canAdminister: false, canManageRoles: false, canManageSeasons: false, canViewFinances: false, canManageFinances: false, canEditSpecTargets: false, canCreateMeeting: false, canDeleteMeeting: false, canManageMilestoneStructure: false },
 }
 
@@ -88,6 +91,16 @@ describe('the permission matrix', () => {
     expect(viewers).toEqual(['developer', 'president'])
     expect(permissionsFor([]).canViewClubCredentials).toBe(false)
     expect(NO_PERMISSIONS.canViewClubCredentials).toBe(false)
+  })
+
+  // can_manage_applicants() / can_post_blog() (20260162000100): each role opens only its own half of the Public page.
+  it('Recruitment manages applicants, Blog posts, the Developer does both', () => {
+    const pick = (key: 'canManageApplicants' | 'canPostBlog' | 'canManagePublicSite') =>
+      ([...PRIVILEGED_ROLES] as PrivilegedRole[]).filter((r) => permissionsFor([r])[key])
+    expect(pick('canManageApplicants')).toEqual(['recruitment', 'developer'])
+    expect(pick('canPostBlog')).toEqual(['blog', 'developer'])
+    expect(pick('canManagePublicSite')).toEqual(['recruitment', 'blog', 'developer'])
+    expect(NO_PERMISSIONS.canManagePublicSite).toBe(false)
   })
 
   it('the President, the Vice President and the Developer open role management', () => {
