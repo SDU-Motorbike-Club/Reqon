@@ -55,6 +55,11 @@ export function presentActivity(row: ActivityRow, names: ReadonlyMap<string, str
       return { ...base, icon: text(d.to) === 'blocked' ? '!' : '↔', summary: `State: ${fromTo(d)}` }
     case 'owner_changed':
       return { ...base, icon: '♙', summary: `Owner: ${fromTo(d, (value) => named(value, names))}` }
+    case 'assignees_changed': {
+      const people = (value: Json | undefined) => (Array.isArray(value) ? value.map((v) => named(v, names)).join(', ') : '')
+      const parts = [people(d.added) && `added ${people(d.added)}`, people(d.removed) && `removed ${people(d.removed)}`].filter(Boolean)
+      return { ...base, icon: '♙', summary: `Assigned to: ${parts.join('; ')}` }
+    }
     case 'department_transferred':
     case 'department_changed':
       return { ...base, icon: '↔', summary: `Department: ${fromTo(d)}` }

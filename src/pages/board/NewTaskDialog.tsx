@@ -1,6 +1,7 @@
 import { useId, useMemo, useState, type FormEvent } from 'react'
 import { flushSync } from 'react-dom'
 import { useClauses } from '../../data/useClauses.ts'
+import { useSetTaskAssignees } from '../../data/useTaskAssignees.ts'
 import { useSetTaskParent } from '../../data/useTaskParent.ts'
 import { useCreateTask } from '../../data/useTasks.ts'
 import { todayIso } from '../../lib/dates.ts'
@@ -11,6 +12,7 @@ import type { Task, TaskPriority } from '../../tasks/types.ts'
 import { Dialog } from '../../ui/Dialog.tsx'
 import { buttonPrimary, buttonSecondary } from '../../ui/buttons.ts'
 import { ActionError } from '../../ui/states.tsx'
+import { AssigneePicker } from './AssigneePicker.tsx'
 
 const FIELD =
   'mt-1 min-h-11 w-full rounded border border-slate-300 bg-surface px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0'
@@ -55,6 +57,7 @@ export function NewTaskDialog({
   const titleId = useId()
   const create = useCreateTask()
   const setParent = useSetTaskParent()
+  const setAssignees = useSetTaskAssignees()
   const clauses = useClauses()
   const options = useMemo(() => buildRequirementOptions(clauses.data ?? []), [clauses.data])
   const close = () => {
@@ -74,7 +77,7 @@ export function NewTaskDialog({
         viewerId={viewerId}
         defaultDepartment={defaultDepartment}
         parent={parent}
-        pending={create.isPending || setParent.isPending}
+        pending={create.isPending || setParent.isPending || setAssignees.isPending}
         error={create.error}
         onCancel={close}
         onSubmit={async (task) => {
@@ -82,6 +85,16 @@ export function NewTaskDialog({
             const made = await create.mutateAsync(task)
             create.reset()
             let note: string | undefined
+            // The first person ticked leads (create_task took them as the owner); the rest join them now.
+            if (task.assigneeIds.length > 1) {
+              try {
+                await setAssignees.mutateAsync({ taskId: made.id, memberIds: task.assigneeIds })
+              } catch (e) {
+                note = `“${made.title}” was created for its first assignee only, because the others could not be added${
+                  e instanceof Error ? `: ${e.message}` : ''
+                }. Open its details to assign them.`
+              }
+            }
             if (parent) {
               try {
                 // The section only carries over while the task stays on its parent's submission.
@@ -131,12 +144,12 @@ function Form({
   pending: boolean
   error: Error | null
   onCancel: () => void
-  onSubmit: (task: Parameters<ReturnType<typeof useCreateTask>['mutateAsync']>[0]) => void
+  onSubmit: (task: Parameters<ReturnType<typeof useCreateTask>['mutateAsync']>[0] & { assigneeIds: string[] }) => void
 }) {
   const fid = (n: string) => `${titleId}-${n}`
   const [title, setTitle] = useState('')
   const [detail, setDetail] = useState('')
-  const [owner, setOwner] = useState('')
+  const [assignees, setAssignees] = useState<string[]>([])
   const [priority, setPriority] = useState<TaskPriority>('normal')
   // A task starts the day it is made unless the person says otherwise; the field can still be cleared.
   const [start, setStart] = useState(() => todayIso())
@@ -166,7 +179,8 @@ function Form({
       title: title.trim(),
       detail: detail.trim() || null,
       departmentKey: department || null,
-      ownerId: owner || null,
+      ownerId: assignees[0] ?? null,
+      assigneeIds: assignees,
       startsOn: start || null,
       dueDate: due,
       milestoneKey: milestone || null,
@@ -175,8 +189,6 @@ function Form({
     })
   }
 
-  const mine = viewerId ? owners.find((o) => o.id === viewerId) : undefined
-  const ordered = [...(mine ? [mine] : []), ...owners.filter((o) => o.id !== viewerId)]
   const err = (id: string, message?: string) =>
     message ? (
       <p id={fid(`${id}-error`)} className="mt-1 text-xs text-red-700">
@@ -218,18 +230,8 @@ function Form({
           </label>
           <textarea id={fid('detail')} rows={3} value={detail} onChange={(e) => setDetail(e.target.value)} className={FIELD} />
         </div>
-        <div>
-          <label htmlFor={fid('owner')} className={LABEL}>
-            Owner
-          </label>
-          <select id={fid('owner')} value={owner} onChange={(e) => setOwner(e.target.value)} className={FIELD}>
-            <option value="">Unassigned</option>
-            {ordered.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.id === viewerId ? `Me (${o.name})` : o.name}
-              </option>
-            ))}
-          </select>
+        <div className="sm:col-span-2">
+          <AssigneePicker label="Assigned to (optional)" people={owners} value={assignees} onChange={setAssignees} viewerId={viewerId} />
         </div>
         <div>
           <label htmlFor={fid('priority')} className={LABEL}>

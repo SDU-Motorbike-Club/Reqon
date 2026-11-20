@@ -1,3 +1,4 @@
+import type { AssigneesByTask } from './assignees.ts'
 import type { Task } from './types.ts'
 
 // The one All/My scope convention (ADR-0011, execution contract "share one
@@ -8,11 +9,14 @@ import type { Task } from './types.ts'
 // (Board §8.1) is Phase 5-6's DepartmentSelect, not this module's job yet.
 export type TaskScope = 'all' | 'mine'
 
-export function tasksInScope<T extends Pick<Task, 'owner_id'>>(
+// "Mine" is being the lead or one of the other assignees (task_assignees); `assigned` is optional so a
+// screen that has not loaded them still shows the owner's tasks.
+export function tasksInScope<T extends Pick<Task, 'owner_id'> & { id?: string }>(
   tasks: readonly T[],
   scope: TaskScope,
   myId: string | null,
+  assigned?: AssigneesByTask,
 ): readonly T[] {
   if (scope === 'all' || !myId) return tasks
-  return tasks.filter((t) => t.owner_id === myId)
+  return tasks.filter((t) => t.owner_id === myId || (t.id !== undefined && assigned?.get(t.id)?.includes(myId)))
 }

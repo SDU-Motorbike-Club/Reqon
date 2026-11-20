@@ -30,6 +30,10 @@ describe('activity presentation', () => {
   it('resolves people, link provenance and missing former actors', () => {
     expect(presentActivity(row('owner_changed', { from: 'm1', to: 'm2' }), names).summary)
       .toBe('Owner: Ada Rider → Lin Driver')
+    expect(presentActivity(row('assignees_changed', { added: ['m1', 'm2'], removed: ['gone'] }), names).summary)
+      .toBe('Assigned to: added Ada Rider, Lin Driver; removed Someone no longer on the roster')
+    expect(presentActivity(row('assignees_changed', { added: [], removed: ['m1'] }), names).summary)
+      .toBe('Assigned to: removed Ada Rider')
     expect(presentActivity(row('created_from_proposal', { proposal_id: 'p1' }), names).proposalId).toBe('p1')
     expect(actorLabel(row('archived', { actor_kind: 'system' }, null), names)).toBe('Automatic archive scheduler')
     expect(actorLabel(row('state_changed', {}, 'former'), names)).toBe('Former team member')

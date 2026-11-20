@@ -58,7 +58,8 @@ test('a Head creates a task from the Board; a plain member is not offered it', a
   await form.getByLabel('Milestone').selectOption(m.milestoneKey)
   await form.getByLabel('Department').selectOption({ label: m.departments.headA.name })
   await form.getByLabel('Find a requirement').fill('1')
-  await form.getByRole('checkbox').first().check()
+  // The assignee checklist comes first; the requirement matches come last.
+  await form.getByRole('checkbox').last().check()
   await form.getByTestId('new-task-submit').click()
   await expect(page.getByTestId('board-task-created')).toContainText('made on the board')
   expect(runSql(`select count(*) from tasks where title = '${PREFIX} made on the board' and links_required and source_proposal is null`).trim()).toBe('1')

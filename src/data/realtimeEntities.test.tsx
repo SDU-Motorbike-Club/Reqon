@@ -35,6 +35,7 @@ const { useRealtimeTasks } = await import('./useRealtimeTasks.ts')
 const { useRealtimeProposals } = await import('./useRealtimeProposals.ts')
 const { useRealtimeProposalComments } = await import('./useRealtimeProposalComments.ts')
 const { useRealtimeTaskDependencies } = await import('./useRealtimeTaskDependencies.ts')
+const { useRealtimeTaskAssignees } = await import('./useRealtimeTaskAssignees.ts')
 const { useRealtimeSpecs } = await import('./useRealtimeSpecs.ts')
 const { useRealtimeTaskRequirements } = await import('./useRealtimeTaskRequirements.ts')
 const { useRealtimeMilestoneSections } = await import('./useRealtimeMilestoneSections.ts')
@@ -235,6 +236,22 @@ describe('useRealtimeTaskRequirements', () => {
     expect(invalidate).toHaveBeenCalledTimes(4)
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.taskRequirements('season-a') })
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.activityAll('season-a') })
+  })
+})
+
+describe('useRealtimeTaskAssignees', () => {
+  it('listens unfiltered (the table has no season column) and refreshes the assignee list', () => {
+    const qc = new QueryClient()
+    const invalidate = vi.spyOn(qc, 'invalidateQueries')
+    mount(() => useRealtimeTaskAssignees(), qc)
+
+    expect(capturedTable).toBe('task_assignees')
+    expect(capturedOptions?.filterBySeasonId).toBe(false)
+    expect(typeof capturedOptions?.onSubscribed).toBe('function')
+
+    capturedOnChange?.({ eventType: 'DELETE', new: null, old: { task_id: 'a', member_id: 'b' } }, 'season-a')
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.taskAssignees('season-a') })
+    expect(invalidate).not.toHaveBeenCalledWith({ queryKey: queryKeys.taskAssignees('season-b') })
   })
 })
 

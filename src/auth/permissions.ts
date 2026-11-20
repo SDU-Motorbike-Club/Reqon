@@ -263,10 +263,12 @@ export function hasDepartmentAuthority(actor: TaskActor, subteamKey: string | nu
 export function canEditTask(
   actor: TaskActor,
   task: Pick<Task, 'owner_id' | 'subteam_key' | 'archived_at'>,
+  // The actor is one of the task's other assignees (task_assignees): they edit it like its owner.
+  assigned = false,
 ): boolean {
   if (!isParticipating(actor.status)) return false
   if (task.archived_at !== null) return false
-  if (task.owner_id === actor.id) return true
+  if (task.owner_id === actor.id || assigned) return true
   return hasDepartmentAuthority(actor, task.subteam_key) || isTaskLeader(actor)
 }
 

@@ -1,5 +1,6 @@
 import { ALL_DEPARTMENTS, resolveDepartmentParam } from '../departments/filter.ts'
 import { mergeSearchParams } from '../lib/searchParams.ts'
+import type { AssigneesByTask } from './assignees.ts'
 import { isOverdue } from './overdue.ts'
 import { tasksInScope, type TaskScope } from './scope.ts'
 import type { Task } from './types.ts'
@@ -12,21 +13,22 @@ export const DEFAULT_TASK_FILTER: TaskFilter = { scope: 'all', department: ALL_D
 
 // Generic over the row shape, so the same filter serves the Board's full tasks
 // and the progress list's slimmer rows (the Gantt's department lens).
-export function filterTasks<T extends Pick<Task, 'owner_id' | 'subteam_key'>>(
+export function filterTasks<T extends Pick<Task, 'owner_id' | 'subteam_key'> & { id?: string }>(
   tasks: readonly T[],
   filter: TaskFilter,
   myId: string | null,
+  assigned?: AssigneesByTask,
 ): T[] {
-  return tasksInScope(tasks, filter.scope, myId).filter(
+  return tasksInScope(tasks, filter.scope, myId, assigned).filter(
     (t) => filter.department === ALL_DEPARTMENTS || t.subteam_key === filter.department,
   ) as T[]
 }
 
 // What each Scope button would show under the chosen department.
-export function taskScopeCounts(tasks: readonly Task[], department: string, myId: string | null): Record<TaskScope, number> {
+export function taskScopeCounts(tasks: readonly Task[], department: string, myId: string | null, assigned?: AssigneesByTask): Record<TaskScope, number> {
   return {
-    all: filterTasks(tasks, { scope: 'all', department }, myId).length,
-    mine: filterTasks(tasks, { scope: 'mine', department }, myId).length,
+    all: filterTasks(tasks, { scope: 'all', department }, myId, assigned).length,
+    mine: filterTasks(tasks, { scope: 'mine', department }, myId, assigned).length,
   }
 }
 

@@ -106,6 +106,7 @@ export const queryKeys = {
     ['season', seasonId ?? 'unknown', 'archive', 'tasks_by_source', ids] as const,
   taskRequirements: (seasonId: string | undefined) => ['season', seasonId ?? 'unknown', 'task_requirements'] as const,
   taskDependencies: (seasonId: string | undefined) => ['season', seasonId ?? 'unknown', 'task_dependencies'] as const,
+  taskAssignees: (seasonId: string | undefined) => ['season', seasonId ?? 'unknown', 'task_assignees'] as const,
   progressTasks: (seasonId: string | undefined) => ['season', seasonId ?? 'unknown', 'progress_tasks'] as const,
 
   // Task attachments (docs/ultraplan Phase 3). Keyed by task, not season: a task id is unique across

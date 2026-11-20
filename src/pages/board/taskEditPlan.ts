@@ -19,7 +19,6 @@ export type TaskFormValues = {
   // '' keeps the current milestone (the select has no "remove" choice here;
   // the Gantt's Unlink is the place for that).
   milestone: string
-  owner: string // '' = unassigned
   // Only meaningful while the task is Blocked; '' otherwise.
   blockedReason: string
 }
@@ -31,7 +30,7 @@ export type EditPlan =
 
 type Editable = Pick<
   Task,
-  'id' | 'title' | 'detail' | 'starts_on' | 'due_date' | 'priority' | 'milestone_key' | 'owner_id' | 'links_required' | 'state' | 'blocked_reason'
+  'id' | 'title' | 'detail' | 'starts_on' | 'due_date' | 'priority' | 'milestone_key' | 'links_required' | 'state' | 'blocked_reason'
 > & Partial<Pick<Task, 'source_proposal' | 'section_id'>>
 
 const MAX_TITLE = 200
@@ -40,7 +39,6 @@ export const MAX_BLOCKER_REASON = 500
 export function planTaskEdit(
   task: Editable,
   values: TaskFormValues,
-  canReassign: boolean,
   // Whether the task has at least one prerequisite task, which explains a
   // blocker on its own so the written reason may then be left empty.
   context: { hasPrerequisites?: boolean } = {},
@@ -99,10 +97,7 @@ export function planTaskEdit(
       changed.push('milestone')
     }
   }
-  if (canReassign && values.owner !== (task.owner_id ?? '')) {
-    edit.ownerId = values.owner || null
-    changed.push('owner')
-  }
+  // Who it is assigned to is not part of this edit: it is its own command, set_task_assignees.
 
   return changed.length === 0 ? { kind: 'unchanged' } : { kind: 'edit', edit, changed }
 }

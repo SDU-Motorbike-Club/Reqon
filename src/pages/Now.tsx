@@ -5,7 +5,9 @@ import { canReviewProposal, reviewsAnyProposal } from '../auth/permissions.ts'
 import { useMembers } from '../data/useMembers.ts'
 import { useMilestones } from '../data/useMilestones.ts'
 import { useTaskDependencies } from '../data/useTaskDependencies.ts'
+import { useRealtimeTaskAssignees } from '../data/useRealtimeTaskAssignees.ts'
 import { useRealtimeTaskDependencies } from '../data/useRealtimeTaskDependencies.ts'
+import { useTaskAssignees } from '../data/useTaskAssignees.ts'
 import { useAttention, useBookProgress } from '../data/useNowMetrics.ts'
 import { useProposals } from '../data/useProposals.ts'
 import { useRealtimeMilestones } from '../data/useRealtimeMilestones.ts'
@@ -311,6 +313,7 @@ export default function Now() {
   const actor = useTaskActor()
   const milestones = useMilestones()
   const dependencyLinks = useTaskDependencies()
+  const assigned = useTaskAssignees()
   const bookProgress = useBookProgress()
   const attention = useAttention()
   const proposals = useProposals()
@@ -324,6 +327,7 @@ export default function Now() {
   useRealtimeTasks()
   // The blocked list names what each task waits for; keep those links live too.
   useRealtimeTaskDependencies()
+  useRealtimeTaskAssignees()
   // A rule marked compliant elsewhere moves its chapter's bar here.
   useRealtimeClauseStatus()
 
@@ -343,7 +347,7 @@ export default function Now() {
   const overdue = attentionFor(attention.data ?? [], 'overdue')
   const blocked = attentionFor(attention.data ?? [], 'blocked')
   const upcoming = upcomingDeadlines(tasks.data ?? [], today, 14)
-  const mine = myOpenTasks(tasks.data ?? [], myId)
+  const mine = myOpenTasks(tasks.data ?? [], myId, assigned.data)
   const deadline = nextDeadline(milestones.data ?? [], new Date())
   const points = ms1Points(milestones.data ?? [])
   const openProposals = openProposalsCount(proposals.data ?? [])

@@ -12,7 +12,10 @@ import { useProposals } from '../data/useProposals.ts'
 import { useRealtimeProposalComments } from '../data/useRealtimeProposalComments.ts'
 import { useRealtimeProposalRequirements } from '../data/useRealtimeProposalRequirements.ts'
 import { useRealtimeProposals } from '../data/useRealtimeProposals.ts'
+import { useRealtimeTaskAssignees } from '../data/useRealtimeTaskAssignees.ts'
 import { useRealtimeTaskDependencies } from '../data/useRealtimeTaskDependencies.ts'
+import { useTaskAssignees } from '../data/useTaskAssignees.ts'
+import { assigneeIds, isAssignee } from '../tasks/assignees.ts'
 import { useRealtimeTaskRequirements } from '../data/useRealtimeTaskRequirements.ts'
 import { useRealtimeTasks } from '../data/useRealtimeTasks.ts'
 import { useSubteams } from '../data/useSubteams.ts'
@@ -73,6 +76,9 @@ export default function Board() {
   useRealtimeTaskRequirements()
   useRealtimeTaskDependencies()
   const dependencies = useTaskDependencies()
+  // Everybody each task is assigned to (the owner is the lead); live, so a changed assignment reaches an open Board.
+  useRealtimeTaskAssignees()
+  const assigned = useTaskAssignees().data
   // Proposals are not a page of their own: they are an overlay on the Board, for the department in view.
   const proposals = useProposals()
   const proposalsRealtime = useRealtimeProposals()
@@ -107,7 +113,7 @@ export default function Board() {
 
   const memberName = useMemo(() => new Map((members.data ?? []).map((m) => [m.id, m.full_name])), [members.data])
   const deptName = useMemo(() => new Map((departmentList ?? []).map((d) => [d.key, d.name])), [departmentList])
-  const visible = useMemo(() => inDateRange(filterTasks(allTasks, filter, myId), range, today), [allTasks, filter, myId, range, today])
+  const visible = useMemo(() => inDateRange(filterTasks(allTasks, filter, myId, assigned), range, today), [allTasks, filter, myId, range, today, assigned])
   // Parent tasks carry their subtasks; "My tasks" stays a flat list of the viewer's own tasks.
   const flat = filter.scope === 'mine'
   const { tops, childrenOf } = useMemo(() => groupBoardTasks(visible, allTasks, flat), [visible, allTasks, flat])
@@ -161,14 +167,14 @@ export default function Board() {
   const [created, setCreated] = useState<string | null>(null)
   const [archived, setArchived] = useState<{ id: string; title: string; canRestore: boolean; restored: boolean } | null>(null)
   const restore = useRestoreTask()
-  const counts = useMemo(() => taskScopeCounts(allTasks, filter.department, myId), [allTasks, filter.department, myId])
+  const counts = useMemo(() => taskScopeCounts(allTasks, filter.department, myId, assigned), [allTasks, filter.department, myId, assigned])
   // How many tasks each department entry would show under the current scope.
   const departmentCounts = useMemo(() => {
-    const inScope = filterTasks(allTasks, { scope: filter.scope, department: 'all' }, myId)
+    const inScope = filterTasks(allTasks, { scope: filter.scope, department: 'all' }, myId, assigned)
     const out: Record<string, number> = { all: inScope.length }
     for (const task of inScope) if (task.subteam_key) out[task.subteam_key] = (out[task.subteam_key] ?? 0) + 1
     return out
-  }, [allTasks, filter.scope, myId])
+  }, [allTasks, filter.scope, myId, assigned])
   // Proposals still being worked on in the department in view (all departments: all of them).
   const pendingProposals = useMemo(
     () => (proposals.data ?? []).filter((p) => !isHistory(p) && (filter.department === 'all' || p.subteam_key === filter.department)).length,
@@ -216,7 +222,7 @@ export default function Board() {
 
   const permsFor = (task: (typeof allTasks)[number]): TaskPermissions => {
     if (!actor) return NO_PERMISSIONS
-    const edit = canEditTask(actor, task)
+    const edit = canEditTask(actor, task, isAssignee(task, actor.id, assigned))
     return {
       canEdit: edit,
       canReassign: edit && canReassignTaskOwner(actor, task),
@@ -236,10 +242,14 @@ export default function Board() {
     }
     updateTask.mutate({ id, state })
   }
-  const ownersFor = (task: (typeof allTasks)[number]) =>
-    task.owner_id && !activeOwners.some((o) => o.id === task.owner_id)
-      ? [...activeOwners, { id: task.owner_id, name: `${memberName.get(task.owner_id) ?? 'Someone'} (no longer active)` }]
-      : activeOwners
+  // Everybody who can be ticked: the active members, plus anyone already assigned who is no longer active (so
+  // they can be unticked; the database only accepts active members).
+  const ownersFor = (task: (typeof allTasks)[number]) => [
+    ...activeOwners,
+    ...assigneeIds(task, assigned)
+      .filter((id) => !activeOwners.some((o) => o.id === id))
+      .map((id) => ({ id, name: `${memberName.get(id) ?? 'Someone'} (no longer active)` })),
+  ]
 
   // The tour explains one real card: the first VISIBLE one, reading the lanes in
   // order, so the tour never points at a card the filter has hidden.
@@ -498,6 +508,7 @@ export default function Board() {
                 departmentName={task.subteam_key ? (deptName.get(task.subteam_key) ?? task.subteam_key) : null}
                 ownerName={task.owner_id ? (memberName.get(task.owner_id) ?? 'Someone no longer on the roster') : null}
                 ownerImage={task.owner_id ? (avatars.data?.get(task.owner_id) ?? null) : null}
+                otherAssignees={assigneeIds(task, assigned).slice(1).map((id) => memberName.get(id) ?? 'Someone no longer on the roster')}
                 milestoneLabel={task.milestone_key ? (milestoneName.get(task.milestone_key) ?? task.milestone_key) : null}
                 requirementKeys={keysByTask.get(task.id) ?? []}
                 source={source ? { id: source.id, title: source.title } : null}
@@ -724,6 +735,7 @@ export default function Board() {
               task={openTask}
               perms={permsFor(openTask)}
               owners={ownersFor(openTask)}
+              assigneeIds={assigneeIds(openTask, assigned)}
               milestones={milestoneOptions}
               requirementKeys={keysByTask.get(openTask.id) ?? []}
               links={linksFor(openTask)}

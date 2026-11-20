@@ -65,8 +65,13 @@ test.describe('two-session realtime propagation and season switching (R38-R39)',
       // of a different department reused here purely as "someone else".
       await pageB.goto('/board')
       await pageB.getByTestId(`task-more-${taskId}`).click()
-      await expect(pageB.getByLabel('Owner', { exact: true })).toBeVisible({ timeout: 5_000 })
-      await pageB.getByLabel('Owner', { exact: true }).selectOption(m.users.headB.id)
+      const picker = pageB.getByTestId('assignee-picker')
+      await expect(picker).toBeVisible({ timeout: 5_000 })
+      // Swap the person: untick whoever is assigned, then find Head B with the search box.
+      const ticked = picker.getByRole('checkbox', { checked: true })
+      while ((await ticked.count()) > 0) await ticked.first().uncheck()
+      await picker.getByRole('searchbox', { name: 'Search people' }).fill('e2e-head-b')
+      await picker.getByRole('checkbox', { name: /e2e-head-b/i }).check()
       await pageB.getByTestId(`task-save-${taskId}`).click()
       await expect.poll(() => runSql(`select owner_id from tasks where id = '${taskId}'`).trim()).toBe(m.users.headB.id)
       // Reflected live on A's still-open card, no reload.

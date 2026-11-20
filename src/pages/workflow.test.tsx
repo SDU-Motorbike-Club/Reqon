@@ -365,6 +365,13 @@ const supabase = {
     if (fn === 'review_proposal') return reviewProposal(args ?? {})
     if (fn === 'set_proposal_requirements') return setProposalRequirements(args ?? {})
     if (fn === 'can_review_proposal') return { data: true, error: null }
+    // The database keeps the lead while still listed, otherwise the first listed person leads.
+    if (fn === 'set_task_assignees') {
+      const task = db.tasks.find((x) => x.id === args?.p_task_id)
+      const ids = (args?.p_member_ids ?? []) as string[]
+      if (task && !ids.includes(task.owner_id as string)) task.owner_id = ids[0] ?? null
+      return { data: null, error: null }
+    }
     // attention(p_season, p_today) replaced v_attention (ADR-0007) — nothing
     // in this file asserts on its content, only that Now/Priorities render,
     // so an empty result is enough (mirrors the old v_attention: [] fixture).
@@ -780,16 +787,17 @@ describe('task board', () => {
     )
   })
 
-  it('assigns an owner from the details editor, listing active members', async () => {
+  it('assigns people from the details editor: a checklist of active members with a search box', async () => {
     const user = userEvent.setup()
     renderApp('/board')
     const card = await screen.findByTestId('task-k1')
     await user.click(within(card).getByText(/^Details/))
     const panel = within(await screen.findByTestId('task-details-k1'))
-    const owner = panel.getByLabelText('Owner')
     // The signed-in member first, named as such.
-    expect([...(owner as HTMLSelectElement).options].map((o) => o.textContent)).toEqual(['Unassigned', 'Me (Ada Rider)', 'Bo Wrench'])
-    await user.selectOptions(owner, 'm2')
+    expect(panel.getAllByRole('checkbox').map((c) => c.closest('label')?.textContent)).toEqual(['Me (Ada Rider)', 'Bo Wrench'])
+    await user.type(panel.getByRole('searchbox', { name: 'Search people' }), 'wrench')
+    expect(panel.getAllByRole('checkbox')).toHaveLength(1)
+    await user.click(panel.getByRole('checkbox', { name: 'Bo Wrench' }))
     await user.click(panel.getByTestId('task-save-k1'))
     await waitFor(() => expect(db.tasks[0].owner_id).toBe('m2'))
   })

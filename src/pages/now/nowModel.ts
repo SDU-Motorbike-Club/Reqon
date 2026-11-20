@@ -252,10 +252,14 @@ export function upcomingDeadlines<T extends Pick<Task, 'due_date' | 'state' | 'a
 
 // The viewer's own unfinished, active tasks: overdue first, then by deadline,
 // undated last.
-export function myOpenTasks<T extends Pick<Task, 'owner_id' | 'due_date' | 'state' | 'archived_at'>>(tasks: readonly T[], myId: string | null): T[] {
+export function myOpenTasks<T extends Pick<Task, 'owner_id' | 'due_date' | 'state' | 'archived_at'> & { id?: string }>(
+  tasks: readonly T[],
+  myId: string | null,
+  assigned?: ReadonlyMap<string, readonly string[]>,
+): T[] {
   if (!myId) return []
   return tasks
-    .filter((t) => t.owner_id === myId && t.archived_at === null && t.state !== 'done' && t.state !== 'cancelled')
+    .filter((t) => (t.owner_id === myId || (t.id !== undefined && Boolean(assigned?.get(t.id)?.includes(myId)))) && t.archived_at === null && t.state !== 'done' && t.state !== 'cancelled')
     .sort((a, b) => (a.due_date ?? '9999-12-31').localeCompare(b.due_date ?? '9999-12-31'))
 }
 

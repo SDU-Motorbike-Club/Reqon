@@ -1,9 +1,11 @@
 import { useId, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useClauses } from '../../data/useClauses.ts'
+import { useSetTaskAssignees } from '../../data/useTaskAssignees.ts'
 import { useAddTaskDependency, useRemoveTaskDependency } from '../../data/useTaskDependencies.ts'
 import { useArchiveTask, useLinkTaskRequirement, useSetTaskDepartment, useUnlinkTaskRequirement, useUpdateTask, type Task, type TaskEdit } from '../../data/useTasks.ts'
 import { formatDay, formatInstantDay } from '../../lib/dates.ts'
+import { sameAssignees } from '../../tasks/assignees.ts'
 import { isSatisfied, openPrerequisites, scheduleConflict, type TaskRef } from '../../tasks/dependencies.ts'
 import { TASK_STATE_LABEL } from '../../tasks/taskState.ts'
 import { buildRequirementOptions } from '../../proposals/requirementOptions.ts'
@@ -15,6 +17,7 @@ import type { AttachmentPermissions } from '../../auth/permissions.ts'
 import { AttachmentsSection } from '../../attachments/AttachmentsSection.tsx'
 import { buttonDanger, buttonPrimary, buttonSecondary } from '../../ui/buttons.ts'
 import { ActionError } from '../../ui/states.tsx'
+import { AssigneePicker } from './AssigneePicker.tsx'
 import { DepartmentMove, FIRST_ASSIGNMENT_REASON } from './DepartmentMove.tsx'
 import { ParentSelect } from './ParentSelect.tsx'
 import { TaskPicker } from './TaskPicker.tsx'
@@ -48,6 +51,8 @@ type Props = {
   task: Task
   perms: TaskPermissions
   owners: { id: string; name: string }[]
+  // Everybody the task is assigned to, the lead (task.owner_id) first. Absent = just the owner.
+  assigneeIds?: string[]
   milestones: { value: string; label: string }[]
   requirementKeys: string[]
   // What this task waits for and what waits for it, and the tasks that could be
@@ -97,7 +102,9 @@ export function TaskDetails(props: Props) {
   const [due, setDue] = useState(task.due_date ?? '')
   const [priority, setPriority] = useState<TaskPriority>(task.priority)
   const [milestone, setMilestone] = useState(task.milestone_key ?? '')
-  const [owner, setOwner] = useState(task.owner_id ?? '')
+  const liveAssignees = props.assigneeIds ?? (task.owner_id ? [task.owner_id] : [])
+  const [assignees, setAssignees] = useState<string[]>(liveAssignees)
+  const setTaskAssignees = useSetTaskAssignees()
   // What this editor started from. A save sends only the fields the person
   // changed RELATIVE TO THIS, never relative to the live row: if someone else
   // changed a field the person did not touch, that change stays.
@@ -132,7 +139,7 @@ export function TaskDetails(props: Props) {
     setDue(t.due_date ?? '')
     setPriority(t.priority)
     setMilestone(t.milestone_key ?? '')
-    setOwner(t.owner_id ?? '')
+    setAssignees(props.assigneeIds ?? (t.owner_id ? [t.owner_id] : []))
     setBlockedDraft(null)
     setOrigin(t)
     setBaseline(t.updated_at)
@@ -189,11 +196,12 @@ export function TaskDetails(props: Props) {
         // The reason is judged against the LIVE state and reason, everything else
         // against what the editor started from.
         { ...origin, state: task.state, blocked_reason: task.blocked_reason },
-        { title, detail, start, due, priority, milestone, owner, blockedReason: blockedDraft ?? task.blocked_reason ?? '' },
-        perms.canReassign,
+        { title, detail, start, due, priority, milestone, blockedReason: blockedDraft ?? task.blocked_reason ?? '' },
         { hasPrerequisites: openPrerequisites(links.prerequisites).length > 0 },
       )
       if (plan.kind === 'invalid') throw new Error(plan.reason)
+      // Who it is assigned to is its own command (set_task_assignees), judged against what is stored now.
+      const reassign = perms.canReassign && !sameAssignees(assignees, liveAssignees)
       // A department picked in the Department section. Judged before anything is written, so a
       // missing reason never leaves half of a save done.
       const department = (perms.moveTo ?? []).some((d) => d.key === deptTarget) ? deptTarget : ''
@@ -203,7 +211,7 @@ export function TaskDetails(props: Props) {
       }
       const toAdd = keys.filter((k) => !props.requirementKeys.includes(k))
       const toRemove = props.requirementKeys.filter((k) => !keys.includes(k))
-      if (plan.kind === 'unchanged' && toAdd.length === 0 && toRemove.length === 0 && department === '') {
+      if (plan.kind === 'unchanged' && toAdd.length === 0 && toRemove.length === 0 && department === '' && !reassign) {
         setResult({ kind: 'nothing' })
         return
       }
@@ -213,6 +221,11 @@ export function TaskDetails(props: Props) {
       // change as "changed elsewhere".
       if (plan.kind === 'edit') {
         await update.mutateAsync(plan.edit satisfies TaskEdit)
+        setSelfSave(true)
+      }
+      if (reassign) {
+        // A new lead moves the row's version too, so this is marked as ours as well.
+        await setTaskAssignees.mutateAsync({ taskId: task.id, memberIds: assignees })
         setSelfSave(true)
       }
       for (const clauseKey of toAdd) await link.mutateAsync({ taskId: task.id, clauseKey })
@@ -226,6 +239,7 @@ export function TaskDetails(props: Props) {
       }
       const what = [
         ...(plan.kind === 'edit' ? plan.changed : []),
+        ...(reassign ? ['assigned to'] : []),
         ...(toAdd.length + toRemove.length > 0 ? ['requirements'] : []),
         ...(department !== '' ? ['department'] : []),
       ]
@@ -353,24 +367,20 @@ export function TaskDetails(props: Props) {
               </div>
             )}
             <div>
-              <label htmlFor={fid('owner')} className={LABEL}>
-                Owner
-              </label>
               {perms.canReassign ? (
-                <select id={fid('owner')} value={owner} onChange={(e) => setOwner(e.target.value)} className={FIELD}>
-                  <option value="">Unassigned</option>
-                  {/* The signed-in member first, so taking a task is one pick. */}
-                  {[...props.owners.filter((o) => o.id === props.viewerId), ...props.owners.filter((o) => o.id !== props.viewerId)].map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.id === props.viewerId ? `Me (${o.name})` : o.name}
-                    </option>
-                  ))}
-                </select>
+                <AssigneePicker label="Assigned to" people={props.owners} value={assignees} onChange={setAssignees} viewerId={props.viewerId} />
               ) : (
-                <p id={fid('owner')} className="mt-1 min-h-11 py-2 text-sm text-slate-800 sm:min-h-0 sm:py-1.5">
-                  {props.owners.find((o) => o.id === task.owner_id)?.name ?? 'Unassigned'}{' '}
-                  <span className="text-xs text-slate-500">(only the department Head can reassign)</span>
-                </p>
+                <>
+                  <p id={fid('owner')} className={LABEL}>
+                    Assigned to
+                  </p>
+                  <p aria-labelledby={fid('owner')} className="mt-1 min-h-11 py-2 text-sm text-slate-800 sm:min-h-0 sm:py-1.5">
+                    {liveAssignees.length === 0
+                      ? 'Unassigned'
+                      : liveAssignees.map((id) => props.owners.find((o) => o.id === id)?.name ?? 'Someone').join(', ')}{' '}
+                    <span className="text-xs text-slate-500">(only the department Head can reassign)</span>
+                  </p>
+                </>
               )}
             </div>
             <div>

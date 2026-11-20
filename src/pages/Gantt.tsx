@@ -19,7 +19,10 @@ import { Dialog } from '../ui/Dialog.tsx'
 import { ActionError, EmptyState, ErrorState } from '../ui/states.tsx'
 import { useMembers } from '../data/useMembers.ts'
 import { useMilestones, useMilestoneSections } from '../data/useMilestones.ts'
+import { useRealtimeTaskAssignees } from '../data/useRealtimeTaskAssignees.ts'
 import { useRealtimeTaskDependencies } from '../data/useRealtimeTaskDependencies.ts'
+import { useTaskAssignees } from '../data/useTaskAssignees.ts'
+import { isAssignee } from '../tasks/assignees.ts'
 import { useRealtimeTasks } from '../data/useRealtimeTasks.ts'
 import { useRealtimeMilestones } from '../data/useRealtimeMilestones.ts'
 import { useRealtimeMilestoneSections } from '../data/useRealtimeMilestoneSections.ts'
@@ -73,6 +76,8 @@ export default function Gantt() {
   useRealtimeTasks()
   useRealtimeTaskDependencies()
   const dependencies = useTaskDependencies()
+  useRealtimeTaskAssignees()
+  const assigned = useTaskAssignees().data
   useRealtimeMilestones()
   useRealtimeMilestoneSections()
   const [params, setParams] = useUrlParams()
@@ -156,14 +161,14 @@ export default function Gantt() {
     departmentLabel && filter.scope === 'mine' ? `My ${departmentLabel} tasks` : departmentLabel ? departmentLabel : filter.scope === 'mine' ? 'My tasks' : 'All tasks'
   // The Gantt shows linked tasks only, so both sets of counts are taken from them and agree with each other.
   const linked = useMemo(() => taskRows.filter((t) => t.milestone_key !== null || t.section_id !== null), [taskRows])
-  const counts = useMemo(() => taskScopeCounts(linked, filter.department, myId), [linked, filter.department, myId])
+  const counts = useMemo(() => taskScopeCounts(linked, filter.department, myId, assigned), [linked, filter.department, myId, assigned])
   // Linked tasks each department entry would show under the current scope.
   const departmentCounts = useMemo(() => {
-    const inScope = filterTasks(linked, { scope: filter.scope, department: 'all' }, myId)
+    const inScope = filterTasks(linked, { scope: filter.scope, department: 'all' }, myId, assigned)
     const out: Record<string, number> = { all: inScope.length }
     for (const task of inScope) if (task.subteam_key) out[task.subteam_key] = (out[task.subteam_key] ?? 0) + 1
     return out
-  }, [linked, filter.scope, myId])
+  }, [linked, filter.scope, myId, assigned])
 
   const departmentNames = useMemo(() => new Map((departmentList ?? []).map((d) => [d.key, d.name])), [departmentList])
   const memberNames = useMemo(() => new Map((members.data ?? []).map((m) => [m.id, m.full_name])), [members.data])
@@ -221,7 +226,7 @@ export default function Gantt() {
   const canManage = actor !== null && (permissions.roles.length > 0 || actor.headOf.length > 0)
   const permsFor = (task: Task) => {
     if (!actor || !canManage) return { canEdit: false, canReassign: false }
-    const canEdit = canEditTask(actor, task)
+    const canEdit = canEditTask(actor, task, isAssignee(task, actor.id, assigned))
     return { canEdit, canReassign: canEdit && canReassignTaskOwner(actor, task) }
   }
 
@@ -254,7 +259,7 @@ export default function Gantt() {
     lens: {
       active: lensActive,
       name: lensName,
-      matches: (t) => filterTasks([t], filter, myId).length > 0,
+      matches: (t) => filterTasks([t], filter, myId, assigned).length > 0,
     },
     moveTargets,
     onMoveTo: (task, target) => {

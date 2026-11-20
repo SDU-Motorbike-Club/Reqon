@@ -71,38 +71,6 @@ export type Database = {
           },
         ]
       }
-      announcements: {
-        Row: {
-          author_id: string | null
-          body: string
-          created_at: string
-          id: number
-          title: string | null
-        }
-        Insert: {
-          author_id?: string | null
-          body: string
-          created_at?: string
-          id?: number
-          title?: string | null
-        }
-        Update: {
-          author_id?: string | null
-          body?: string
-          created_at?: string
-          id?: number
-          title?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "announcements_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "members"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       announcement_comments: {
         Row: {
           announcement_id: number
@@ -135,6 +103,38 @@ export type Database = {
           },
           {
             foreignKeyName: "announcement_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcements: {
+        Row: {
+          author_id: string | null
+          body: string
+          created_at: string
+          id: number
+          title: string | null
+        }
+        Insert: {
+          author_id?: string | null
+          body: string
+          created_at?: string
+          id?: number
+          title?: string | null
+        }
+        Update: {
+          author_id?: string | null
+          body?: string
+          created_at?: string
+          id?: number
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcements_author_id_fkey"
             columns: ["author_id"]
             isOneToOne: false
             referencedRelation: "members"
@@ -244,6 +244,60 @@ export type Database = {
         }
         Relationships: []
       }
+      blog_posts: {
+        Row: {
+          author_name: string
+          category: Database["public"]["Enums"]["blog_category"]
+          content: string
+          cover_image_alt: string | null
+          cover_image_url: string | null
+          created_at: string
+          excerpt: string | null
+          id: string
+          is_featured: boolean
+          published_at: string | null
+          reading_minutes: number | null
+          slug: string
+          status: Database["public"]["Enums"]["blog_post_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author_name?: string
+          category?: Database["public"]["Enums"]["blog_category"]
+          content?: string
+          cover_image_alt?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          is_featured?: boolean
+          published_at?: string | null
+          reading_minutes?: number | null
+          slug: string
+          status?: Database["public"]["Enums"]["blog_post_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author_name?: string
+          category?: Database["public"]["Enums"]["blog_category"]
+          content?: string
+          cover_image_alt?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          is_featured?: boolean
+          published_at?: string | null
+          reading_minutes?: number | null
+          slug?: string
+          status?: Database["public"]["Enums"]["blog_post_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       book_chapters: {
         Row: {
           category: string | null
@@ -328,60 +382,6 @@ export type Database = {
             referencedColumns: ["regs_ref", "code"]
           },
         ]
-      }
-      blog_posts: {
-        Row: {
-          author_name: string
-          category: Database["public"]["Enums"]["blog_category"]
-          content: string
-          cover_image_alt: string | null
-          cover_image_url: string | null
-          created_at: string
-          excerpt: string | null
-          id: string
-          is_featured: boolean
-          published_at: string | null
-          reading_minutes: number | null
-          slug: string
-          status: Database["public"]["Enums"]["blog_post_status"]
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          author_name?: string
-          category?: Database["public"]["Enums"]["blog_category"]
-          content?: string
-          cover_image_alt?: string | null
-          cover_image_url?: string | null
-          created_at?: string
-          excerpt?: string | null
-          id?: string
-          is_featured?: boolean
-          published_at?: string | null
-          reading_minutes?: number | null
-          slug: string
-          status?: Database["public"]["Enums"]["blog_post_status"]
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          author_name?: string
-          category?: Database["public"]["Enums"]["blog_category"]
-          content?: string
-          cover_image_alt?: string | null
-          cover_image_url?: string | null
-          created_at?: string
-          excerpt?: string | null
-          id?: string
-          is_featured?: boolean
-          published_at?: string | null
-          reading_minutes?: number | null
-          slug?: string
-          status?: Database["public"]["Enums"]["blog_post_status"]
-          title?: string
-          updated_at?: string
-        }
-        Relationships: []
       }
       bug_reports: {
         Row: {
@@ -2382,6 +2382,46 @@ export type Database = {
           },
         ]
       }
+      task_assignees: {
+        Row: {
+          created_at: string
+          member_id: string
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          member_id: string
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          member_id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_assignees_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_assignees_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_assignees_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_list"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_attachments: {
         Row: {
           caption: string | null
@@ -2908,6 +2948,20 @@ export type Database = {
             columns: ["owner_id"]
             isOneToOne: false
             referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "v_task_list"
             referencedColumns: ["id"]
           },
           {
@@ -3618,6 +3672,7 @@ export type Database = {
         Args: { p_role: Database["public"]["Enums"]["privileged_role"] }
         Returns: boolean
       }
+      can_manage_applicants: { Args: never; Returns: boolean }
       can_manage_department_members: {
         Args: { p_key: string }
         Returns: boolean
@@ -3625,14 +3680,13 @@ export type Database = {
       can_manage_departments: { Args: never; Returns: boolean }
       can_manage_finances: { Args: never; Returns: boolean }
       can_manage_milestone_structure: { Args: never; Returns: boolean }
-      can_manage_applicants: { Args: never; Returns: boolean }
       can_manage_roles: { Args: never; Returns: boolean }
-      can_post_blog: { Args: never; Returns: boolean }
       can_manage_seasons: { Args: never; Returns: boolean }
       can_manage_spec_evidence: {
         Args: { p_spec_id: string }
         Returns: boolean
       }
+      can_post_blog: { Args: never; Returns: boolean }
       can_reset_password: { Args: { p_member: string }; Returns: boolean }
       can_review_proposal: { Args: { p_proposal_id: string }; Returns: boolean }
       can_view_club_credentials: { Args: never; Returns: boolean }
@@ -4244,7 +4298,6 @@ export type Database = {
         Returns: boolean
       }
       set_current_season: { Args: { p_season_id: string }; Returns: undefined }
-      set_my_username: { Args: { p_username: string }; Returns: string }
       set_meeting_attendees: {
         Args: { p_meeting: string; p_members: string[] }
         Returns: undefined
@@ -4276,6 +4329,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_my_username: { Args: { p_username: string }; Returns: string }
       set_proposal_department: {
         Args: {
           p_expected_revision: number
@@ -4366,6 +4420,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      set_task_assignees: {
+        Args: { p_member_ids: string[]; p_task_id: string }
+        Returns: undefined
       }
       set_task_department: {
         Args: { p_reason: string; p_subteam_key: string; p_task_id: string }

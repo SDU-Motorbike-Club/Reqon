@@ -17,6 +17,8 @@ type Props = {
   ownerName: string | null
   // The owner's profile picture (a data: URL), or null: initials are drawn instead.
   ownerImage?: string | null
+  // The names of everybody else the task is assigned to (the owner is the lead), shown as "+N".
+  otherAssignees?: string[]
   milestoneLabel: string | null
   requirementKeys: string[]
   source: { id: string; title: string } | null
@@ -115,6 +117,12 @@ export function TaskCard(props: Props) {
             ) : (
               (props.ownerName ?? <Missing>Unassigned</Missing>)
             )}
+            {props.otherAssignees && props.otherAssignees.length > 0 ? (
+              <span className="text-slate-600" title={props.otherAssignees.join(', ')}>
+                +{props.otherAssignees.length}
+                <span className="sr-only"> more: {props.otherAssignees.join(', ')}</span>
+              </span>
+            ) : null}
           </dd>
           <dt className="sr-only">Department</dt>
           <dd className="min-w-0 truncate">{props.departmentName ?? <Missing>No department</Missing>}</dd>

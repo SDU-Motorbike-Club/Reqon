@@ -321,7 +321,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/board',
     target: 'board-new-task',
     title: 'New task — start date and deadline',
-    body: 'Heads and the President or Vice President make a task here. Only the title and deadline (marked *) are required. The start date is today unless you change it; the department and the rest can be added later.',
+    body: 'Heads and the President or Vice President make a task here. Only the title and deadline (marked *) are required. The start date is today. Tick one or more people under “Assigned to” (search by name); the rest can wait.',
   },
   {
     id: 'board-departments',
@@ -345,7 +345,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/board',
     target: 'board-card',
     title: 'A task',
-    body: 'Dates first, then the owner with their picture (add yours in Settings), department, milestone. Drag it to a lane or use the dropdown (if you may); Blocked asks why, or which task. Details opens the editor.',
+    body: 'Dates, then the owner with their picture and “+2” when more people share the task, department, milestone. Drag it to a lane or use the dropdown (if you may); Blocked asks why. Details opens the editor.',
   },
   {
     id: 'board-subtasks',
@@ -398,7 +398,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     route: '/board',
     target: 'board-card',
     title: 'Who can edit a task',
-    body: 'Its owner, its department’s Head, the President or the Vice President. Only they reassign it; a move to another department needs a reason. A Done task archives itself after 24 hours.',
+    body: 'Anyone assigned to it, its department’s Head, the President or the Vice President. Only the Head and above change who is assigned; a department move needs a reason. Done tasks archive after 24 hours.',
   },
 
   // --------------------------------------------------------------------- Files

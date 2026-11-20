@@ -71,6 +71,8 @@ vi.mock('../data/useMembers.ts', () => ({ useMembers: () => ({ data: MEMBERS, is
 vi.mock('../data/useSubteams.ts', () => ({ useSubteams: () => ({ data: DEPARTMENTS, isLoading: false, error: null }) }))
 vi.mock('../data/useRealtimeTasks.ts', () => ({ useRealtimeTasks: () => 'live' }))
 vi.mock('../data/useRealtimeTaskDependencies.ts', () => ({ useRealtimeTaskDependencies: () => 'live' }))
+vi.mock('../data/useRealtimeTaskAssignees.ts', () => ({ useRealtimeTaskAssignees: () => 'live' }))
+vi.mock('../data/useTaskAssignees.ts', () => ({ useTaskAssignees: () => ({ data: undefined }) }))
 vi.mock('../data/useTaskDependencies.ts', () => ({ useTaskDependencies: () => ({ data: deps.links }) }))
 vi.mock('../data/useRealtimeMilestones.ts', () => ({ useRealtimeMilestones: () => 'live' }))
 vi.mock('../data/useRealtimeMilestoneSections.ts', () => ({ useRealtimeMilestoneSections: () => 'live' }))

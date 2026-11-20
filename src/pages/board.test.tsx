@@ -61,6 +61,14 @@ vi.mock('../proposals/ProposalsPanel.tsx', () => ({
 vi.mock('../data/useRealtimeTasks.ts', () => ({ useRealtimeTasks: () => 'live' }))
 vi.mock('../data/useRealtimeTaskRequirements.ts', () => ({ useRealtimeTaskRequirements: () => 'live' }))
 vi.mock('../data/useRealtimeTaskDependencies.ts', () => ({ useRealtimeTaskDependencies: () => 'live' }))
+vi.mock('../data/useRealtimeTaskAssignees.ts', () => ({ useRealtimeTaskAssignees: () => 'live' }))
+vi.mock('../data/useTaskAssignees.ts', () => ({
+  useTaskAssignees: () => ({ data: undefined }),
+  useSetTaskAssignees: () => ({
+    mutateAsync: async (v: { taskId: string; memberIds: string[] }) => { state.writes.push({ id: v.taskId, assigneeIds: v.memberIds }) },
+    isPending: false,
+  }),
+}))
 vi.mock('../data/useTaskDependencies.ts', () => ({
   useTaskDependencies: () => ({ data: state.links }),
   useAddTaskDependency: () => ({ mutate: (v: Record<string, unknown>, o?: { onSuccess?: () => void }) => { state.linkWrites.push({ add: v }); o?.onSuccess?.() }, isPending: false, error: state.linkError, reset: () => {} }),
@@ -486,7 +494,7 @@ describe('the details editor', () => {
       panel.getByLabelText('Title'),
       panel.getByLabelText('Description'),
       panel.getByLabelText('Why is it blocked?'),
-      panel.getByLabelText('Owner'),
+      panel.getByRole('group', { name: 'Assigned to' }),
       panel.getByLabelText('Priority'),
       panel.getByLabelText('Start date'),
       panel.getByLabelText('Deadline'),
@@ -510,14 +518,22 @@ describe('the details editor', () => {
     expect(links.getByText('Saved with “Save details”.')).toBeInTheDocument()
   })
 
-  it('lets a Head reassign the owner and saves ONLY the changed fields', async () => {
+  it('lets a Head reassign the task and saves ONLY the changed fields', async () => {
     const { user, panel } = await (async () => { renderBoard('/board?dept=AERO'); return open('aero-theirs') })()
     // The signed-in member comes first, named as such, so taking a task is one pick.
-    const ownerOptions = within(panel.getByLabelText('Owner')).getAllByRole('option').map((o) => o.textContent)
-    expect(ownerOptions[1]).toMatch(/^Me \(/)
-    await user.selectOptions(panel.getByLabelText('Owner'), 'me')
+    expect(panel.getAllByRole('checkbox')[0]).toHaveAccessibleName(/^Me \(/)
+    await user.click(panel.getByRole('checkbox', { name: /Bo Wrench/ }))
+    await user.click(panel.getByRole('checkbox', { name: /^Me \(/ }))
     await user.click(panel.getByTestId('task-save-aero-theirs'))
-    expect(state.writes).toEqual([{ id: 'aero-theirs', ownerId: 'me' }])
+    expect(state.writes).toEqual([{ id: 'aero-theirs', assigneeIds: ['me'] }])
+  })
+
+  it('lets a Head add a second person without taking the lead from the first', async () => {
+    const { user, panel } = await (async () => { renderBoard('/board?dept=AERO'); return open('aero-theirs') })()
+    await user.type(panel.getByRole('searchbox', { name: 'Search people' }), 'ada')
+    await user.click(panel.getByRole('checkbox', { name: /^Me \(/ }))
+    await user.click(panel.getByTestId('task-save-aero-theirs'))
+    expect(state.writes).toEqual([{ id: 'aero-theirs', assigneeIds: ['m2', 'me'] }])
   })
 
   it('lets an owner edit their fields but not reassign, and says who can', async () => {
@@ -525,7 +541,7 @@ describe('the details editor', () => {
     renderBoard('/board?dept=BODY')
     const { panel } = await open('body-mine')
     expect(panel.getByLabelText('Deadline')).toBeInTheDocument()
-    expect(panel.queryByRole('combobox', { name: 'Owner' })).not.toBeInTheDocument()
+    expect(panel.queryByRole('searchbox', { name: 'Search people' })).not.toBeInTheDocument()
     expect(panel.getByText(/only the department Head can reassign/)).toBeInTheDocument()
   })
 
@@ -1268,7 +1284,7 @@ describe('creating a task straight on the Board (task leaders only)', () => {
     await user.click(form.getByTestId('new-task-submit'))
     await waitFor(() => expect(state.created).toHaveLength(1))
     expect(state.created[0]).toEqual({
-      title: 'Brake duct', detail: null, departmentKey: null, ownerId: null, startsOn: todayIso(), dueDate: '2099-12-01',
+      title: 'Brake duct', detail: null, departmentKey: null, ownerId: null, assigneeIds: [], startsOn: todayIso(), dueDate: '2099-12-01',
       milestoneKey: null, clauseKeys: [], priority: 'normal',
     })
     expect(await screen.findByTestId('board-task-created')).toHaveTextContent('Created “Brake duct”.')
@@ -1284,10 +1300,12 @@ describe('creating a task straight on the Board (task leaders only)', () => {
     await user.type(form.getByLabelText('Start date'), '2099-11-20')
     await user.type(form.getByLabelText('Deadline'), '2099-12-01')
     await user.selectOptions(form.getByLabelText('Department'), 'BODY')
-    await user.selectOptions(form.getByLabelText('Owner'), 'me')
+    await user.click(form.getByRole('checkbox', { name: /^Me \(/ }))
     await user.click(form.getByTestId('new-task-submit'))
     await waitFor(() => expect(state.created).toHaveLength(1))
-    expect(state.created[0]).toMatchObject({ departmentKey: 'BODY', ownerId: 'me', startsOn: '2099-11-20', dueDate: '2099-12-01' })
+    expect(state.created[0]).toMatchObject({ departmentKey: 'BODY', ownerId: 'me', assigneeIds: ['me'], startsOn: '2099-11-20', dueDate: '2099-12-01' })
+    // One person: the create call alone carries them, no second assignment call.
+    expect(state.writes).toEqual([])
   })
 
   it('lets the start date be cleared, and then sends none', async () => {
@@ -1329,7 +1347,7 @@ describe('creating a task straight on the Board (task leaders only)', () => {
     await user.type(form.getByLabelText('Deadline'), '2026-12-01')
     await user.selectOptions(form.getByLabelText('Milestone'), 'MS1')
     await user.type(form.getByLabelText('Find a requirement'), 'A.1')
-    await user.click(await form.findByRole('checkbox'))
+    await user.click(await form.findByRole('checkbox', { name: /A\.1/ }))
     await user.click(form.getByTestId('new-task-submit'))
     await waitFor(() => expect(state.created).toHaveLength(1))
     expect(state.created[0]).toMatchObject({ milestoneKey: 'MS1', clauseKeys: ['A.1'] })
