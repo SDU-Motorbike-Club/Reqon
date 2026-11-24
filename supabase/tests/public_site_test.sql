@@ -46,6 +46,8 @@ do $test$
 declare
   rec      uuid := gen_random_uuid();
   blogger  uuid := gen_random_uuid();
+  evm      uuid := gen_random_uuid();
+  vp       uuid := gen_random_uuid();
   mem      uuid := gen_random_uuid();
   app      uuid;
   post     uuid;
@@ -58,10 +60,12 @@ declare
   failures text[] := '{}';
 begin
   insert into auth.users (id, email) values
-    (rec, 'pub-rec@roles.test'), (blogger, 'pub-blog@roles.test'), (mem, 'pub-mem@roles.test');
+    (rec, 'pub-rec@roles.test'), (blogger, 'pub-blog@roles.test'), (mem, 'pub-mem@roles.test'),
+    (evm, 'pub-ev@roles.test'), (vp, 'pub-vp@roles.test');
   insert into members (id, full_name, role, status) values
-    (rec, 'Pub Recruiter', 'Team', 'active'), (blogger, 'Pub Blogger', 'Team', 'active'), (mem, 'Pub Member', 'Team', 'active');
-  insert into member_roles (member_id, role) values (rec, 'recruitment'), (blogger, 'blog');
+    (rec, 'Pub Recruiter', 'Team', 'active'), (blogger, 'Pub Blogger', 'Team', 'active'), (mem, 'Pub Member', 'Team', 'active'),
+    (evm, 'Pub Events', 'Team', 'active'), (vp, 'Pub VP', 'Team', 'active');
+  insert into member_roles (member_id, role) values (rec, 'recruitment'), (blogger, 'blog'), (evm, 'events'), (vp, 'vicepresident');
   insert into membership_applications (full_name, email, consent) values ('Seed', 'seed@example.com', true) returning id into app;
   insert into blog_posts (slug, title, content, status) values ('pub-hello', 'Hello', 'First post', 'published') returning id into post;
   insert into blog_posts (slug, title, content) values ('pub-secret', 'Secret', 'Not yet');
@@ -93,12 +97,18 @@ begin
     ('recruiter     deletes an application',   rec,     format('delete from membership_applications where id = %L', app), 'write', 'ALLOWED'),
     ('anon          reads published events',   null,    'select count(*) from events where title = ''Pub meetup''', 'read', 'ALLOWED'),
     ('anon          reads hidden events',      null,    'select count(*) from events where title = ''Pub hidden''', 'read', 'DENIED'),
-    ('blogger       reads hidden events',      blogger, 'select count(*) from events where title = ''Pub hidden''', 'read', 'ALLOWED'),
+    ('blogger       reads hidden events',      blogger, 'select count(*) from events where title = ''Pub hidden''', 'read', 'DENIED'),
+    ('events        reads hidden events',      evm,     'select count(*) from events where title = ''Pub hidden''', 'read', 'ALLOWED'),
     ('member        adds an event',            mem,     'insert into events (title, starts_at) values (''X'', now())', 'write', 'DENIED'),
-    ('blogger       adds an event',            blogger, 'insert into events (title, type, starts_at, signup_url) values (''Ride'', ''ride'', now(), ''https://example.com/a'')', 'write', 'ALLOWED'),
-    ('blogger       adds a script link',       blogger, 'insert into events (title, starts_at, signup_url) values (''Bad'', now(), ''javascript:alert(1)'')', 'write', 'ERROR 23514'),
+    ('blogger       adds an event',            blogger, 'insert into events (title, starts_at) values (''X'', now())', 'write', 'DENIED'),
+    ('events        adds a post',              evm,     'insert into blog_posts (slug, title, content) values (''pub-e'', ''E'', ''B'')', 'write', 'DENIED'),
+    ('events        adds an event',            evm,     'insert into events (title, type, starts_at, signup_url) values (''Ride'', ''ride'', now(), ''https://example.com/a'')', 'write', 'ALLOWED'),
+    ('events        adds a script link',       evm,     'insert into events (title, starts_at, signup_url) values (''Bad'', now(), ''javascript:alert(1)'')', 'write', 'ERROR 23514'),
     ('member        edits an event',           mem,     format('update events set title = ''x'' where id = %L', ev), 'write', 'DENIED'),
-    ('blogger       deletes an event',         blogger, format('delete from events where id = %L', ev), 'write', 'ALLOWED');
+    ('vice-pres.    reads applications',       vp,      'select count(*) from membership_applications', 'read', 'ALLOWED'),
+    ('vice-pres.    adds a post',              vp,      'insert into blog_posts (slug, title, content) values (''pub-vp'', ''VP'', ''B'')', 'write', 'ALLOWED'),
+    ('vice-pres.    adds an event',            vp,      'insert into events (title, starts_at) values (''VP ride'', now())', 'write', 'ALLOWED'),
+    ('events        deletes an event',         evm,     format('delete from events where id = %L', ev), 'write', 'ALLOWED');
 
   for c in select * from checks order by n loop
     got := pg_temp.attempt(c.who, c.stmt, c.kind);

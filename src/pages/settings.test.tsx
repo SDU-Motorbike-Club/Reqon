@@ -438,10 +438,10 @@ describe('who sees what', () => {
     expect(
       screen.getByText(/You cannot change seasons or the President and Vice President roles/),
     ).toBeInTheDocument()
-    expect(screen.getByText(/You can give or take away the Treasurer, Documentation, Recruitment and Blog roles/)).toBeInTheDocument()
+    expect(screen.getByText(/You can give or take away the Treasurer, Documentation, Recruitment, Blog and Events roles/)).toBeInTheDocument()
   })
 
-  it('the vice-president may tick only Treasurer, Documentation, Recruitment and Blog', async () => {
+  it('the vice-president may tick only Treasurer, Documentation, Recruitment, Blog and Events', async () => {
     caller = VP
     const user = userEvent.setup()
     renderSettings()
@@ -450,6 +450,7 @@ describe('who sees what', () => {
     expect(dialog.getByRole('checkbox', { name: 'Documentation' })).toBeEnabled()
     expect(dialog.getByRole('checkbox', { name: 'Recruitment' })).toBeEnabled()
     expect(dialog.getByRole('checkbox', { name: 'Blog' })).toBeEnabled()
+    expect(dialog.getByRole('checkbox', { name: 'Events' })).toBeEnabled()
     expect(dialog.getByRole('checkbox', { name: 'President' })).toBeDisabled()
     expect(dialog.getByRole('checkbox', { name: 'Vice President' })).toBeDisabled()
     expect(dialog.getByRole('checkbox', { name: 'Developer' })).toBeDisabled()

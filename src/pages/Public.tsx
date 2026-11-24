@@ -42,8 +42,9 @@ import { pageMain } from '../ui/layout.ts'
 import { ActionError, EmptyState, ErrorState, LoadingState } from '../ui/states.tsx'
 
 // The club's public website, run from here: the applications people send (Recruitment, can_manage_applicants()),
-// the blog and the events (Blog, can_post_blog()). The website reads the same rows, so a saved post or event is live
-// there at once. The database checks every write (20260162000100, 20260163000200).
+// the blog (Blog, can_post_blog()) and the events (Events, can_manage_events()); the President and VP hold all three.
+// The website reads the same rows, so a saved post or event is live there at once. The database checks every write
+// (20260167000100).
 
 const input =
   'mt-1 block min-h-11 w-full rounded border border-slate-300 bg-surface px-2.5 text-base text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-9 sm:text-sm'
@@ -111,7 +112,8 @@ export default function Public() {
   const [params, setParams] = useUrlParams()
   const sections: { id: Section; label: string }[] = [
     ...(can.canManageApplicants ? [{ id: 'applicants' as const, label: 'Applicants' }] : []),
-    ...(can.canPostBlog ? [{ id: 'blog' as const, label: 'Blog' }, { id: 'events' as const, label: 'Events' }] : []),
+    ...(can.canPostBlog ? [{ id: 'blog' as const, label: 'Blog' }] : []),
+    ...(can.canManageEvents ? [{ id: 'events' as const, label: 'Events' }] : []),
   ]
   const current = sections.find((s) => s.id === params.get('section'))?.id ?? sections[0]?.id
 
@@ -119,7 +121,7 @@ export default function Public() {
     <main id="main-content" tabIndex={-1} className={pageMain('wide')}>
       <PageHeader title="Public" tutorialId="public-overview" description="What the club’s public website shows: the people who applied, the blog and upcoming events." />
       {current === undefined ? (
-        <EmptyState title="Nothing here for you">The Recruitment and Blog roles open this page. Ask the President or Vice President for one.</EmptyState>
+        <EmptyState title="Nothing here for you">The Recruitment, Blog and Events roles open this page. Ask the President or Vice President for one.</EmptyState>
       ) : (
         <>
           <nav aria-label="Sections" className="mb-4">

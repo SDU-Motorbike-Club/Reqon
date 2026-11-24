@@ -43,6 +43,7 @@ const MATRIX: Record<PrivilegedRole | 'member', Row> = {
   documentation: { canAdminister: false, canManageRoles: false, canManageSeasons: false, canViewFinances: false, canManageFinances: false, canEditSpecTargets: false, canCreateMeeting: true,  canDeleteMeeting: false, canManageMilestoneStructure: true  },
   recruitment:   { canAdminister: false, canManageRoles: false, canManageSeasons: false, canViewFinances: false, canManageFinances: false, canEditSpecTargets: false, canCreateMeeting: false, canDeleteMeeting: false, canManageMilestoneStructure: false },
   blog:          { canAdminister: false, canManageRoles: false, canManageSeasons: false, canViewFinances: false, canManageFinances: false, canEditSpecTargets: false, canCreateMeeting: false, canDeleteMeeting: false, canManageMilestoneStructure: false },
+  events:        { canAdminister: false, canManageRoles: false, canManageSeasons: false, canViewFinances: false, canManageFinances: false, canEditSpecTargets: false, canCreateMeeting: false, canDeleteMeeting: false, canManageMilestoneStructure: false },
   member:        { canAdminister: false, canManageRoles: false, canManageSeasons: false, canViewFinances: false, canManageFinances: false, canEditSpecTargets: false, canCreateMeeting: false, canDeleteMeeting: false, canManageMilestoneStructure: false },
 }
 
@@ -93,13 +94,15 @@ describe('the permission matrix', () => {
     expect(NO_PERMISSIONS.canViewClubCredentials).toBe(false)
   })
 
-  // can_manage_applicants() / can_post_blog() (20260162000100): each role opens only its own half of the Public page.
-  it('Recruitment manages applicants, Blog posts, the Developer does both', () => {
-    const pick = (key: 'canManageApplicants' | 'canPostBlog' | 'canManagePublicSite') =>
+  // can_manage_applicants() / can_post_blog() / can_manage_events() (20260167000100): one role per section of the
+  // Public page; the President, Vice President and Developer hold all three.
+  it('Recruitment, Blog and Events each open their own section; the leads open all of them', () => {
+    const pick = (key: 'canManageApplicants' | 'canPostBlog' | 'canManageEvents' | 'canManagePublicSite') =>
       ([...PRIVILEGED_ROLES] as PrivilegedRole[]).filter((r) => permissionsFor([r])[key])
-    expect(pick('canManageApplicants')).toEqual(['recruitment', 'developer'])
-    expect(pick('canPostBlog')).toEqual(['blog', 'developer'])
-    expect(pick('canManagePublicSite')).toEqual(['recruitment', 'blog', 'developer'])
+    expect(pick('canManageApplicants')).toEqual(['president', 'vicepresident', 'recruitment', 'developer'])
+    expect(pick('canPostBlog')).toEqual(['president', 'vicepresident', 'blog', 'developer'])
+    expect(pick('canManageEvents')).toEqual(['president', 'vicepresident', 'events', 'developer'])
+    expect(pick('canManagePublicSite')).toEqual(['president', 'vicepresident', 'recruitment', 'blog', 'events', 'developer'])
     expect(NO_PERMISSIONS.canManagePublicSite).toBe(false)
   })
 
