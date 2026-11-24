@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { useAuth } from '../auth/context.ts'
 import {
   PRIVILEGED_ROLES,
+  PUBLIC_SITE_ROLES,
   ROLE_LABELS,
   ROLE_SUMMARIES,
   canGrantRole,
@@ -127,6 +128,9 @@ function RoleEditor({
   )
   const nothingToDo = plan.changes.length === 0
   const others = plan.otherTreasurers
+  // The President and VP hold every public-site permission through their own role (20260167000100): shown
+  // ticked and locked, since there is nothing to give or take away.
+  const leads = desired.includes('president') || desired.includes('vicepresident')
 
   function toggle(role: PrivilegedRole, on: boolean) {
     setEdited(on ? [...desired, role] : desired.filter((r) => r !== role))
@@ -174,6 +178,7 @@ function RoleEditor({
             <ul className="mt-2 space-y-1.5">
               {PRIVILEGED_ROLES.map((role) => {
                 const id = `${titleId}-${role}`
+                const included = leads && PUBLIC_SITE_ROLES.includes(role)
                 return (
                   <li key={role}>
                     <label
@@ -183,8 +188,8 @@ function RoleEditor({
                       <input
                         id={id}
                         type="checkbox"
-                        checked={desired.includes(role)}
-                        disabled={!canGrantRole(myRoles, role)}
+                        checked={included || desired.includes(role)}
+                        disabled={included || !canGrantRole(myRoles, role)}
                         onChange={(e) => toggle(role, e.target.checked)}
                         aria-labelledby={`${id}-name`}
                         aria-describedby={`${id}-about`}
@@ -195,7 +200,7 @@ function RoleEditor({
                           {ROLE_LABELS[role]}
                         </span>
                         <span id={`${id}-about`} className="block text-xs text-pretty text-slate-600">
-                          {ROLE_SUMMARIES[role]}
+                          {included ? 'Included with President and Vice President — cannot be taken away.' : ROLE_SUMMARIES[role]}
                         </span>
                       </span>
                     </label>

@@ -3678,6 +3678,7 @@ export type Database = {
         Returns: boolean
       }
       can_manage_departments: { Args: never; Returns: boolean }
+      can_manage_events: { Args: never; Returns: boolean }
       can_manage_finances: { Args: never; Returns: boolean }
       can_manage_milestone_structure: { Args: never; Returns: boolean }
       can_manage_roles: { Args: never; Returns: boolean }
@@ -4618,6 +4619,7 @@ export type Database = {
         | "documentation"
         | "recruitment"
         | "blog"
+        | "events"
       proposal_outcome: "approved" | "rejected"
       task_priority: "normal" | "urgent"
       task_state: "todo" | "wip" | "blocked" | "done" | "cancelled"
@@ -4781,6 +4783,7 @@ export const Constants = {
         "documentation",
         "recruitment",
         "blog",
+        "events",
       ],
       proposal_outcome: ["approved", "rejected"],
       task_priority: ["normal", "urgent"],

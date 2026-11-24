@@ -77,7 +77,7 @@ export const AUDIENCES = {
   // role. A Head with no privileged role must still see these.
   head: { label: 'Head of a department', includes: (can) => can.isHeadOfDepartment },
   publicSite: {
-    label: 'Recruitment and Blog',
+    label: 'Public website (Recruitment, Blog, Events)',
     includes: (can) => can.canManagePublicSite,
   },
   // Whoever may review proposals (can_review_proposal): the Head of the proposal's department, the
@@ -604,7 +604,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     target: 'settings-roster',
     audience: 'vicePresident',
     title: 'Which roles you manage',
-    body: 'As Vice President you give or take away the Treasurer, Documentation, Recruitment and Blog roles. President and Vice President roles, and switching seasons, belong to the President.',
+    body: 'As Vice President you give or take away the Treasurer, Documentation, Recruitment, Blog and Events roles. President and Vice President roles, and switching seasons, belong to the President.',
   },
   {
     id: 'change-roles',
@@ -613,7 +613,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     target: 'change-roles',
     audience: 'president',
     title: 'Giving and taking away roles',
-    body: 'The President manages the President and Vice President roles; the Vice President manages Treasurer, Documentation, Recruitment and Blog. “Change roles” opens a checklist; big changes ask you to confirm first.',
+    body: 'The President manages the President and Vice President roles; the Vice President manages Treasurer, Documentation, Recruitment, Blog and Events. “Change roles” opens a checklist; big changes ask you to confirm first.',
   },
   {
     id: 'role-rules',

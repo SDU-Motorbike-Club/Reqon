@@ -15,6 +15,7 @@ const HOLDERS: Record<PrivilegedRole, Person[]> = {
   documentation: [],
   recruitment: [],
   blog: [],
+  events: [],
   developer: [DI],
 }
 

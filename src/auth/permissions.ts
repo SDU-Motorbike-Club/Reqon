@@ -13,8 +13,13 @@ export const PRIVILEGED_ROLES: readonly PrivilegedRole[] = [
   'documentation',
   'recruitment',
   'blog',
+  'events',
   'developer',
 ]
+
+// The public website's three permissions. The President and Vice President hold all three through their own
+// role (can_manage_applicants / can_post_blog / can_manage_events, 20260167000100), so nobody can take them away.
+export const PUBLIC_SITE_ROLES: readonly PrivilegedRole[] = ['recruitment', 'blog', 'events']
 
 export const ROLE_LABELS: Record<PrivilegedRole, string> = {
   president: 'President',
@@ -23,17 +28,19 @@ export const ROLE_LABELS: Record<PrivilegedRole, string> = {
   documentation: 'Documentation',
   recruitment: 'Recruitment',
   blog: 'Blog',
+  events: 'Events',
   developer: 'Developer',
 }
 
 // What each role may do, in one line — shown where roles are handed out.
 export const ROLE_SUMMARIES: Record<PrivilegedRole, string> = {
   president: 'Runs Settings and seasons, and manages the roles available to the President.',
-  vicepresident: 'Runs Settings and the Treasurer, Documentation, Recruitment and Blog roles; cannot switch seasons.',
+  vicepresident: 'Runs Settings and the Treasurer, Documentation, Recruitment, Blog and Events roles; cannot switch seasons.',
   treasurer: 'Adds, edits and deletes financial entries.',
   documentation: 'Edits meetings, the default agenda and milestone sections. No access to finances.',
   recruitment: 'Reads the applications sent from the public website.',
-  blog: 'Writes, edits and deletes the public website’s blog posts and events.',
+  blog: 'Writes, edits and deletes the public website’s blog posts.',
+  events: 'Adds, edits, hides and deletes the public website’s events.',
   developer: 'Full access, for maintenance: everything the other roles can do, roles included.',
 }
 
@@ -139,12 +146,13 @@ export type Permissions = {
   canCreateMeeting: boolean
   canDeleteMeeting: boolean
   canEditMeetingTemplate: boolean
-  // can_manage_applicants() (20260162000100): edit the public site's application form, read applications
-  // (Recruitment, Developer).
+  // can_manage_applicants() (20260167000100): read applications (Recruitment, President, VP, Developer).
   canManageApplicants: boolean
-  // can_post_blog() (20260162000100): write the public site's blog (Blog, Developer).
+  // can_post_blog() (20260167000100): write the public site's blog (Blog, President, VP, Developer).
   canPostBlog: boolean
-  // Either of the two: opens the Public page.
+  // can_manage_events() (20260167000100): the public site's events (Events, President, VP, Developer).
+  canManageEvents: boolean
+  // Any of the three: opens the Public page.
   canManagePublicSite: boolean
 }
 
@@ -180,9 +188,10 @@ export function permissionsFor(roles: readonly PrivilegedRole[]): Permissions {
     canCreateMeeting: editsMeetings,
     canDeleteMeeting: mayDelete,
     canEditMeetingTemplate: editsMeetings,
-    canManageApplicants: hasRole('recruitment') || hasRole('developer'),
-    canPostBlog: hasRole('blog') || hasRole('developer'),
-    canManagePublicSite: hasRole('recruitment') || hasRole('blog') || hasRole('developer'),
+    canManageApplicants: admin || hasRole('recruitment'),
+    canPostBlog: admin || hasRole('blog'),
+    canManageEvents: admin || hasRole('events'),
+    canManagePublicSite: admin || PUBLIC_SITE_ROLES.some(hasRole),
   }
 }
 
