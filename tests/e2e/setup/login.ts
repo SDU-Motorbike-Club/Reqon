@@ -26,7 +26,8 @@ export async function login(page: Page, email: string, password: string) {
     await expect(page.getByLabel('Email')).toBeVisible({ timeout: 10_000 })
   }
   await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password').fill(password)
+  // exact: the show/hide eye button is labelled "Show password", which a substring match also finds.
+  await page.getByLabel('Password', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Sign in' }).click()
   // Wait for the Login form itself (its Email field) to disappear, not for
   // the button's accessible name to stop matching — while signing in the

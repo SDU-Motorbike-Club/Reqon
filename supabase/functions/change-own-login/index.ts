@@ -57,7 +57,19 @@ Deno.serve(async (req) => {
 
   const { error: updateError } = await admin.auth.admin.updateUserById(who.user.id, { email: newEmail, email_confirm: true })
   if (updateError) {
-    if (updateError.code === 'email_exists') return reply(409, { error: 'Another account already uses that e-mail.' })
+    // GoTrue answers a taken address with a bare 500 ("duplicate key ... users_email_partial_key", no code) rather
+    // than email_exists, so a failure with no code is checked against the existing logins before it is blamed on the server.
+    // shortcut: scans Auth users 1000 at a time, fine for a club roster; use a SQL lookup past a few thousand.
+    let taken = updateError.code === 'email_exists'
+    if (!taken && !updateError.code) {
+      for (let page = 1; !taken; page++) {
+        const { data: found, error: listError } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
+        if (listError) break
+        taken = found.users.some((u) => u.id !== who.user.id && u.email?.toLowerCase() === newEmail.toLowerCase())
+        if (found.users.length < 1000) break
+      }
+    }
+    if (taken) return reply(409, { error: 'Another account already uses that e-mail.' })
     if (updateError.code === 'email_address_invalid' || updateError.code === 'validation_failed') {
       return reply(400, { error: 'That doesn’t look like an e-mail address.' })
     }

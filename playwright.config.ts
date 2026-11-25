@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 
-// Real-browser integration verification (Phase 13). Runs against the local
+// Real-browser end-to-end suite. Runs against the local
 // Supabase stack (`npx supabase start`, migrations already applied) and the
 // Vite dev server — never against the hosted project. `.env.development.local`
 // already points `npm run dev` at http://127.0.0.1:54321.
