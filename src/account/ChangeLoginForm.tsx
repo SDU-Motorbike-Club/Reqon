@@ -1,5 +1,6 @@
 import { useId, useState, type FormEvent } from 'react'
 import { changeLogin } from '../auth/changeLogin.ts'
+import { PasswordInput } from '../ui/PasswordInput.tsx'
 import { buttonPrimary, buttonSecondary } from '../ui/buttons.ts'
 
 // 16px on a phone, so iOS does not zoom the page when a field is tapped.
@@ -69,9 +70,8 @@ export function ChangeLoginForm({
           <label htmlFor={`${id}-password`} className="block text-sm font-medium text-slate-900">
             Your password
           </label>
-          <input
+          <PasswordInput
             id={`${id}-password`}
-            type="password"
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

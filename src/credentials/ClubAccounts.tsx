@@ -10,6 +10,7 @@ import { useMembers } from '../data/useMembers.ts'
 import { formatInstant } from '../lib/dates.ts'
 import { buttonPrimary, buttonSecondary } from '../ui/buttons.ts'
 import { Dialog } from '../ui/Dialog.tsx'
+import { PasswordInput } from '../ui/PasswordInput.tsx'
 import { ActionError, ErrorState, LoadingState } from '../ui/states.tsx'
 import { copyToClipboard } from './clipboard.ts'
 
@@ -181,9 +182,8 @@ function AddAccount() {
         <label htmlFor={`${ids}-secret`} className="text-xs font-medium text-slate-700">
           Password (optional)
         </label>
-        <input
+        <PasswordInput
           id={`${ids}-secret`}
-          type="password"
           className={input}
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
@@ -352,9 +352,8 @@ function EditForm({ account, onDone }: { account: ClubCredential; onDone: (saved
         <label htmlFor={`${ids}-secret`} className="text-xs font-medium text-slate-700">
           {hasPassword ? 'New password' : 'Password'}
         </label>
-        <input
+        <PasswordInput
           id={`${ids}-secret`}
-          type="password"
           className={input}
           value={secret}
           onChange={(e) => setSecret(e.target.value)}

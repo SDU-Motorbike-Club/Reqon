@@ -150,7 +150,8 @@ export function TutorialProvider({
           instead of only "usually" true. Sized for the offer's own two
           breakpoints (full-width card on a phone, a smaller corner card from
           sm: up); real-browser Phase 13 verification caught the mobile case. */}
-      <div className={value.offerVisible ? 'pb-44 sm:pb-32' : undefined}>{children}</div>
+      {/* flex-1 + flex-col: this wrapper is the page, so the footer's mt-auto pins it to the window's bottom. */}
+      <div className={`flex flex-1 flex-col ${value.offerVisible ? 'pb-44 sm:pb-32' : ''}`}>{children}</div>
       {value.offerVisible && <TutorialOffer />}
       {/* Before the overlay on purpose: when a tour starts from the chooser,
           the chooser hands focus back first and the overlay's card takes it

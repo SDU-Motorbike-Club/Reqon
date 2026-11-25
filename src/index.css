@@ -144,6 +144,13 @@ html {
   accent-color: var(--color-accent);
 }
 
+/* Sticky footer: a short page still ends with the footer at the bottom of the window (it has mt-auto). */
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
 /* ---------------------------------------------------------------------------
    Interaction feedback, defined once for the whole app.
 

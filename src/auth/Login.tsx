@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { PasswordInput } from '../ui/PasswordInput.tsx'
 import { PublicFooter } from '../ui/PublicFooter.tsx'
 import { useAuth } from './context.ts'
 
@@ -32,7 +33,7 @@ export default function Login() {
 
   return (
     <>
-    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+    <main id="main-content" tabIndex={-1} className="flex flex-1 items-center justify-center bg-slate-50 p-6">
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-sm rounded-lg border border-slate-200 bg-surface p-6 shadow-sm"
@@ -63,15 +64,14 @@ export default function Login() {
         <label htmlFor="password" className="block text-sm font-medium text-slate-700">
           Password
         </label>
-        <input
+        <PasswordInput
           id="password"
           name="password"
-          type="password"
           autoComplete="current-password"
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="mt-1 mb-4 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus-visible:border-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+          className="mt-1 mb-4 block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus-visible:border-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
         />
 
         {error && (

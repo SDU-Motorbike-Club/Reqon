@@ -12,6 +12,7 @@ import { RoleBadges } from '../../roles/RoleBadges.tsx'
 import { Avatar } from '../../ui/Avatar.tsx'
 import { buttonDanger, buttonPrimary, buttonQuiet, buttonSecondary } from '../../ui/buttons.ts'
 import { ActionError, ErrorState } from '../../ui/states.tsx'
+import { PasswordInput } from '../../ui/PasswordInput.tsx'
 import { useState, type FormEvent } from 'react'
 import { IssuedPassword } from './IssuedPassword.tsx'
 import { JobTitleSelect } from './JobTitleSelect.tsx'
@@ -351,16 +352,15 @@ export function RosterSettings() {
             <label className="mt-2 block text-xs font-medium text-slate-600" htmlFor="recruit-password">
               Password you give them
             </label>
-            <input
+            <PasswordInput
               id="recruit-password"
-              type="password"
               required
               minLength={8}
               maxLength={72}
               autoComplete="new-password"
               value={recruit.password}
               onChange={(e) => setRecruit((s) => ({ ...s, password: e.target.value }))}
-              className="mt-1 min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
+              className="mt-1 block min-h-11 w-full rounded border border-slate-300 px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring sm:min-h-0"
             />
             <p className="mt-1 text-xs text-slate-600">At least 8 characters.</p>
             <span aria-hidden="true" className="mt-2 block text-xs font-medium text-slate-600">
